@@ -250,7 +250,7 @@
         bind:this={themeNameElm}
       />
       <button
-        class="flex justify-center items-center rounded-md border-2 border-gray-400 p-2 text-lg"
+        class="setting-toggle-button flex items-center justify-center p-2 text-lg"
         style={themeStyle}
       >
         ぁあ

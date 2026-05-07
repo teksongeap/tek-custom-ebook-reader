@@ -1,4 +1,4 @@
-# Run from pnpm workspace root (e.g. docker build -t ebook-reader -f apps/web/Dockerfile .)
+# Run from pnpm workspace root (e.g. docker build -t toku-ebook-reader -f apps/web/Dockerfile .)
 
 FROM node:20.11-alpine as builder
 

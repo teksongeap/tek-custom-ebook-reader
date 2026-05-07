@@ -112,6 +112,7 @@ export const enableTextWrapPretty$ = writableBooleanLocalStorageSubject()(
   'enableTextWrapPretty',
   false
 );
+export const hoverFocusEnabled$ = writableBooleanLocalStorageSubject()('hoverFocusEnabled', true);
 export const textMarginMode$ = writableStringLocalStorageSubject<TextMarginMode>()(
   'textMarginMode',
   'auto'

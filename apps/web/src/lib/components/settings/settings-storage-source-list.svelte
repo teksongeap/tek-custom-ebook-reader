@@ -214,21 +214,21 @@
   }
 </script>
 
-<div class="mb-8 sm:col-span-2 lg:col-span-3">
-  <div class="flex">
+<div class="settings-section sm:col-span-2 lg:col-span-3">
+  <div class="settings-section-header">
     <div class="flex grow">
-      <h1 class="mb-2 text-xl font-medium">
+      <h1 class="settings-section-title">
         <span class="capitalize">Storage Sources</span>
       </h1>
       <Popover contentText={listTooltip} contentStyles="padding: 0.5rem;">
-        <Fa icon={faCircleQuestion} slot="icon" class="mx-2" />
+        <Fa icon={faCircleQuestion} slot="icon" class="settings-icon-action" />
       </Popover>
       {#if $autoReplication$ !== AutoReplicationType.Off && !$syncTarget$}
         <Popover
           contentText={'Auto import/export enabled but no source as sync target from list selected'}
           contentStyles="padding: 0.25rem;"
         >
-          <Fa icon={faTriangleExclamation} slot="icon" class="mx-2" />
+          <Fa icon={faTriangleExclamation} slot="icon" class="settings-icon-action" />
         </Popover>
       {/if}
     </div>
@@ -247,10 +247,9 @@
       <Ripple />
     </button>
   </div>
-  <hr class="border border-black" />
   <div class="mt-6">
     {#if !listLoading && storageSources}
-      <div class="grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {#each storageSources as storageSource (storageSource.name)}
           {@const icon = getStorageIconData(storageSource.type)}
           {@const isDefault = isAppDefault(storageSource.name)}
@@ -260,7 +259,7 @@
             storageSource.type,
             [$gDriveStorageSource$, $oneDriveStorageSource$, $fsStorageSource$]
           )}
-          <div class="flex flex-col">
+          <div class="rounded-lg border border-[color:var(--app-surface-border)] p-4">
             <div class="flex">
               <svg
                 class="inline-block h-6 w-6 self-center"
@@ -271,12 +270,12 @@
               </svg>
               <div class="ml-3 self-center">{storageSource.name}</div>
             </div>
-            <div class="mt-4 flex">
+            <div class="mt-4 flex flex-wrap gap-2">
               <div
                 tabindex="0"
                 role="button"
                 title="Edit source"
-                class="mr-4"
+                class="settings-icon-action"
                 class:hidden={isDefault}
                 on:click={() => modifyStorageSource(storageSource)}
                 on:keyup={dummyFn}
@@ -287,7 +286,7 @@
                 tabindex="0"
                 role="button"
                 title="Toggle source as sync target"
-                class="mr-4"
+                class="settings-icon-action"
                 class:opacity-50={!storageSourceIsSyncTarget}
                 on:click={() =>
                   syncTarget$.next($syncTarget$ === storageSource.name ? '' : storageSource.name)}
@@ -299,7 +298,7 @@
                 tabindex="0"
                 role="button"
                 title="Toggle source as data source for this type"
-                class="mr-4"
+                class="settings-icon-action"
                 class:opacity-50={!storageSourceIsSourceDefault}
                 on:click={() =>
                   setStorageSourceDefault(
@@ -314,6 +313,7 @@
                 tabindex="0"
                 role="button"
                 title="Delete source"
+                class="settings-icon-action"
                 class:hidden={isDefault}
                 on:click={() =>
                   deleteStorageSource(

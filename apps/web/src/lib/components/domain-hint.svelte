@@ -13,7 +13,7 @@
         props: {
           title: 'Old Domain',
           message:
-            'You are currently using the old domain of ッツ Reader - consider switching to https://reader.ttsu.app to prevent issues and to ensure full features'
+            'You are currently using an old TTU Reader domain - consider switching to https://reader.ttsu.app to prevent issues and to ensure full features'
         },
         disableCloseOnClick: true
       }

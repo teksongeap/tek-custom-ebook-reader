@@ -1,7 +1,7 @@
 version: "2.0"
 
 services:
-  ebook-reader:
+  toku-ebook-reader:
     build:
       context: ./
       dockerfile: ./apps/web/Dockerfile

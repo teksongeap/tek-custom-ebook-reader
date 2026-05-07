@@ -30,5 +30,9 @@ jobs:
       - name: Lint
         run: pnpm eslint .
 
+      - name: Type check
+        run: pnpm check
+        working-directory: apps/web
+
       - name: Test build
         run: pnpm build

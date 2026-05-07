@@ -22,20 +22,30 @@
       icon: faClock
     }
   ];
+
+  $: activeSettingsIndex = Math.max(
+    settingItems.findIndex((settingItem) => settingItem.label === activeSettings),
+    0
+  );
 </script>
 
 <div class={baseHeaderClasses}>
-  <div class="{pxScreen} flex px-0 md:px-5">
-    <div class="h12 flex grow justify-evenly xl:h-10">
+  <div class="{pxScreen} flex items-center gap-2 px-2 md:px-5">
+    <div
+      class="settings-tabs"
+      style={`--settings-tab-count: ${settingItems.length}; --settings-tab-index: ${activeSettingsIndex};`}
+    >
+      <span class="settings-tabs-indicator" aria-hidden="true"></span>
       {#each settingItems as settingItem (settingItem.label)}
         <button
-          class="flex grow flex-col items-center justify-center text-xs"
-          class:bg-gray-900={activeSettings === settingItem.label}
-          class:hover:bg-gray-900={activeSettings !== settingItem.label}
+          type="button"
+          class="settings-tab-button"
+          class:settings-tab-button--active={activeSettings === settingItem.label}
+          aria-pressed={activeSettings === settingItem.label}
           on:click={() => (activeSettings = settingItem.label)}
         >
-          <Fa class="mb-1" icon={settingItem.icon} />
-          {settingItem.label}
+          <Fa class="settings-tab-icon" icon={settingItem.icon} />
+          <span class="settings-tab-label">{settingItem.label}</span>
           <Ripple />
         </button>
       {/each}

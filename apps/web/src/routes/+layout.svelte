@@ -87,8 +87,8 @@
 <svelte:window bind:online={$isOnline$} />
 
 <MetaTags
-  title="ッツ Ebook Reader"
-  description="Online e-book reader that supports dictionary extensions like Yomitan"
+  title="とく Ebook Reader"
+  description="Customized online e-book reader that supports dictionary extensions like Yomitan"
   canonical="{basePath}{path !== '/' ? path : ''}"
   openGraph={{
     type: 'website',

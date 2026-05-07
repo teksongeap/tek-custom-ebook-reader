@@ -30,6 +30,7 @@
     furiganaStyle$,
     hideFurigana$,
     hideSpoilerImage$,
+    hoverFocusEnabled$,
     importHTMLFixMode$,
     lineHeight$,
     manualBookmark$,
@@ -143,7 +144,7 @@
 </div>
 
 <div class="{pxScreen} h-full pt-16 xl:pt-14">
-  <div class="max-w-5xl">
+  <div class="max-w-6xl">
     <SettingsContent
       {activeSettings}
       {storageQuota}
@@ -165,6 +166,7 @@
       bind:prioritizeReaderStyles={$prioritizeReaderStyles$}
       bind:enableTextJustification={$enableTextJustification$}
       bind:enableTextWrapPretty={$enableTextWrapPretty$}
+      bind:hoverFocusEnabled={$hoverFocusEnabled$}
       bind:textMarginMode={$textMarginMode$}
       bind:enableReaderWakeLock={$enableReaderWakeLock$}
       bind:showCharacterCounter={$showCharacterCounter$}

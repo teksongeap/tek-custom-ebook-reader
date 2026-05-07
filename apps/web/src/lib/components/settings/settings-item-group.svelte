@@ -8,21 +8,23 @@
   export let applyHeaderClasses = true;
 </script>
 
-<section class="pb-8 md:pb-3">
-  <div class="flex">
-    <h2 class="mb-2" class:text-xl={applyHeaderClasses} class:font-medium={applyHeaderClasses}>
+<section class="settings-item">
+  <div class="settings-item-header">
+    <h2 class="settings-item-title" class:text-base={applyHeaderClasses}>
       {#if tooltip}
-        <Popover contentText={tooltip} contentStyles="padding: 0.5rem;">
-          <Fa icon={faCircleQuestion} slot="icon" class="mx-2" />
+        <Popover contentText={tooltip} contentStyles="padding: 0.75rem;">
+          <Fa icon={faCircleQuestion} slot="icon" class="settings-icon-action" />
           <span class="capitalize">{title}</span>
         </Popover>
       {:else}
         <span class="capitalize">{title}</span>
       {/if}
     </h2>
-    <slot name="header" />
+    <div class="settings-item-actions">
+      <slot name="header" />
+    </div>
   </div>
-  <div>
+  <div class="settings-item-control">
     <slot />
   </div>
 </section>

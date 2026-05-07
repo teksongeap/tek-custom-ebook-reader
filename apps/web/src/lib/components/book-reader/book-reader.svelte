@@ -4,6 +4,7 @@
     combineLatest,
     debounceTime,
     filter,
+    fromEvent,
     map,
     mergeMap,
     of,
@@ -28,7 +29,12 @@
   import { reactiveElements } from './reactive-elements';
   import type { AutoScroller, BookmarkManager, PageManager } from './types';
   import BookReaderPaginated from './book-reader-paginated/book-reader-paginated.svelte';
-  import { enableReaderWakeLock$, enableTapEdgeToFlip$ } from '$lib/data/store';
+  import { hoverFocus } from './hover-focus';
+  import {
+    enableReaderWakeLock$,
+    enableTapEdgeToFlip$,
+    hoverFocusEnabled$
+  } from '$lib/data/store';
   import { onDestroy } from 'svelte';
 
   export let htmlContent: string;
@@ -78,6 +84,8 @@
   export let secondDimensionMaxValue: number;
 
   export let firstDimensionMargin: number;
+
+  export let bottomChromeClearance = 0;
 
   export let autoPositionOnResize: boolean;
 
@@ -206,6 +214,25 @@
     reduceToEmptyString()
   );
 
+  const hoverFocusKeybind$ = iffBrowser(() =>
+    fromEvent<KeyboardEvent>(document, 'keydown', { capture: true })
+  ).pipe(
+    filter(
+      (event) =>
+        event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === 'h' &&
+        !isEditableEventTarget(event.target)
+    ),
+    tap((event) => {
+      event.preventDefault();
+      hoverFocusEnabled$.next(!$hoverFocusEnabled$);
+    }),
+    reduceToEmptyString()
+  );
+
   $: width$.next(width);
 
   $: height$.next(height);
@@ -235,6 +262,19 @@
     }
 
     showBlurMessage = mutation.target.style.filter.includes('blur');
+  }
+
+  function handleContentChange({ detail }: CustomEvent<HTMLElement>) {
+    contentEl$.next(detail);
+  }
+
+  function isEditableEventTarget(target: EventTarget | null) {
+    return (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLElement && target.isContentEditable)
+    );
   }
 
   async function requestWakeLock() {
@@ -275,7 +315,13 @@
     The reader is currently blurred due to an external application (e. g. exstatic)
   </div>
 {/if}
-<div bind:this={$containerEl$} class="{pxReader} py-8">
+<div
+  bind:this={$containerEl$}
+  class="{pxReader}"
+  style:padding-top="2.375rem"
+  style:padding-bottom={`calc(2rem + ${bottomChromeClearance}px)`}
+  use:hoverFocus={$hoverFocusEnabled$}
+>
   {#if viewMode === ViewMode.Continuous}
     <BookReaderContinuous
       {htmlContent}
@@ -317,7 +363,7 @@
       bind:customReadingPointTop
       bind:customReadingPointLeft
       bind:customReadingPointScrollOffset
-      on:contentChange={(ev) => contentEl$.next(ev.detail)}
+      on:contentChange={handleContentChange}
       on:bookmark
       on:trackerPause
     />
@@ -359,7 +405,7 @@
       bind:pageManager
       bind:customReadingPointRange
       bind:showCustomReadingPoint
-      on:contentChange={(ev) => contentEl$.next(ev.detail)}
+      on:contentChange={handleContentChange}
       on:bookmark
       on:trackerPause
     />
@@ -367,4 +413,5 @@
 </div>
 {$blurListener$ ?? ''}
 {$reactiveElements$ ?? ''}
+{$hoverFocusKeybind$ ?? ''}
 <svelte:document bind:visibilityState />

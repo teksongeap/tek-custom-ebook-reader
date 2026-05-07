@@ -6,10 +6,7 @@
     TrackerSkipThresholdAction
   } from '$lib/components/book-reader/book-reading-tracker/book-reading-tracker';
   import ButtonToggleGroup from '$lib/components/button-toggle-group/button-toggle-group.svelte';
-  import {
-    optionsForToggle,
-    type ToggleOption
-  } from '$lib/components/button-toggle-group/toggle-option';
+  import { optionsForToggle } from '$lib/components/button-toggle-group/toggle-option';
   import MessageDialog from '$lib/components/message-dialog.svelte';
   import Ripple from '$lib/components/ripple.svelte';
   import SettingsCustomTheme from '$lib/components/settings/settings-custom-theme.svelte';
@@ -17,16 +14,28 @@
   import SettingsFontSelector from '$lib/components/settings/settings-font-selector.svelte';
   import SettingsReadingGoals from '$lib/components/settings/settings-reading-goals.svelte';
   import SettingsItemGroup from '$lib/components/settings/settings-item-group.svelte';
+  import {
+    optionsForAutoReplicationType,
+    optionsForBlurMode,
+    optionsForFuriganaStyle,
+    optionsForImportHTMLFixes,
+    optionsForMergeMode,
+    optionsForReplicationSaveBehavior,
+    optionsForTextMarginMode,
+    optionsForTrackerAutoPause,
+    optionsForTrackerSkipThresholdAction,
+    optionsForVerticalTextOrientation,
+    optionsForViewMode,
+    optionsForWritingMode
+  } from '$lib/components/settings/settings-options';
   import SettingsStorageSourceList from '$lib/components/settings/settings-storage-source-list.svelte';
   import SettingsUserFontDialog from '$lib/components/settings/settings-user-font-dialog.svelte';
   import { inputClasses } from '$lib/css-classes';
-  import { BlurMode } from '$lib/data/blur-mode';
   import { dialogManager } from '$lib/data/dialog-manager';
   import { LocalFont } from '$lib/data/fonts';
   import { FuriganaStyle } from '$lib/data/furigana-style';
   import { ImportHTMLFixMode } from '$lib/data/import-html-fix-mode';
   import { logger } from '$lib/data/logger';
-  import { MergeMode } from '$lib/data/merge-mode';
   import { isAppDefault } from '$lib/data/storage/storage-source-manager';
   import { defaultStorageSources } from '$lib/data/storage/storage-types';
   import { isStorageSourceAvailable } from '$lib/data/storage/storage-view';
@@ -93,6 +102,8 @@
   export let enableTextJustification: boolean;
 
   export let enableTextWrapPretty: boolean;
+
+  export let hoverFocusEnabled: boolean;
 
   export let textMarginMode: TextMarginMode;
 
@@ -207,162 +218,6 @@
   }));
 
   onDestroy(() => dialogManager.dialogs$.next([]));
-
-  const optionsForFuriganaStyle: ToggleOption<FuriganaStyle>[] = [
-    {
-      id: FuriganaStyle.Hide,
-      text: 'Hide'
-    },
-    {
-      id: FuriganaStyle.Partial,
-      text: 'Partial'
-    },
-    {
-      id: FuriganaStyle.Toggle,
-      text: 'Toggle'
-    },
-    {
-      id: FuriganaStyle.Full,
-      text: 'Full'
-    }
-  ];
-
-  const optionsForWritingMode: ToggleOption<WritingMode>[] = [
-    {
-      id: 'horizontal-tb',
-      text: 'Horizontal'
-    },
-    {
-      id: 'vertical-rl',
-      text: 'Vertical'
-    }
-  ];
-
-  const optionsForVerticalTextOrientation: ToggleOption<VerticalTextOrientation>[] = [
-    {
-      id: 'mixed',
-      text: 'Mixed'
-    },
-    {
-      id: 'upright',
-      text: 'Upright'
-    }
-  ];
-
-  const optionsForTextMarginMode: ToggleOption<TextMarginMode>[] = [
-    {
-      id: 'auto',
-      text: 'Auto'
-    },
-    {
-      id: 'manual',
-      text: 'Manual'
-    }
-  ];
-
-  const optionsForViewMode: ToggleOption<ViewMode>[] = [
-    {
-      id: ViewMode.Continuous,
-      text: 'Continuous'
-    },
-    {
-      id: ViewMode.Paginated,
-      text: 'Paginated'
-    }
-  ];
-
-  const optionsForBlurMode: ToggleOption<BlurMode>[] = [
-    {
-      id: BlurMode.ALL,
-      text: 'All'
-    },
-    {
-      id: BlurMode.AFTER_TOC,
-      text: 'After ToC'
-    }
-  ];
-
-  const optionsForImportHTMLFixes: ToggleOption<ImportHTMLFixMode>[] = [
-    {
-      id: ImportHTMLFixMode.OFF,
-      text: 'Off'
-    },
-    {
-      id: ImportHTMLFixMode.STANDARD,
-      text: 'Standard'
-    },
-    {
-      id: ImportHTMLFixMode.EXTENDED,
-      text: 'Extended'
-    }
-  ];
-
-  const optionsForAutoReplicationType: ToggleOption<AutoReplicationType>[] = [
-    {
-      id: AutoReplicationType.Off,
-      text: 'Off'
-    },
-    {
-      id: AutoReplicationType.Up,
-      text: 'Up'
-    },
-    {
-      id: AutoReplicationType.Down,
-      text: 'Down'
-    },
-    {
-      id: AutoReplicationType.All,
-      text: 'All'
-    }
-  ];
-
-  const optionsForReplicationSaveBehavior: ToggleOption<ReplicationSaveBehavior>[] = [
-    {
-      id: ReplicationSaveBehavior.NewOnly,
-      text: 'New Only'
-    },
-    {
-      id: ReplicationSaveBehavior.Overwrite,
-      text: 'Overwrite'
-    }
-  ];
-
-  const optionsForTrackerAutoPause: ToggleOption<TrackerAutoPause>[] = [
-    {
-      id: TrackerAutoPause.OFF,
-      text: 'Off'
-    },
-    {
-      id: TrackerAutoPause.MODERATE,
-      text: 'Moderate'
-    },
-    {
-      id: TrackerAutoPause.STRICT,
-      text: 'Strict'
-    }
-  ];
-
-  const optionsForTrackerSkipThresholdAction: ToggleOption<TrackerSkipThresholdAction>[] = [
-    {
-      id: TrackerSkipThresholdAction.IGNORE,
-      text: 'Ignore'
-    },
-    {
-      id: TrackerSkipThresholdAction.PAUSE,
-      text: 'Pause Tracker'
-    }
-  ];
-
-  const optionsForMergeMode: ToggleOption<MergeMode>[] = [
-    {
-      id: MergeMode.MERGE,
-      text: 'Merge'
-    },
-    {
-      id: MergeMode.REPLACE,
-      text: 'Replace'
-    }
-  ];
 
   const storageSources$ = database.storageSourcesChanged$.pipe(
     map((storageSources) => [
@@ -490,7 +345,7 @@
   }
 </script>
 
-<div class="grid grid-cols-1 items-center sm:grid-cols-2 sm:gap-6 lg:md:gap-8 lg:grid-cols-3">
+<div class="settings-page-grid">
   {#if activeSettings === 'Reader'}
     <div class="lg:col-span-2">
       <SettingsItemGroup title="Theme">
@@ -512,7 +367,7 @@
         >
           {#if browser}
             <button
-              class="m-1 rounded-md border-2 border-gray-400 p-2 text-lg"
+              class="setting-toggle-button m-1 p-2 text-lg"
               on:click={() =>
                 dialogManager.dialogs$.next([
                   {
@@ -552,6 +407,7 @@
             tabindex="0"
             role="button"
             title="Open Custom Font Dialog"
+            class="settings-icon-action"
             on:click={() =>
               dialogManager.dialogs$.next([
                 {
@@ -582,6 +438,7 @@
           <div
             tabindex="0"
             role="button"
+            class="settings-icon-action"
             on:click={() =>
               dialogManager.dialogs$.next([
                 {
@@ -768,6 +625,12 @@
       <ButtonToggleGroup options={optionsForToggle} bind:selectedOptionId={enableTextWrapPretty} />
     </SettingsItemGroup>
     <SettingsItemGroup
+      title="Hover Focus"
+      tooltip={'When enabled hovering a paragraph dims surrounding paragraphs. The reader pauses focus changes while dictionary popups are visible and Alt+H toggles it while reading'}
+    >
+      <ButtonToggleGroup options={optionsForToggle} bind:selectedOptionId={hoverFocusEnabled} />
+    </SettingsItemGroup>
+    <SettingsItemGroup
       title="Paragraph Margin Mode"
       tooltip={'When set to manual it allows to specify a margin value which should be applied to paragraphs'}
     >
@@ -873,7 +736,7 @@
             <div
               tabindex="0"
               role="button"
-              class="ml-4 hover:underline"
+              class="settings-inline-action ml-3"
               on:click={() => {
                 verticalCustomReadingPosition$.next(100);
                 horizontalCustomReadingPosition$.next(0);
@@ -974,11 +837,11 @@
           options={optionsForToggle}
           bind:selectedOptionId={keepLocalStatisticsOnDeletion}
         />
-        <div
-          tabindex="0"
-          role="button"
-          class="ml-4 hover:underline"
-          on:click={() => {
+          <div
+            tabindex="0"
+            role="button"
+            class="settings-inline-action ml-3"
+            on:click={() => {
             showSpinner = true;
             database
               .clearZombieStatistics()
@@ -1188,9 +1051,9 @@
     {/if}
   {/if}
   {#if showSpinner}
-    <div class="tap-highlight-transparent fixed inset-0 bg-black/[.2]" />
+    <div class="settings-overlay tap-highlight-transparent fixed inset-0" />
     <div class="fixed inset-0 flex h-full w-full items-center justify-center text-7xl">
-      <Fa icon={faSpinner} spin />
+      <Fa class="settings-spinner" icon={faSpinner} spin />
     </div>
   {/if}
 </div>

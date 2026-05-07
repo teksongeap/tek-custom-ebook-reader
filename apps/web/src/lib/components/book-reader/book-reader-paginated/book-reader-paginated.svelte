@@ -726,11 +726,11 @@
 
 {#if !allowDisplay}
   <div
-    class="fixed inset-0 flex h-full w-full items-center justify-center text-7xl"
+    class="reader-loading-screen fixed inset-0 flex h-full w-full items-center justify-center text-7xl"
     style:color={fontColor}
     style:background-color={backgroundColor}
   >
-    <Fa icon={faSpinner} spin />
+    <Fa class="reader-loading-icon" icon={faSpinner} spin />
   </div>
 {/if}
 

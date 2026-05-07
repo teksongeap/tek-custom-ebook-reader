@@ -368,75 +368,77 @@
   }
 </script>
 
-<div class="mb-8 sm:col-span-2 lg:col-span-3">
-  <div class="flex flex-grow">
-    <h1 class="mb-2 text-xl font-medium w-full">
+<div class="settings-section sm:col-span-2 lg:col-span-3">
+  <div class="settings-section-header flex-wrap">
+    <h1 class="settings-section-title w-full sm:w-auto">
       <span class="capitalize">Reading Goals</span>
     </h1>
-    {#if isInEditMode}
-      <button class={`${buttonClasses} mr-4`} disabled={saveDisabled} on:click={saveReadingGoal}>
-        <div
-          class="flex items-center justify-center hover:opacity-50"
-          class:cursor-not-allowed={saveDisabled}
-        >
-          <span class="mr-2">Save</span>
-          <Fa icon={faSave} />
-        </div>
-      </button>
-      <button
-        class={buttonClasses}
-        on:click={() => {
-          ({
-            timeGoal: currentTimeGoal,
-            characterGoal: currentCharacterGoal,
-            goalFrequency: currentReadingGoalFrequency,
-            goalStartDate: currentReadingGoalStartDate
-          } = $readingGoal$);
+    <div class="flex flex-wrap gap-2">
+      {#if isInEditMode}
+        <button class={buttonClasses} disabled={saveDisabled} on:click={saveReadingGoal}>
+          <div
+            class="flex items-center justify-center hover:opacity-50"
+            class:cursor-not-allowed={saveDisabled}
+          >
+            <span class="mr-2">Save</span>
+            <Fa icon={faSave} />
+          </div>
+        </button>
+        <button
+          class={buttonClasses}
+          on:click={() => {
+            ({
+              timeGoal: currentTimeGoal,
+              characterGoal: currentCharacterGoal,
+              goalFrequency: currentReadingGoalFrequency,
+              goalStartDate: currentReadingGoalStartDate
+            } = $readingGoal$);
 
-          isInEditMode = false;
-        }}
-      >
-        <div class="flex items-center justify-center hover:opacity-50">
-          <span class="mr-2">Cancel</span>
-          <Fa icon={faCancel} />
-        </div>
-      </button>
-    {:else}
-      <button class={buttonClasses} on:click={syncReadingGoals}>
-        <div class="flex items-center justify-center hover:opacity-50">
-          <span class="mr-2">Sync</span>
-          <Fa icon={faRotate} />
-        </div>
-      </button>
-      <button class={buttonClasses} on:click={() => (isInEditMode = true)}>
-        <div class="flex items-center justify-center hover:opacity-50">
-          <span class="mr-2">Edit</span>
-          <Fa icon={faEdit} />
-        </div>
-      </button>
-      <button
-        class={buttonClasses}
-        disabled={!readingGoals.length}
-        on:click={() => deleteReadingGoals()}
-      >
-        <div
-          title="Delete all Reading Goals"
-          class="flex items-center justify-center hover:opacity-50"
-          class:cursor-not-allowed={!readingGoals.length}
+            isInEditMode = false;
+          }}
         >
-          <span class="mr-2">Reset</span>
-          <Fa icon={faTrash} />
-        </div>
-      </button>
-    {/if}
+          <div class="flex items-center justify-center hover:opacity-50">
+            <span class="mr-2">Cancel</span>
+            <Fa icon={faCancel} />
+          </div>
+        </button>
+      {:else}
+        <button class={buttonClasses} on:click={syncReadingGoals}>
+          <div class="flex items-center justify-center hover:opacity-50">
+            <span class="mr-2">Sync</span>
+            <Fa icon={faRotate} />
+          </div>
+        </button>
+        <button class={buttonClasses} on:click={() => (isInEditMode = true)}>
+          <div class="flex items-center justify-center hover:opacity-50">
+            <span class="mr-2">Edit</span>
+            <Fa icon={faEdit} />
+          </div>
+        </button>
+        <button
+          class={buttonClasses}
+          disabled={!readingGoals.length}
+          on:click={() => deleteReadingGoals()}
+        >
+          <div
+            title="Delete all Reading Goals"
+            class="flex items-center justify-center hover:opacity-50"
+            class:cursor-not-allowed={!readingGoals.length}
+          >
+            <span class="mr-2">Reset</span>
+            <Fa icon={faTrash} />
+          </div>
+        </button>
+      {/if}
+    </div>
   </div>
-  <hr class="border border-black" />
   <div class="grid grid-cols-1 gap-4 justify-between items-end mt-4 md:grid-cols-4">
     <div class="flex flex-col">
       Time Goal (Min)
       <input
         type="number"
         min="0"
+        class="settings-input"
         class:cursor-not-allowed={!isInEditMode}
         disabled={!isInEditMode}
         bind:value={currentTimeGoalInMin}
@@ -448,6 +450,7 @@
       <input
         type="number"
         min="0"
+        class="settings-input"
         class:cursor-not-allowed={!isInEditMode}
         disabled={!isInEditMode}
         bind:value={currentCharacterGoal}
@@ -457,6 +460,7 @@
     <div class="flex flex-col">
       Frequency
       <select
+        class="settings-input"
         class:cursor-not-allowed={!isInEditMode}
         disabled={!isInEditMode}
         bind:value={currentReadingGoalFrequency}
@@ -472,6 +476,7 @@
       Start Date
       <input
         type="date"
+        class="settings-input"
         class:cursor-not-allowed={!isInEditMode}
         disabled={!isInEditMode}
         bind:value={currentReadingGoalStartDate}
@@ -492,6 +497,7 @@
           <div>{historyGoal.characterGoal} characters</div>
           <div>{historyGoal.goalFrequency}</div>
           <button
+            class="settings-icon-action"
             on:click={() => deleteReadingGoals(historyGoal, dateRangeLabel)}
             title="Delete Reading Goal"
           >
@@ -509,6 +515,7 @@
             {dateRangeLabel} / {secondsToMinutes(historyGoal.timeGoal)} min / {historyGoal.characterGoal}
             characters / {historyGoal.goalFrequency}
             <button
+              class="settings-icon-action"
               on:click={() => deleteReadingGoals(historyGoal, dateRangeLabel)}
               title="Delete Reading Goal"
             >
@@ -521,6 +528,7 @@
         <button
           title={currentHistoryIndex === 0 ? '' : 'Previous Page'}
           disabled={currentHistoryIndex === 0}
+          class="settings-icon-action"
           class:opacity-50={currentHistoryIndex === 0}
           class:cursor-not-allowed={currentHistoryIndex === 0}
           on:click={() => (historyIndex -= 1)}
@@ -530,6 +538,7 @@
         <button
           title={hasNextHistoryPage ? 'Next Page' : ''}
           disabled={!hasNextHistoryPage}
+          class="settings-icon-action"
           class:opacity-50={!hasNextHistoryPage}
           class:cursor-not-allowed={!hasNextHistoryPage}
           on:click={() => (historyIndex += 1)}

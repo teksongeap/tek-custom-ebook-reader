@@ -22,7 +22,7 @@
   } from '$lib/css-classes';
   import { customReadingPointEnabled$, viewMode$ } from '$lib/data/store';
   import { ViewMode } from '$lib/data/view-mode';
-  import { dummyFn, isMobile$, isOnOldUrl } from '$lib/functions/utils';
+  import { isMobile$, isOnOldUrl } from '$lib/functions/utils';
   import { createEventDispatcher } from 'svelte';
   import Fa from 'svelte-fa';
 
@@ -33,6 +33,9 @@
   export let showFullscreenButton: boolean;
   export let isBookmarkScreen: boolean;
   export let hasBookmarkData: boolean;
+  export let bookTitle = '';
+  export let fontColor = '';
+  export let backgroundColor = '';
 
   const dispatch = createEventDispatcher<{
     tocClick: void;
@@ -51,14 +54,10 @@
     bookManagerClick: void;
   }>();
 
-  const customReadingPointMenuItems: {
+  let customReadingPointMenuItems: {
     label: string;
     action: any;
-  }[] = [
-    ...(hasCustomReadingPoint ? [{ label: 'Show Point', action: 'showCustomReadingPoint' }] : []),
-    { label: 'Set Point', action: 'setCustomReadingPoint' },
-    ...(hasCustomReadingPoint ? [{ label: 'Reset Point', action: 'resetCustomReadingPoint' }] : [])
-  ];
+  }[] = [];
 
   let customReadingPointMenuElm: Popover;
 
@@ -70,6 +69,16 @@
   }[] = [];
 
   $: isOldUrl = browser && isOnOldUrl(window);
+
+  $: customReadingPointMenuItems = [
+    ...(hasCustomReadingPoint ? [{ label: 'Show Point', action: 'showCustomReadingPoint' }] : []),
+    { label: 'Set Point', action: 'setCustomReadingPoint' },
+    ...(hasCustomReadingPoint ? [{ label: 'Reset Point', action: 'resetCustomReadingPoint' }] : [])
+  ];
+
+  $: readerHeaderStyle = `--reader-page-text: ${
+    fontColor || 'var(--font-color)'
+  }; --reader-page-bg: ${backgroundColor || 'var(--background-color)'};`;
 
   $: {
     const items = [];
@@ -99,45 +108,45 @@
   }
 </script>
 
-<div class="flex justify-between bg-gray-700 px-4 md:px-8 {baseHeaderClasses}">
-  <div class="flex transform-gpu {nTranslateXHeaderFa}">
+<div
+  class="reader-header grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-4 md:px-8 {baseHeaderClasses}"
+  style={readerHeaderStyle}
+>
+  <div class="flex min-w-0 transform-gpu {nTranslateXHeaderFa}">
     {#if hasChapterData}
-      <div
-        tabindex="0"
-        role="button"
+      <button
+        type="button"
         title="Open Table of Contents"
+        aria-label="Open Table of Contents"
         class={baseIconClasses}
         on:click={() => dispatch('tocClick')}
-        on:keyup={dummyFn}
       >
         <Fa icon={faList} />
-      </div>
+      </button>
     {/if}
-    <div
-      tabindex="0"
-      role="button"
+    <button
+      type="button"
       title="Create Bookmark"
+      aria-label="Create Bookmark"
       class={baseIconClasses}
       on:click={() => dispatch('bookmarkClick')}
-      on:keyup={dummyFn}
     >
       <Fa icon={isBookmarkScreen ? fasBookmark : farBookmark} />
-    </div>
+    </button>
     {#if hasBookmarkData}
-      <div
-        tabindex="0"
-        role="button"
+      <button
+        type="button"
         title="Return to Bookmark"
+        aria-label="Return to Bookmark"
         class={baseIconClasses}
         on:click={() => dispatch('scrollToBookmarkClick')}
-        on:keyup={dummyFn}
       >
         <Fa icon={faRotateLeft} />
-      </div>
+      </button>
     {/if}
     {#if $viewMode$ === ViewMode.Continuous && !$isMobile$}
       <div
-        class="flex items-center px-4 text-xl xl:px-3 xl:text-lg"
+        class="reader-header-status flex items-center px-3 text-sm font-semibold xl:px-2"
         title="Current Autoscroll Speed"
       >
         {autoScrollMultiplier}x
@@ -145,17 +154,20 @@
     {/if}
   </div>
 
-  <div class="flex transform-gpu {translateXHeaderFa}">
-    <div
-      tabindex="0"
-      role="button"
+  <div class="reader-header-title hidden max-w-[42vw] truncate px-3 text-center text-sm font-normal sm:block">
+    {bookTitle}
+  </div>
+
+  <div class="flex min-w-0 transform-gpu justify-end {translateXHeaderFa}">
+    <button
+      type="button"
       title="Complete Book"
+      aria-label="Complete Book"
       class={baseIconClasses}
       on:click={() => dispatch('completeBook')}
-      on:keyup={dummyFn}
     >
       <Fa icon={faFlag} />
-    </div>
+    </button>
     {#if $customReadingPointEnabled$ || $viewMode$ === ViewMode.Paginated}
       <div class="flex">
         <Popover
@@ -164,36 +176,39 @@
           yOffset={0}
           bind:this={customReadingPointMenuElm}
         >
-          <div slot="icon" title="Open Custom Point Actions" class={baseIconClasses}>
+          <button
+            type="button"
+            slot="icon"
+            title="Open Custom Point Actions"
+            aria-label="Open Custom Point Actions"
+            class={baseIconClasses}
+          >
             <Fa icon={faCrosshairs} />
-          </div>
-          <div class="w-40 bg-gray-700 md:w-32" slot="content">
+          </button>
+          <div class="app-menu w-40 md:w-32" slot="content">
             {#each customReadingPointMenuItems as actionItem (actionItem.label)}
-              <div
-                tabindex="0"
-                role="button"
-                class="px-4 py-2 text-sm hover:bg-white hover:text-gray-700"
+              <button
+                type="button"
+                class="app-menu-item"
                 on:click={() => dispatchCustomReadingPointAction(actionItem.action)}
-                on:keyup={dummyFn}
               >
                 {actionItem.label}
-              </div>
+              </button>
             {/each}
           </div>
         </Popover>
       </div>
     {/if}
     {#if showFullscreenButton}
-      <div
-        tabindex="0"
-        role="button"
+      <button
+        type="button"
         title="Toggle Fullscreen"
+        aria-label="Toggle Fullscreen"
         class={baseIconClasses}
         on:click={() => dispatch('fullscreenClick')}
-        on:keyup={dummyFn}
       >
         <Fa icon={faExpand} />
-      </div>
+      </button>
     {/if}
     <MergedHeaderIcon
       disableRouteNavigation

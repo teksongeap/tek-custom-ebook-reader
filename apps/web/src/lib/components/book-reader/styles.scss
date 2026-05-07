@@ -28,6 +28,22 @@
     user-select: none;
   }
 
+  &.book-content--hover-focus-dim {
+    :global(p),
+    :global(.para),
+    :global(.reader-paragraph),
+    :global(li),
+    :global(blockquote) {
+      opacity: var(--book-content-hover-focus-dim-opacity, 0.15);
+      transition: opacity 120ms ease;
+    }
+
+    :global(.book-content__hover-focus-active),
+    :global(.book-content__hover-focus-active *) {
+      opacity: 1 !important;
+    }
+  }
+
   :global([data-ttu-spoiler-img]) {
     :global(.spoiler-label) {
       display: none;

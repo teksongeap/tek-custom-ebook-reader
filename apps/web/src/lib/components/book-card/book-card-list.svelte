@@ -41,9 +41,9 @@
       on:mouseleave={() => (hoveringBookId = undefined)}
     >
       <div
-        class="mdc-elevation--z1 hover:mdc-elevation--z8 mdc-elevation-transition relative overflow-hidden"
-        class:rounded-tl-xl={bookCard.id === currentBookId}
-        class:mdc-elevation--z4={selectedBookIds.has(bookCard.id) || bookCard.id === currentBookId}
+        class="book-card-shell relative"
+        class:book-card-shell--active={selectedBookIds.has(bookCard.id) ||
+          bookCard.id === currentBookId}
       >
         <BookCard {...bookCard} on:click={() => onBookCardClick(bookCard.id)} />
 
@@ -52,7 +52,7 @@
             tabindex="0"
             role="button"
             title="Book selected"
-            class="absolute inset-0 bg-gray-700 bg-opacity-20"
+            class="absolute inset-0 bg-[color:var(--app-accent-soft)]"
             on:click={() => onBookCardClick(bookCard.id)}
             on:keyup={dummyFn}
           >
@@ -65,7 +65,7 @@
           <Popover placement="right" fallbackPlacements={['bottom']} yOffset={5}>
             <Fa
               slot="icon"
-              class="mdc-elevation--z2 hover:mdc-elevation--z8 mdc-elevation-transition left-2 top-10 rounded-full bg-blue-400 text-xl text-white"
+              class="left-2 top-10 rounded-full bg-[color:var(--app-accent)] p-0.5 text-xl text-white shadow-lg transition hover:scale-105"
               icon={faCircleInfo}
             />
             <div class="p-4" slot="content">
@@ -85,7 +85,7 @@
         <div
           tabindex="0"
           role="button"
-          class="mdc-elevation--z2 hover:mdc-elevation--z8 mdc-elevation-transition absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-400"
+          class="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-[color:var(--app-danger)] p-0.5 shadow-lg transition hover:scale-105"
           on:click={() => dispatch('removeBookClick', { id: bookCard.id })}
           on:keyup={dummyFn}
         >

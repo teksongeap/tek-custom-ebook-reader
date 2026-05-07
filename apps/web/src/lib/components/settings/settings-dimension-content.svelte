@@ -42,21 +42,21 @@
   });
 </script>
 
-<div class="text-center">
+<div class="min-w-56 p-3 text-center">
   {presetValue}% - {calculatedValue}px
-</div>
-<input
-  class="mb-2 mt-4"
-  type="range"
-  step={progressStep}
-  {min}
-  {max}
-  bind:value={presetValue}
-  on:change={() => (dimensionValue = calculatedValue)}
-/>
-<div class="flex justify-evenly">
-  <button on:click={() => setToValue(quarter)}>
-    {quarter}%
-  </button>
-  <button on:click={() => setToValue(50)}> 50% </button>
+  <input
+    class="settings-input mt-4 mb-3"
+    type="range"
+    step={progressStep}
+    {min}
+    {max}
+    bind:value={presetValue}
+    on:change={() => (dimensionValue = calculatedValue)}
+  />
+  <div class="flex justify-center gap-2">
+    <button class="app-button" on:click={() => setToValue(quarter)}>
+      {quarter}%
+    </button>
+    <button class="app-button" on:click={() => setToValue(50)}>50%</button>
+  </div>
 </div>

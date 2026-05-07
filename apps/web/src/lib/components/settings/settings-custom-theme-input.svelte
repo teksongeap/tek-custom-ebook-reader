@@ -34,12 +34,13 @@
 <span>{label}</span>
 <input
   type="color"
-  class="border border-black"
+  class="settings-input h-10 p-1"
   value={values.hexExpression}
   on:change={handleColorChange}
 />
 <input
   type="number"
+  class="settings-input"
   step="0.1"
   min="0"
   max="1"

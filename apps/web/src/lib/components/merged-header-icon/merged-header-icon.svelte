@@ -9,16 +9,27 @@
   import { pagePath } from '$lib/data/env';
   import { dummyFn } from '$lib/functions/utils';
 
+  type MergeEntry = (typeof mergeEntries)[keyof typeof mergeEntries];
+
   export let leavePageLink = '';
-  export let items = [mergeEntries.MANAGE, mergeEntries.SETTINGS, mergeEntries.BUG_REPORT];
-  export let mergeTo = mergeEntries.MANAGE;
+  export let items: MergeEntry[] = [
+    mergeEntries.MANAGE,
+    mergeEntries.SETTINGS,
+    mergeEntries.BUG_REPORT
+  ];
+  export let mergeTo: MergeEntry = mergeEntries.MANAGE;
   export let disableRouteNavigation = false;
 
   const dispatch = createEventDispatcher<{ action: string }>();
 
-  const actionItems = items.filter((item) => item.routeId !== $page.route.id);
-
+  let actionItems: MergeEntry[] = [];
   let menuElm: Popover;
+  let resolvedLeavePageLink = '';
+
+  $: actionItems = items.filter((item) => item.routeId !== $page.route.id);
+
+  $: resolvedLeavePageLink =
+    leavePageLink || (actionItems.length === 1 && actionItems[0].routeId ? actionItems[0].routeId : '');
 
   function handleActionMenuItem(target: string) {
     dispatch('action', target);
@@ -37,14 +48,10 @@
       }
     }
   }
-
-  if (actionItems.length === 1 && actionItems[0].routeId) {
-    leavePageLink = actionItems[0].routeId;
-  }
 </script>
 
-{#if leavePageLink}
-  <a href={leavePageLink}>
+{#if resolvedLeavePageLink}
+  <a href={resolvedLeavePageLink}>
     <div class={baseIconClasses}>
       <Fa icon={mergeTo.icon} />
     </div>
@@ -74,12 +81,12 @@
       <div slot="icon" class={baseIconClasses}>
         <Fa icon={mergeTo.icon} />
       </div>
-      <div class="w-40 bg-gray-700 md:w-32" slot="content">
+      <div class="app-menu w-40 md:w-32" slot="content">
         {#each actionItems as actionItem (actionItem.label)}
           <div
             tabindex="0"
             role="button"
-            class="px-4 py-2 text-sm hover:bg-white hover:text-gray-700"
+            class="app-menu-item"
             title={actionItem.title}
             on:click={() => handleActionMenuItem(actionItem.label)}
             on:keyup={dummyFn}

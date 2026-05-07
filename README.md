@@ -1,8 +1,8 @@
 <img src="assets/readme/icon.png" align="left" style="margin-right: 1rem;" alt="logo">
 
-## ッツ Ebook Reader
+## とく Ebook Reader
 
-An online e-book reader that supports dictionary extensions like Yomitan, which is hosted on [https://reader.ttsu.app](https://reader.ttsu.app)
+とく Ebook Reader is a customized version of the [TTU Reader](https://github.com/ttu-ttu/ebook-reader), an online e-book reader that supports dictionary extensions like Yomitan. The original hosted reader is available at [https://reader.ttsu.app](https://reader.ttsu.app).
 
 **Note**: The reader was created for japanese (language learners) - while books in other languages may work to a specific degree other functionalites (e. g. character counter etc.) may have unsupported / unexpected results
 
@@ -148,7 +148,7 @@ You may find the following controls in the manager:
 
 # Reading Tracker
 
-ッツ Ebook Reader provides a basic time/character and reading goal tracker. You can open your data while reading a book and single click/tap on the tracker icon in the left bottom page corner. It gives an Overview about occured update errors, your reading goal progress, some timer controls and respective Data for your current Reading Session (across days), data of the current Day (across Sessions) and all Time (across sessions and days). If you are using the Continuous Mode with Autoscroll you will find an additional Autoscroller Section with a separate Set of Reading Data which is not persisted and reset between Autoscroll Pauses. Tracking Data will be persisted around every 10 seconds or when tracking gets paused.
+とく Ebook Reader provides a basic time/character and reading goal tracker. You can open your data while reading a book and single click/tap on the tracker icon in the left bottom page corner. It gives an Overview about occured update errors, your reading goal progress, some timer controls and respective Data for your current Reading Session (across days), data of the current Day (across Sessions) and all Time (across sessions and days). If you are using the Continuous Mode with Autoscroll you will find an additional Autoscroller Section with a separate Set of Reading Data which is not persisted and reset between Autoscroll Pauses. Tracking Data will be persisted around every 10 seconds or when tracking gets paused.
 
 Clicking on a tracker item label will toggle a blur effect in case you don't want to see the respective value.
 
@@ -240,7 +240,7 @@ The configured Start / End Dates for a Reading Goal are inclusive. Example: A Re
 
 # Statistics
 
-In the Statistics Tab of ッツ Ebook Reader you can find various visualizations of your tracked Reading Data. You can reach it via the Book Reader (prefilters Data to the current opened Book), Book Manager (displays all Reading Data) and Book Manager Card Selection (prefilters Data to the selected Books).
+In the Statistics Tab of とく Ebook Reader you can find various visualizations of your tracked Reading Data. You can reach it via the Book Reader (prefilters Data to the current opened Book), Book Manager (displays all Reading Data) and Book Manager Card Selection (prefilters Data to the selected Books).
 
 You may find the following controls in the statistics page header:
 
@@ -347,7 +347,7 @@ Other Data which can be imported/exported include:
 
 # Storage Sources
 
-ッツ Ebook Reader provides default storage sources for data import/export via GDrive or OneDrive which requires a reauthentication every 50 minutes in order to be functional.
+とく Ebook Reader provides default storage sources for data import/export via GDrive or OneDrive which requires a reauthentication every 50 minutes in order to be functional.
 Storage Sources under Settings => Data let you add additional custom sources for the filesystem target and/or a custom set of credentials for an external hoster which
 may can create persistent sessions and therefore asks for reauthentication less often in case you add a client secret.
 
@@ -384,7 +384,7 @@ To create such custom credentials follow these steps for the hoster you want to 
 24. Repeat Step 23 for "https://ttu-ebook.web.app/auth"
 25. If you develop locally or self host the reader repeat step 23 for "http://localhost:5173/auth" + "http://127.0.0.1:5173/auth" and/or adjust ports etc. depending on your needs
 26. Click on "CREATE" and copy Client Id and Client Secret values for the next step
-27. Create a new GDrive source on ッツ Ebook Reader with the client id and/or client secret you just have created
+27. Create a new GDrive source on とく Ebook Reader with the client id and/or client secret you just have created
 </details>
 <br/>
 <details>
@@ -406,7 +406,7 @@ To create such custom credentials follow these steps for the hoster you want to 
 41. Fill out available options as you wish
 42. Click on "Add"
 43. Copy the value for later
-44. Create a new OneDrive source on ッツ Ebook Reader with the client id and/or client secret you just have created
+44. Create a new OneDrive source on とく Ebook Reader with the client id and/or client secret you just have created
 </details>
 <br/>
 
@@ -437,6 +437,9 @@ If you develop locally or self host the reader you need to provide credentials f
 - VITE_ONEDRIVE_CLIENT_ID - Client id for the OneDrive source
 - VITE_ONEDRIVE_CLIENT_SECRET - Client secret for the OneDrive source
 </details>
+
+The default storage root intentionally remains `ttu-reader-data` for compatibility with existing TTU Reader data.
+
 <br/>
 <details>
     <summary>Example</summary>
@@ -461,21 +464,21 @@ VITE_ONEDRIVE_CLIENT_SECRET1="gfedcba"
 </details>
 <br/>
 
-**General Note**: Depending on your settings data from storage sources can be cached locally. In case you read and/or modifiy your library on a different device/tab it is recommended to refresh ッツ Ebook Reader tabs or start a new one after you have switched devices/tabs to ensure having all the latest data. The related "Cache Storage Data" option under settings only covers the list of files - in case you delete and readd files on a different device/ tab you should always refresh the tab in order to prevent issues
+**General Note**: Depending on your settings data from storage sources can be cached locally. In case you read and/or modifiy your library on a different device/tab it is recommended to refresh とく Ebook Reader tabs or start a new one after you have switched devices/tabs to ensure having all the latest data. The related "Cache Storage Data" option under settings only covers the list of files - in case you delete and readd files on a different device/ tab you should always refresh the tab in order to prevent issues
 
 **Cover Note**: When caching for storage data is enabled and/or you are using an external storage source links for book cover may expire. If you notice issues with loading covers refresh the current tab to renew them
 
-**GDrive Note**: Permissions are scoped to the client id and client secret which means different GDrive storage sources can only see their own data and will create their own "ttu-reader-data" folder. Also data added by you manually on the google website will not be displayed - you should use the functionality provided by ッツ Ebook Reader in order to add/delete books etc.
+**GDrive Note**: Permissions are scoped to the client id and client secret which means different GDrive storage sources can only see their own data and will create their own "ttu-reader-data" folder. Also data added by you manually on the google website will not be displayed - you should use the functionality provided by とく Ebook Reader in order to add/delete books etc.
 
 **OneDrive Note**: OneDrive only allows to add localhost addresses - in case you host or develop on 127.0.0.1 you should either switch to localhost or need to manually type in the localhost address in the address bar in order to use OneDrive. The maximum file size of a book for this storage source is currently 60 MB. In case you encounter an ETag Error simply retry your export attempt - typically it should work the 2nd time
 
 ## Security Considerations
 
-ッツ Ebook Reader has no backend component to store/retrieve your storage source data like refresh tokens in a secure way at runtime. Access to data like the refresh tokens allows to access external hosted Data on your behalf without you potentially even noticing it. You are therefore asked to provide a password for storage sources of external hoster which is used to secure and encrypt the data locally. As this password is only known to you and will not be stored you will have to (re)enter it whenever you want to delete/edit the storage source or ッツ Ebook Reader needs to access data from the storage source. For the same reason the password can't be restored - if you forget it you will not be able to interact with this storage source anymore. The password should follow common best practices in terms of complexity and length though there are currently no rules enforced on the site for it.
+とく Ebook Reader has no backend component to store/retrieve your storage source data like refresh tokens in a secure way at runtime. Access to data like the refresh tokens allows to access external hosted Data on your behalf without you potentially even noticing it. You are therefore asked to provide a password for storage sources of external hoster which is used to secure and encrypt the data locally. As this password is only known to you and will not be stored you will have to (re)enter it whenever you want to delete/edit the storage source or とく Ebook Reader needs to access data from the storage source. For the same reason the password can't be restored - if you forget it you will not be able to interact with this storage source anymore. The password should follow common best practices in terms of complexity and length though there are currently no rules enforced on the site for it.
 
 ### Password Manager
 
-Available if your browser supports the [PasswordCredentials Api](https://caniuse.com/mdn-api_passwordcredential) (or by using it manually). In order to use the "Store in Manager" setting you need to have password save settings in your browser enabled (at the time of creation/update of a storage source - it can be disabled afterwards). New passwords will trigger a native save dialog, in case there is already a password under the same name stored it will be updated automatically. Depending on your "Autofill" browser settings you will be presented with a browser dialog to select a pair of credentials or a notification about the usage of credentials is displayed whenever ッツ Ebook Reader needs to access the storage source data. You can always check the stored passwords in the browser password manager site.
+Available if your browser supports the [PasswordCredentials Api](https://caniuse.com/mdn-api_passwordcredential) (or by using it manually). In order to use the "Store in Manager" setting you need to have password save settings in your browser enabled (at the time of creation/update of a storage source - it can be disabled afterwards). New passwords will trigger a native save dialog, in case there is already a password under the same name stored it will be updated automatically. Depending on your "Autofill" browser settings you will be presented with a browser dialog to select a pair of credentials or a notification about the usage of credentials is displayed whenever とく Ebook Reader needs to access the storage source data. You can always check the stored passwords in the browser password manager site.
 
 **Note**: The API does not expose methods to delete credentials. In case you update the name of a storage source or delete it you need to manually remove the stored credentials in your password manager.
 
@@ -508,7 +511,7 @@ Data like books or bookmarks will be (depending on the storage source and data t
 > When the available disk space is filled up, the quota manager will start clearing out data based on an LRU policy — the least recently used origin will be
 > deleted first, then the next one, until the browser is no longer over the limit.
 
-Therefore your data can be lost based on the amount you stored and how much storage is available. In order to overcome this limitation ッツ Ebook Reader
+Therefore your data can be lost based on the amount you stored and how much storage is available. In order to overcome this limitation とく Ebook Reader
 will try to request for persistant storage during data insertion to the browser db. Based on your browser you will
 see different behavior. E. g. firefox will ask you for your confirmation while chrome will not display any dialog but automatically grant the permissions if you frequently interacted with / bookmarked the page and / or have granted notification permissions to the site.
 You can see the current status of persistant storage (and estimated storage usage) in the reader data settings.
@@ -530,8 +533,8 @@ If for some reason you want to host the reader by yourself, you can use the foll
 2. Run the commands below
 
 ```sh
-docker build -t ebook-reader -f apps/web/Dockerfile .
-docker run --name ebook-reader -d -p 8080:80 ebook-reader
+docker build -t toku-ebook-reader -f apps/web/Dockerfile .
+docker run --name toku-ebook-reader -d -p 8080:80 toku-ebook-reader
 ```
 
 3. Visit [http://localhost:8080](http://localhost:8080) to use the app

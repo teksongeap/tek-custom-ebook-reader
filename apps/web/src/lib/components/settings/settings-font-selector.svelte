@@ -15,12 +15,13 @@
   <div slot="icon" class="mx-2" title="Show available default Fonts">
     <Fa icon={faFont} />
   </div>
-  <div slot="content">
+  <div class="app-menu" slot="content">
     {#each availableFonts as font (font)}
       <div
         tabindex="0"
         role="button"
-        class="px-4 py-2 hover:bg-gray-900"
+        class="app-menu-item"
+        class:app-menu-item--selected={fontValue === font}
         on:click={() => {
           fontValue = font;
           element.toggleOpen();
