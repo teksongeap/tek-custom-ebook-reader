@@ -20,7 +20,7 @@ export class PageManagerPaginated implements PageManager {
   constructor(
     private contentEl: HTMLElement,
     private scrollEl: HTMLElement,
-    private sections: Element[],
+    private sectionIds: string[],
     private sectionIndex$: BehaviorSubject<number>,
     private virtualScrollPos$: BehaviorSubject<number>,
     private width: number,
@@ -65,11 +65,11 @@ export class PageManagerPaginated implements PageManager {
         currentPercentage;
 
       this.updateSectionData(
-        this.sections[this.sectionIndex$.getValue()]?.id,
+        this.sectionIds[this.sectionIndex$.getValue()],
         currentPercentage + diffPercentage * offset
       );
     } else {
-      this.updateSectionData(this.sections[this.sectionIndex$.getValue()]?.id, currentPercentage);
+      this.updateSectionData(this.sectionIds[this.sectionIndex$.getValue()], currentPercentage);
     }
   }
 
@@ -151,12 +151,12 @@ export class PageManagerPaginated implements PageManager {
 
   private nextSection(isUser: boolean) {
     const nextPage = this.sectionIndex$.getValue() + 1;
-    if (nextPage >= this.sections.length) return false;
+    if (nextPage >= this.sectionIds.length) return false;
 
     this.updateSectionIndex(nextPage).subscribe(() => {
       this.scrollToPos(0, isUser);
-      this.updateSectionData(this.sections[nextPage - 1]?.id, 100, false);
-      this.updateSectionData(this.sections[nextPage]?.id, 0);
+      this.updateSectionData(this.sectionIds[nextPage - 1], 100, false);
+      this.updateSectionData(this.sectionIds[nextPage], 0);
     });
     return true;
   }
@@ -168,7 +168,7 @@ export class PageManagerPaginated implements PageManager {
     isUser: boolean
   ) {
     this.updateSectionData(
-      this.sections[this.sectionIndex$.getValue()]?.id,
+      this.sectionIds[this.sectionIndex$.getValue()],
       (pos / scrollSize) * 100
     );
 

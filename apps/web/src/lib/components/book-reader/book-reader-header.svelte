@@ -6,6 +6,7 @@
     faCrosshairs,
     faExpand,
     faFlag,
+    faHighlighter,
     faList,
     faRotateLeft,
     type IconDefinition
@@ -36,6 +37,7 @@
   export let bookTitle = '';
   export let fontColor = '';
   export let backgroundColor = '';
+  export let annotationCount = 0;
 
   const dispatch = createEventDispatcher<{
     tocClick: void;
@@ -49,6 +51,7 @@
     resetCustomReadingPoint: void;
     statisticsClick: void;
     readerImageGalleryClick: void;
+    annotationsClick: void;
     settingsClick: void;
     domainHintClick: void;
     bookManagerClick: void;
@@ -122,6 +125,17 @@
         on:click={() => dispatch('tocClick')}
       >
         <Fa icon={faList} />
+      </button>
+    {/if}
+    {#if hasText}
+      <button
+        type="button"
+        title={annotationCount ? `Open Annotations (${annotationCount})` : 'Open Annotations'}
+        aria-label="Open Annotations"
+        class={baseIconClasses}
+        on:click={() => dispatch('annotationsClick')}
+      >
+        <Fa icon={faHighlighter} />
       </button>
     {/if}
     <button

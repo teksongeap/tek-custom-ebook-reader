@@ -17,7 +17,10 @@
   } from 'rxjs';
   import BookReaderContinuous from '$lib/components/book-reader/book-reader-continuous/book-reader-continuous.svelte';
   import { pxReader } from '$lib/components/book-reader/css-classes';
-  import type { BooksDbBookmarkData } from '$lib/data/database/books-db/versions/books-db';
+  import type {
+    BooksDbAnnotation,
+    BooksDbBookmarkData
+  } from '$lib/data/database/books-db/versions/books-db';
   import type { FuriganaStyle } from '$lib/data/furigana-style';
   import { ViewMode } from '$lib/data/view-mode';
   import { iffBrowser } from '$lib/functions/rxjs/iff-browser';
@@ -35,7 +38,8 @@
     enableTapEdgeToFlip$,
     hoverFocusEnabled$
   } from '$lib/data/store';
-  import { onDestroy } from 'svelte';
+  import { createEventDispatcher, onDestroy } from 'svelte';
+  import BookAnnotationsRenderer from './book-annotations/book-annotations-renderer.svelte';
 
   export let htmlContent: string;
 
@@ -62,6 +66,10 @@
   export let fontColor: string;
 
   export let backgroundColor: string;
+
+  export let selectionFontColor = '';
+
+  export let selectionBackgroundColor = '';
 
   export let hintFuriganaFontColor: string;
 
@@ -127,11 +135,25 @@
 
   export let showCustomReadingPoint: boolean;
 
+  export let annotations: BooksDbAnnotation[] = [];
+
+  export let activeAnnotationId = '';
+
+  export let annotationPopoverResetKey = 0;
+
   let showBlurMessage = false;
 
   let wakeLock: WakeLockSentinel | undefined;
 
   let visibilityState: DocumentVisibilityState;
+
+  let contentEl: HTMLElement | undefined;
+
+  let annotationRenderRevision = 0;
+
+  const dispatch = createEventDispatcher<{
+    annotationActivate: string;
+  }>();
 
   const mutationObserver: MutationObserver = new MutationObserver(handleMutation);
 
@@ -265,6 +287,8 @@
   }
 
   function handleContentChange({ detail }: CustomEvent<HTMLElement>) {
+    contentEl = detail;
+    annotationRenderRevision += 1;
     contentEl$.next(detail);
   }
 
@@ -335,6 +359,8 @@
       {enableTextWrapPretty}
       {fontColor}
       {backgroundColor}
+      {selectionFontColor}
+      {selectionBackgroundColor}
       {hintFuriganaFontColor}
       {hintFuriganaShadowColor}
       {fontFamilyGroupOne}
@@ -380,6 +406,8 @@
       {enableTextWrapPretty}
       {fontColor}
       {backgroundColor}
+      {selectionFontColor}
+      {selectionBackgroundColor}
       {hintFuriganaFontColor}
       {hintFuriganaShadowColor}
       {fontFamilyGroupOne}
@@ -411,6 +439,16 @@
     />
   {/if}
 </div>
+<BookAnnotationsRenderer
+  {contentEl}
+  {annotations}
+  {activeAnnotationId}
+  {annotationPopoverResetKey}
+  {fontColor}
+  {backgroundColor}
+  renderRevision={annotationRenderRevision}
+  on:activate={({ detail }) => dispatch('annotationActivate', detail)}
+/>
 {$blurListener$ ?? ''}
 {$reactiveElements$ ?? ''}
 {$hoverFocusKeybind$ ?? ''}

@@ -253,7 +253,7 @@
     flex: 0 1 auto;
     min-height: 2.25rem;
     min-width: 4.5rem;
-    max-width: min(24rem, 34vw);
+    max-width: min(24rem, 50vw);
     overflow: hidden;
     align-items: center;
     border-radius: 0.5rem;
@@ -265,6 +265,8 @@
   }
 
   .reader-chapter-card-label {
+    display: block;
+    max-width: 100%;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -437,7 +439,11 @@
 
   @container (max-width: 15rem) {
     .reader-progress-layout {
-      grid-template-columns: minmax(10rem, 1fr);
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .reader-progress-track {
+      min-width: 0;
     }
 
     .reader-progress-percent {
@@ -447,7 +453,16 @@
 
   @media (max-width: 520px) {
     .reader-chapter-card {
-      display: none;
+      display: flex;
+      flex: 1 1 50vw;
+      min-width: 3.25rem;
+      max-width: 50vw;
+      padding: 0 0.65rem;
+    }
+
+    .reader-progress-card {
+      width: 44vw;
+      min-width: 8rem;
     }
   }
 

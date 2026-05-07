@@ -91,16 +91,16 @@ const darkTheme = updateHintFuriganaFontColor({
     b: 0x2a
   },
   selectionFontColor: {
-    r: 85,
-    g: 90,
-    b: 92,
-    a: 0.6
+    r: 0xff,
+    g: 0xff,
+    b: 0xff,
+    a: 0.92
   },
   selectionBackgroundColor: {
-    r: 212,
-    g: 217,
-    b: 220,
-    a: 0.8
+    r: 0x2a,
+    g: 0x62,
+    b: 0xb8,
+    a: 0.72
   },
   hintFuriganaFontColor: {
     r: 0x00,

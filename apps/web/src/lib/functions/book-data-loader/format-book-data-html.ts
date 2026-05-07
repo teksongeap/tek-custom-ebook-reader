@@ -40,45 +40,60 @@ export default function formatBookDataHtml(
 
 function getHtmlWithImageSource(bookData: BooksDbBookData, isPaginated: boolean) {
   return new Observable<string>((subscriber) => {
-    const { blobs } = bookData;
-    const objectUrls: string[] = [];
-    const urlIndexes = new Map<string, number>();
+    const { elementHtml, objectUrls, readerImageGalleryPictures } = buildHtmlWithImageSources(
+      bookData,
+      isPaginated
+    );
 
-    let { elementHtml } = bookData;
-
-    Object.entries(blobs).forEach(([key, value]) => {
-      const url = URL.createObjectURL(
-        value.type
-          ? value
-          : new Blob([value], { type: BaseStorageHandler.getImageMimeTypeFromExtension(key) })
-      );
-      const dummyUrl = buildDummyBookImage(key);
-
-      objectUrls.push(url);
-      urlIndexes.set(url, elementHtml.indexOf(dummyUrl));
-
-      elementHtml = elementHtml.replaceAll(dummyUrl, url).replaceAll(`ttu:${key}`, url);
-    });
     subscriber.next(elementHtml);
-
-    const readerImageGalleryPictures: ReaderImageGalleryPicture[] = objectUrls.map((url) => ({
-      url,
-      unspoilered: !isPaginated
-    }));
-
-    readerImageGalleryPictures.sort((picture1, picture2) => {
-      const index1 = urlIndexes.get(picture1.url) || 0;
-      const index2 = urlIndexes.get(picture2.url) || 0;
-
-      return index1 - index2;
-    });
-
     readerImageGalleryPictures$.next(readerImageGalleryPictures);
 
-    return () => {
-      objectUrls.forEach((url) => URL.revokeObjectURL(url));
-    };
+    return createObjectUrlCleanup(objectUrls);
   });
+}
+
+function buildHtmlWithImageSources(bookData: BooksDbBookData, isPaginated: boolean) {
+  const objectUrls: string[] = [];
+  const urlIndexes = new Map<string, number>();
+
+  let { elementHtml } = bookData;
+
+  Object.entries(bookData.blobs).forEach(([key, value]) => {
+    const url = URL.createObjectURL(
+      value.type
+        ? value
+        : new Blob([value], { type: BaseStorageHandler.getImageMimeTypeFromExtension(key) })
+    );
+    const dummyUrl = buildDummyBookImage(key);
+
+    objectUrls.push(url);
+    urlIndexes.set(url, elementHtml.indexOf(dummyUrl));
+
+    elementHtml = elementHtml.replaceAll(dummyUrl, url).replaceAll(`ttu:${key}`, url);
+  });
+
+  const readerImageGalleryPictures: ReaderImageGalleryPicture[] = objectUrls.map((url) => ({
+    url,
+    unspoilered: !isPaginated
+  }));
+
+  readerImageGalleryPictures.sort((picture1, picture2) => {
+    const index1 = urlIndexes.get(picture1.url) || 0;
+    const index2 = urlIndexes.get(picture2.url) || 0;
+
+    return index1 - index2;
+  });
+
+  urlIndexes.clear();
+
+  return { elementHtml, objectUrls, readerImageGalleryPictures };
+}
+
+function createObjectUrlCleanup(objectUrls: string[]) {
+  return () => {
+    objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    readerImageGalleryPictures$.next([]);
+  };
 }
 
 function addImageContainerClass(el: HTMLElement) {

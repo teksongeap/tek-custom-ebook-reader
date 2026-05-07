@@ -70,6 +70,10 @@
 
   export let backgroundColor: string;
 
+  export let selectionFontColor = '';
+
+  export let selectionBackgroundColor = '';
+
   export let hintFuriganaFontColor: string;
 
   export let hintFuriganaShadowColor: string;
@@ -157,6 +161,10 @@
   let bookmarkAdjustment = window.matchMedia('(min-width: 640px)').matches ? '0.5rem' : '0.25rem';
 
   let fontLoadingAdded = false;
+
+  let fontLoadTimer: ReturnType<typeof setTimeout> | undefined;
+
+  let fontLoadingDoneHandler: (() => void) | undefined;
 
   const scrollFn = browser
     ? horizontalMouseWheel(4, document.documentElement, requestAnimationFrame)
@@ -352,6 +360,7 @@
 
   onDestroy(() => {
     document.removeEventListener('ttu-action', handleAction, false);
+    clearFontLoadingListener();
 
     destroy$.next();
     destroy$.complete();
@@ -584,7 +593,9 @@
       fontLoadingAdded = true;
 
       const timeout = isStoredFont(fontFamilyGroupOne, $userFonts$) ? 30000 : 10000;
-      const fontLoadTimer = setTimeout(() => {
+      fontLoadTimer = setTimeout(() => {
+        clearFontLoadingListener();
+
         if (!contentEl) {
           return;
         }
@@ -593,13 +604,27 @@
         dispatch('contentChange', contentEl);
       }, timeout);
 
-      document.fonts.addEventListener('loadingdone', () => {
-        clearTimeout(fontLoadTimer);
+      fontLoadingDoneHandler = () => {
+        clearFontLoadingListener();
 
         if (contentEl) {
           dispatch('contentChange', contentEl);
         }
-      });
+      };
+
+      document.fonts.addEventListener('loadingdone', fontLoadingDoneHandler);
+    }
+  }
+
+  function clearFontLoadingListener() {
+    if (fontLoadTimer) {
+      clearTimeout(fontLoadTimer);
+      fontLoadTimer = undefined;
+    }
+
+    if (fontLoadingDoneHandler) {
+      document.fonts.removeEventListener('loadingdone', fontLoadingDoneHandler);
+      fontLoadingDoneHandler = undefined;
     }
   }
 
@@ -674,6 +699,8 @@
   style:--font-family-sans-serif={fontFamilyGroupTwo}
   style:--book-content-hint-furigana-font-color={hintFuriganaFontColor}
   style:--book-content-hint-furigana-shadow-color={hintFuriganaShadowColor}
+  style:--book-content-selection-color={selectionFontColor || undefined}
+  style:--book-content-selection-background-color={selectionBackgroundColor || undefined}
   style:--book-content-child-height="{maxHeight || height}px"
   style:--book-content-text-margin="{textMarginValue ?? 0}rem"
   style:--book-content-text-intendation="{textIndentation ?? 0}rem"

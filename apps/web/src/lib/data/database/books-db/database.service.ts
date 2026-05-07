@@ -5,6 +5,7 @@
  */
 
 import type {
+  BooksDbAnnotation,
   BooksDbAudioBook,
   BooksDbBookData,
   BooksDbBookmarkData,
@@ -115,6 +116,8 @@ export class DatabaseService {
   );
 
   bookmarksChanged$ = new Subject<void>();
+
+  annotationsChanged$ = new Subject<number>();
 
   bookmarks$ = this.bookmarksChanged$.pipe(
     startWith(0),
@@ -325,6 +328,32 @@ export class DatabaseService {
     return db.put('bookmark', bookmarkData);
   }
 
+  async getAnnotations(dataId: number) {
+    const db = await this.db;
+
+    return db.getAllFromIndex('annotation', 'dataId', dataId);
+  }
+
+  async putAnnotation(annotation: BooksDbAnnotation) {
+    const db = await this.db;
+    const result = await db.put('annotation', annotation);
+
+    this.annotationsChanged$.next(annotation.dataId);
+
+    return result;
+  }
+
+  async deleteAnnotation(annotationId: string) {
+    const db = await this.db;
+    const annotation = await db.get('annotation', annotationId);
+
+    await db.delete('annotation', annotationId);
+
+    if (annotation) {
+      this.annotationsChanged$.next(annotation.dataId);
+    }
+  }
+
   async putAudioBook(audioBook: BooksDbAudioBook) {
     const db = await this.db;
 
@@ -366,6 +395,7 @@ export class DatabaseService {
       | 'audioBook'
       | 'subtitle'
       | 'handle'
+      | 'annotation'
     )[] = ['data', 'audioBook', 'subtitle', 'handle'];
     const shouldDeleteLastItem = cachedData.lastItem === dataId;
     const shouldDeleteBookmark = cachedData.bookmarkIds.has(dataId);
@@ -379,6 +409,8 @@ export class DatabaseService {
     if (shouldDeleteBookmark) {
       storeNames.push('bookmark');
     }
+
+    storeNames.push('annotation');
 
     if (shouldDeleteStatistics) {
       storeNames.push('statistic');
@@ -399,6 +431,11 @@ export class DatabaseService {
       if (shouldDeleteBookmark) {
         await tx.objectStore('bookmark').delete(dataId);
       }
+
+      const annotationStore = tx.objectStore('annotation');
+      const annotationKeys = await annotationStore.index('dataId').getAllKeys(dataId);
+
+      await Promise.all(annotationKeys.map((key) => annotationStore.delete(key)));
 
       if (shouldDeleteStatistics && bookTitle) {
         await tx.objectStore('statistic').delete(IDBKeyRange.bound([bookTitle], [bookTitle, []]));

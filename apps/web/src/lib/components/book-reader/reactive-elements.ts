@@ -8,6 +8,7 @@ import {
   NEVER,
   filter,
   fromEvent,
+  map,
   merge,
   race,
   switchMap,
@@ -48,10 +49,9 @@ function anchorTagListener(document: Document) {
       el.href = document.location.pathname + el.hash;
     });
 
-    const obs$ = anchorTags.map((el) =>
-      fromClickEvent(el).pipe(tap(() => nextChapter$.next(el.hash.substring(1))))
+    return fromDelegatedClickEvent<HTMLAnchorElement>(contentEl, 'a').pipe(
+      tap(({ element }) => nextChapter$.next(element.hash.substring(1)))
     );
-    return merge(...obs$);
   };
 }
 
@@ -61,28 +61,22 @@ function rubyTagListener(contentEl: HTMLElement, furiganaStyle: FuriganaStyle) {
   }
 
   const isToggle = furiganaStyle === FuriganaStyle.Toggle;
-  const rubyTags = Array.from(contentEl.getElementsByTagName('ruby'));
-  const obs$ = rubyTags.map((el) =>
-    isToggle
-      ? fromClickEvent(el).pipe(
-          tap(() => {
-            el.classList.toggle('reveal-rt');
-          })
-        )
-      : fromClickEvent(el).pipe(
-          take(1),
-          tap(() => {
-            el.classList.add('reveal-rt');
-          })
-        )
+  return fromDelegatedClickEvent<HTMLElement>(contentEl, 'ruby').pipe(
+    tap(({ element }) => {
+      if (isToggle) {
+        element.classList.toggle('reveal-rt');
+        return;
+      }
+
+      element.classList.add('reveal-rt');
+    })
   );
-  return merge(...obs$);
 }
 
 function spoilerImageListener(document: Document) {
   return (contentEl: HTMLElement) => {
     const elements = Array.from(contentEl.querySelectorAll('[data-ttu-spoiler-img]'));
-    const obs$ = elements.map((el) => {
+    elements.forEach((el) => {
       const spoilerLabelEl = document.createElement('span');
       spoilerLabelEl.title = 'Show Image';
       spoilerLabelEl.classList.add('spoiler-label');
@@ -93,20 +87,19 @@ function spoilerImageListener(document: Document) {
       const imageElement = el.querySelector('img,image');
 
       toggleImageGalleryPictureSpoiler(imageElement, false);
-
-      return fromClickEvent(el).pipe(
-        take(1),
-        tap(() => {
-          el.removeChild(spoilerLabelEl);
-          el.removeAttribute('data-ttu-spoiler-img');
-
-          imageElement?.classList.add('ttu-unspoilered');
-
-          toggleImageGalleryPictureSpoiler(imageElement, true);
-        })
-      );
     });
-    return merge(...obs$);
+
+    return fromDelegatedClickEvent<HTMLElement>(contentEl, '[data-ttu-spoiler-img]').pipe(
+      tap(({ element }) => {
+        element.querySelector('.spoiler-label')?.remove();
+        element.removeAttribute('data-ttu-spoiler-img');
+
+        const imageElement = element.querySelector('img,image');
+        imageElement?.classList.add('ttu-unspoilered');
+
+        toggleImageGalleryPictureSpoiler(imageElement, true);
+      })
+    );
   };
 }
 
@@ -115,70 +108,76 @@ function openImageInNewTab(
   hideSpoilerImage: boolean,
   isExtendedMode: boolean
 ) {
+  const selector = isExtendedMode ? 'img,image' : 'image';
+
+  contentEl.querySelectorAll<HTMLElement>(selector).forEach((elm) => {
+    elm.draggable = false;
+  });
+
   return merge(
-    ...[...contentEl.querySelectorAll<HTMLElement>(`${isExtendedMode ? 'img,' : ''}image`)].map(
-      (elm) => {
-        elm.draggable = false;
+    fromEvent<MouseEvent>(contentEl, 'contextmenu').pipe(
+      tap((event) => {
+        if (isExtendedMode && getDelegatedTarget<HTMLElement>(event, contentEl, selector)) {
+          event.preventDefault();
+        }
+      })
+    ),
+    fromEvent<PointerEvent>(contentEl, 'pointerdown').pipe(
+      map((event) => ({
+        event,
+        element: getDelegatedTarget<HTMLElement>(event, contentEl, selector)
+      })),
+      filter(
+        (data): data is { event: PointerEvent; element: HTMLElement } => data.element !== undefined
+      ),
+      switchMap(({ event, element }) => {
+        const { clientX, clientY } = event;
 
-        return merge(
-          fromEvent(elm, 'contextmenu').pipe(
-            tap((event) => {
-              if (isExtendedMode) {
-                event.preventDefault();
-              }
-            })
-          ),
-          fromEvent(elm, 'pointerdown').pipe(
-            switchMap((event) => {
-              const { clientX, clientY } = event as PointerEvent;
+        return timer(1000).pipe(
+          map(() => element),
+          takeUntil(
+            race(
+              fromEvent<PointerEvent>(contentEl, 'pointermove').pipe(
+                throttleTime(200, undefined, { trailing: true }),
+                filter((event2) => {
+                  const { clientX: newX, clientY: newY } = event2;
 
-              return timer(1000).pipe(
-                takeUntil(
-                  race(
-                    fromEvent(elm, 'pointermove').pipe(
-                      throttleTime(200, undefined, { trailing: true }),
-                      filter((event2) => {
-                        const { clientX: newX, clientY: newY } = event2 as PointerEvent;
-
-                        return Math.abs(clientX - newX) > 5 || Math.abs(clientY - newY) > 5;
-                      })
-                    ),
-                    fromEvent(elm, 'pointerup'),
-                    fromEvent(elm, 'pointercancel')
-                  )
-                )
-              );
-            }),
-            filter(
-              () =>
-                !hideSpoilerImage ||
-                elm.classList.contains('ttu-unspoilered') ||
-                !elm.closest('span[data-ttu-spoiler-img]')
-            ),
-            switchMap(() => {
-              pulseElement(
-                elm.parentElement && elm.tagName.toLowerCase() === 'image'
-                  ? elm.parentElement
-                  : elm,
-                'add',
-                0.5,
-                500
-              );
-
-              return merge(fromEvent(elm, 'pointerup'), fromEvent(elm, 'pointercancel')).pipe(
-                take(1),
-                tap(() => {
-                  const src = elm.getAttribute('src') || elm.getAttribute('href');
-
-                  if (src) {
-                    window.open(src, '_blank');
-                  }
+                  return Math.abs(clientX - newX) > 5 || Math.abs(clientY - newY) > 5;
                 })
-              );
-            })
+              ),
+              fromEvent(contentEl, 'pointerup'),
+              fromEvent(contentEl, 'pointercancel')
+            )
           )
         );
-      }
+      }),
+      filter(
+        (element) =>
+          !hideSpoilerImage ||
+          element.classList.contains('ttu-unspoilered') ||
+          !element.closest('span[data-ttu-spoiler-img]')
+      ),
+      switchMap((element) => {
+        pulseElement(
+          element.parentElement && element.tagName.toLowerCase() === 'image'
+            ? element.parentElement
+            : element,
+          'add',
+          0.5,
+          500
+        );
+
+        return merge(fromEvent(contentEl, 'pointerup'), fromEvent(contentEl, 'pointercancel')).pipe(
+          take(1),
+          tap(() => {
+            const src = element.getAttribute('src') || element.getAttribute('href');
+
+            if (src) {
+              window.open(src, '_blank');
+            }
+          })
+        );
+      })
     )
   );
 }
@@ -194,11 +193,36 @@ function toggleImageGalleryPictureSpoiler(imageElement: Element | null, unspoile
   }
 }
 
-function fromClickEvent(el: Element) {
-  return fromEvent(el, 'click').pipe(
-    tap((ev) => {
-      ev.preventDefault();
-      ev.stopImmediatePropagation();
+function fromDelegatedClickEvent<T extends Element>(contentEl: HTMLElement, selector: string) {
+  return fromEvent<MouseEvent>(contentEl, 'click').pipe(
+    map((event) => ({
+      event,
+      element: getDelegatedTarget<T>(event, contentEl, selector)
+    })),
+    filter((data): data is { event: MouseEvent; element: T } => data.element !== undefined),
+    tap(({ event }) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
     })
   );
+}
+
+function getDelegatedTarget<T extends Element>(
+  event: Event,
+  contentEl: HTMLElement,
+  selector: string
+) {
+  const target = event.target;
+
+  if (!(target instanceof Element)) {
+    return undefined;
+  }
+
+  const element = target.closest(selector);
+
+  if (!element || !contentEl.contains(element)) {
+    return undefined;
+  }
+
+  return element as T;
 }

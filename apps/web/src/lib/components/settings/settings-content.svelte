@@ -109,14 +109,6 @@
 
   export let enableReaderWakeLock: boolean;
 
-  export let showCharacterCounter: boolean;
-
-  export let showPercentage: boolean;
-
-  export let showFooterChapterCharacterCounter: boolean;
-
-  export let showFooterChapterPercentage: boolean;
-
   export let secondDimensionMaxValue: number;
 
   export let firstDimensionMargin: number;
@@ -650,24 +642,6 @@
         />
       </SettingsItemGroup>
     {/if}
-    <SettingsItemGroup title="Show Character Counter">
-      <ButtonToggleGroup options={optionsForToggle} bind:selectedOptionId={showCharacterCounter} />
-    </SettingsItemGroup>
-    <SettingsItemGroup title="Show Percentage">
-      <ButtonToggleGroup options={optionsForToggle} bind:selectedOptionId={showPercentage} />
-    </SettingsItemGroup>
-    <SettingsItemGroup title="Show Footer Chapter Characters">
-      <ButtonToggleGroup
-        options={optionsForToggle}
-        bind:selectedOptionId={showFooterChapterCharacterCounter}
-      />
-    </SettingsItemGroup>
-    <SettingsItemGroup title="Show Footer Chapter Percentage">
-      <ButtonToggleGroup
-        options={optionsForToggle}
-        bind:selectedOptionId={showFooterChapterPercentage}
-      />
-    </SettingsItemGroup>
     <SettingsItemGroup title="Disable Wheel Navigation">
       <ButtonToggleGroup
         options={optionsForToggle}

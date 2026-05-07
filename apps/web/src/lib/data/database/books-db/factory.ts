@@ -9,91 +9,82 @@ import { openDB } from 'idb';
 import upgradeBooksDbFromV2 from './versions/v2/upgrade';
 
 export function createBooksDb(name = 'books') {
-  return openDB<BooksDb>(name, 6, {
+  return openDB<BooksDb>(name, 7, {
     async upgrade(oldDb, oldVersion, newVersion, transaction) {
-      switch (oldVersion) {
-        case 0: {
-          const dataStore = oldDb.createObjectStore('data', {
-            keyPath: 'id',
-            autoIncrement: true
-          });
-          dataStore.createIndex('title', 'title');
-
-          oldDb.createObjectStore('bookmark', {
-            keyPath: 'dataId'
-          });
-
-          oldDb.createObjectStore('lastItem');
-
-          oldDb.createObjectStore('storageSource', {
-            keyPath: 'name'
-          });
-
-          const statisticsStore = oldDb.createObjectStore('statistic', {
-            keyPath: ['title', 'dateKey']
-          });
-
-          statisticsStore.createIndex('dateKey', 'dateKey');
-          statisticsStore.createIndex('completedBook', ['completedBook', 'title']);
-
-          const readingGoalsStore = oldDb.createObjectStore('readingGoal', {
-            keyPath: 'goalStartDate'
-          });
-
-          readingGoalsStore.createIndex('goalEndDate', 'goalEndDate');
-
-          oldDb.createObjectStore('lastModified', {
-            keyPath: ['title', 'dataType']
-          });
-
-          oldDb.createObjectStore('audioBook', { keyPath: 'title' });
-
-          oldDb.createObjectStore('subtitle', { keyPath: 'title' });
-
-          oldDb.createObjectStore('handle', { keyPath: ['title', 'dataType'] });
-
-          break;
-        }
-        case 2: {
-          await upgradeBooksDbFromV2(oldDb, oldVersion, newVersion, transaction);
-          break;
-        }
-        case 3: {
-          oldDb.createObjectStore('storageSource', {
-            keyPath: 'name'
-          });
-          break;
-        }
-        case 4: {
-          const statisticsStore = oldDb.createObjectStore('statistic', {
-            keyPath: ['title', 'dateKey']
-          });
-
-          statisticsStore.createIndex('dateKey', 'dateKey');
-          statisticsStore.createIndex('completedBook', ['completedBook', 'title']);
-
-          const readingGoalsStore = oldDb.createObjectStore('readingGoal', {
-            keyPath: 'goalStartDate'
-          });
-
-          readingGoalsStore.createIndex('goalEndDate', 'goalEndDate');
-
-          oldDb.createObjectStore('lastModified', {
-            keyPath: ['title', 'dataType']
-          });
-
-          break;
-        }
-        case 5: {
-          oldDb.createObjectStore('audioBook', { keyPath: 'title' });
-
-          oldDb.createObjectStore('subtitle', { keyPath: 'title' });
-
-          oldDb.createObjectStore('handle', { keyPath: ['title', 'dataType'] });
-
-          break;
-        }
+      if (oldVersion === 2) {
+        await upgradeBooksDbFromV2(oldDb, oldVersion, newVersion, transaction);
       }
+
+      ensureBooksDbStores(oldDb);
     }
   });
+}
+
+function ensureBooksDbStores(oldDb: any) {
+  if (!oldDb.objectStoreNames.contains('data')) {
+    const dataStore = oldDb.createObjectStore('data', {
+      keyPath: 'id',
+      autoIncrement: true
+    });
+    dataStore.createIndex('title', 'title');
+  }
+
+  if (!oldDb.objectStoreNames.contains('bookmark')) {
+    oldDb.createObjectStore('bookmark', {
+      keyPath: 'dataId'
+    });
+  }
+
+  if (!oldDb.objectStoreNames.contains('annotation')) {
+    const annotationStore = oldDb.createObjectStore('annotation', {
+      keyPath: 'id'
+    });
+
+    annotationStore.createIndex('dataId', 'dataId');
+  }
+
+  if (!oldDb.objectStoreNames.contains('lastItem')) {
+    oldDb.createObjectStore('lastItem');
+  }
+
+  if (!oldDb.objectStoreNames.contains('storageSource')) {
+    oldDb.createObjectStore('storageSource', {
+      keyPath: 'name'
+    });
+  }
+
+  if (!oldDb.objectStoreNames.contains('statistic')) {
+    const statisticsStore = oldDb.createObjectStore('statistic', {
+      keyPath: ['title', 'dateKey']
+    });
+
+    statisticsStore.createIndex('dateKey', 'dateKey');
+    statisticsStore.createIndex('completedBook', ['completedBook', 'title']);
+  }
+
+  if (!oldDb.objectStoreNames.contains('readingGoal')) {
+    const readingGoalsStore = oldDb.createObjectStore('readingGoal', {
+      keyPath: 'goalStartDate'
+    });
+
+    readingGoalsStore.createIndex('goalEndDate', 'goalEndDate');
+  }
+
+  if (!oldDb.objectStoreNames.contains('lastModified')) {
+    oldDb.createObjectStore('lastModified', {
+      keyPath: ['title', 'dataType']
+    });
+  }
+
+  if (!oldDb.objectStoreNames.contains('audioBook')) {
+    oldDb.createObjectStore('audioBook', { keyPath: 'title' });
+  }
+
+  if (!oldDb.objectStoreNames.contains('subtitle')) {
+    oldDb.createObjectStore('subtitle', { keyPath: 'title' });
+  }
+
+  if (!oldDb.objectStoreNames.contains('handle')) {
+    oldDb.createObjectStore('handle', { keyPath: ['title', 'dataType'] });
+  }
 }

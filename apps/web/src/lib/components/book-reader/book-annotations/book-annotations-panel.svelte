@@ -1,0 +1,356 @@
+<script lang="ts">
+  import { createEventDispatcher } from 'svelte';
+  import Fa from 'svelte-fa';
+  import {
+    faChevronRight,
+    faHighlighter,
+    faTrash,
+    faXmark
+  } from '@fortawesome/free-solid-svg-icons';
+  import type { BooksDbAnnotation } from '$lib/data/database/books-db/versions/books-db';
+  import type { SectionWithProgress } from '$lib/components/book-reader/book-toc/book-toc';
+  import { getAnnotationColorValue } from './annotation-colors';
+
+  export let annotations: BooksDbAnnotation[] = [];
+  export let sectionData: SectionWithProgress[] = [];
+  export let fontColor = '';
+  export let backgroundColor = '';
+
+  const dispatch = createEventDispatcher<{
+    close: void;
+    jump: BooksDbAnnotation;
+    delete: BooksDbAnnotation;
+  }>();
+
+  $: panelStyle = `--reader-page-text: ${
+    fontColor || 'var(--font-color)'
+  }; --reader-page-bg: ${backgroundColor || 'var(--background-color)'};`;
+  $: sortedAnnotations = annotations
+    .slice()
+    .sort((a, b) => a.exploredCharCount - b.exploredCharCount || a.createdAt - b.createdAt);
+
+  function getChapterLabel(annotation: BooksDbAnnotation) {
+    const mainChapters = sectionData.filter((section) => !section.parentChapter);
+    const chapter = mainChapters
+      .slice()
+      .reverse()
+      .find((section) => (section.startCharacter || 0) <= annotation.exploredCharCount);
+
+    return chapter?.label || 'Current Book';
+  }
+
+  function getProgress(annotation: BooksDbAnnotation) {
+    return `${Math.max(0, Math.min(100, annotation.progress * 100)).toFixed(1)}%`;
+  }
+</script>
+
+<div class="annotations-panel" style={panelStyle}>
+  <div class="annotations-panel-header">
+    <div class="annotations-panel-title">
+      <span class="annotations-panel-title-icon"><Fa icon={faHighlighter} /></span>
+      <div>
+        <div class="annotations-panel-title-main">Annotations</div>
+        <div class="annotations-panel-title-sub">{annotations.length} saved</div>
+      </div>
+    </div>
+    <button
+      type="button"
+      class="annotations-panel-close"
+      title="Close annotations"
+      aria-label="Close annotations"
+      on:click={() => dispatch('close')}
+    >
+      <Fa icon={faXmark} />
+    </button>
+  </div>
+
+  <div class="annotations-panel-list">
+    {#if sortedAnnotations.length}
+      {#each sortedAnnotations as annotation (annotation.id)}
+        <div
+          role="button"
+          tabindex="0"
+          class="annotation-item"
+          style:--book-annotation-base={getAnnotationColorValue(annotation.color)}
+          on:click={() => dispatch('jump', annotation)}
+          on:keydown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              dispatch('jump', annotation);
+            }
+          }}
+        >
+          <span class="annotation-item-swatch" aria-hidden="true"></span>
+          <span class="annotation-item-content">
+            <span class="annotation-item-meta">
+              <span>{getChapterLabel(annotation)}</span>
+              <span>{getProgress(annotation)}</span>
+            </span>
+            {#if annotation.comment}
+              <span class="annotation-item-comment">{annotation.comment}</span>
+            {/if}
+            <span class="annotation-item-quote">{annotation.selectedText}</span>
+          </span>
+          <span class="annotation-item-actions">
+            <span class="annotation-item-go" aria-hidden="true"><Fa icon={faChevronRight} /></span>
+            <button
+              type="button"
+              class="annotation-item-delete"
+              title="Delete annotation"
+              aria-label="Delete annotation"
+              on:click|stopPropagation={() => dispatch('delete', annotation)}
+              on:keydown|stopPropagation={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  dispatch('delete', annotation);
+                }
+              }}
+            >
+              <Fa icon={faTrash} />
+            </button>
+          </span>
+        </div>
+      {/each}
+    {:else}
+      <div class="annotations-panel-empty">
+        <div class="annotations-panel-empty-icon"><Fa icon={faHighlighter} /></div>
+        <div class="annotations-panel-empty-title">No annotations yet</div>
+        <div class="annotations-panel-empty-copy">Select text in the reader to save a highlight.</div>
+      </div>
+    {/if}
+  </div>
+</div>
+
+<style lang="scss">
+  .annotations-panel {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    flex-direction: column;
+    background:
+      linear-gradient(
+        145deg,
+        color-mix(in srgb, var(--reader-page-bg) 96%, transparent),
+        color-mix(in srgb, var(--reader-page-bg) 82%, var(--reader-page-text))
+      ),
+      var(--reader-page-bg);
+    color: var(--reader-page-text);
+  }
+
+  .annotations-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--reader-page-text) 12%, transparent);
+    padding: 1rem;
+  }
+
+  .annotations-panel-title {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .annotations-panel-title-icon,
+  .annotations-panel-empty-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.625rem;
+    background: color-mix(in srgb, var(--app-accent) 16%, transparent);
+    color: var(--app-accent);
+  }
+
+  .annotations-panel-title-icon {
+    height: 2.35rem;
+    width: 2.35rem;
+    flex: 0 0 auto;
+  }
+
+  .annotations-panel-title-main {
+    font-size: 1rem;
+    font-weight: 850;
+    line-height: 1.1;
+  }
+
+  .annotations-panel-title-sub {
+    margin-top: 0.15rem;
+    color: color-mix(in srgb, var(--reader-page-text) 58%, transparent);
+    font-size: 0.78rem;
+    line-height: 1.1;
+  }
+
+  .annotations-panel-close {
+    display: inline-flex;
+    height: 2.2rem;
+    width: 2.2rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: color-mix(in srgb, var(--reader-page-text) 66%, transparent);
+    outline: none;
+  }
+
+  .annotations-panel-close:hover,
+  .annotations-panel-close:focus-visible {
+    background: color-mix(in srgb, var(--reader-page-text) 9%, transparent);
+    color: var(--reader-page-text);
+  }
+
+  .annotations-panel-list {
+    min-height: 0;
+    flex: 1;
+    overflow: auto;
+    padding: 0.75rem;
+  }
+
+  .annotation-item {
+    --book-annotation-base: #f5c84b;
+    display: grid;
+    width: 100%;
+    grid-template-columns: 0.45rem minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    margin-bottom: 0.625rem;
+    cursor: pointer;
+    border: 1px solid color-mix(in srgb, var(--reader-page-text) 11%, transparent);
+    border-radius: 0.75rem;
+    background:
+      linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--book-annotation-base) 13%, transparent),
+        color-mix(in srgb, var(--reader-page-bg) 74%, transparent)
+      ),
+      color-mix(in srgb, var(--reader-page-bg) 90%, transparent);
+    color: inherit;
+    padding: 0.75rem;
+    text-align: left;
+    outline: none;
+    transition:
+      border-color 140ms ease,
+      box-shadow 140ms ease,
+      transform 140ms ease;
+  }
+
+  .annotation-item:hover,
+  .annotation-item:focus-visible {
+    border-color: color-mix(in srgb, var(--book-annotation-base) 52%, transparent);
+    box-shadow: 0 16px 34px rgba(5, 7, 10, 0.16);
+    transform: translateY(-1px);
+  }
+
+  .annotation-item-swatch {
+    height: 100%;
+    min-height: 4.5rem;
+    border-radius: 999px;
+    background: var(--book-annotation-base);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--book-annotation-base) 32%, transparent);
+  }
+
+  .annotation-item-content {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .annotation-item-meta {
+    display: flex;
+    min-width: 0;
+    justify-content: space-between;
+    gap: 0.75rem;
+    color: color-mix(in srgb, var(--reader-page-text) 54%, transparent);
+    font-size: 0.72rem;
+    font-weight: 760;
+    line-height: 1;
+  }
+
+  .annotation-item-meta span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .annotation-item-comment {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 0.9rem;
+    font-weight: 720;
+    line-height: 1.25;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .annotation-item-quote {
+    display: -webkit-box;
+    overflow: hidden;
+    color: color-mix(in srgb, var(--reader-page-text) 62%, transparent);
+    font-size: 0.78rem;
+    line-height: 1.35;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .annotation-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: color-mix(in srgb, var(--reader-page-text) 48%, transparent);
+  }
+
+  .annotation-item-go,
+  .annotation-item-delete {
+    display: inline-flex;
+    height: 1.8rem;
+    width: 1.8rem;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .annotation-item-delete:hover,
+  .annotation-item-delete:focus-visible {
+    background: color-mix(in srgb, var(--app-danger) 14%, transparent);
+    color: var(--app-danger);
+    outline: none;
+  }
+
+  .annotations-panel-empty {
+    display: grid;
+    min-height: 70%;
+    place-content: center;
+    justify-items: center;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .annotations-panel-empty-icon {
+    height: 3rem;
+    width: 3rem;
+    font-size: 1.2rem;
+  }
+
+  .annotations-panel-empty-title {
+    margin-top: 1rem;
+    font-size: 1rem;
+    font-weight: 820;
+  }
+
+  .annotations-panel-empty-copy {
+    margin-top: 0.35rem;
+    max-width: 15rem;
+    color: color-mix(in srgb, var(--reader-page-text) 58%, transparent);
+    font-size: 0.86rem;
+    line-height: 1.35;
+  }
+</style>

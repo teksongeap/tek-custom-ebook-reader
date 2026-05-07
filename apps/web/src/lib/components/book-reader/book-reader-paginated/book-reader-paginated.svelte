@@ -7,6 +7,7 @@
   import { isStoredFont } from '$lib/data/fonts';
   import { FuriganaStyle } from '$lib/data/furigana-style';
   import { logger } from '$lib/data/logger';
+  import { getCharacterCount } from '$lib/functions/get-character-count';
   import {
     disableWheelNavigation$,
     firstDimensionMargin$,
@@ -41,6 +42,7 @@
   import { PageManagerPaginated } from './page-manager-paginated';
   import { SectionCharacterStatsCalculator } from './section-character-stats-calculator';
   import { createEventDispatcher, onDestroy, onMount } from 'svelte';
+  import { getParagraphNodes } from '../get-paragraph-nodes';
 
   export let htmlContent: string;
 
@@ -63,6 +65,10 @@
   export let fontColor: string;
 
   export let backgroundColor: string;
+
+  export let selectionFontColor = '';
+
+  export let selectionBackgroundColor = '';
 
   export let hintFuriganaFontColor: string;
 
@@ -126,7 +132,13 @@
 
   let calculator: SectionCharacterStatsCalculator | undefined;
 
-  let sections: Element[] = [];
+  type ReaderSection = {
+    id: string;
+    html: string;
+    characterCount: number;
+  };
+
+  let sections: ReaderSection[] = [];
 
   let concretePageManager: PageManagerPaginated | undefined;
 
@@ -154,6 +166,10 @@
 
   let fontLoadingAdded = false;
 
+  let fontLoadTimer: ReturnType<typeof setTimeout> | undefined;
+
+  let fontLoadingDoneHandler: (() => void) | undefined;
+
   let currentSectionId = '';
 
   const width$ = new Subject<number>();
@@ -170,7 +186,7 @@
 
   const sectionReady$ = new Subject<SectionCharacterStatsCalculator>();
 
-  const currentSection$ = sectionIndex$.pipe(map((index) => sections[index]?.innerHTML || ''));
+  const currentSection$ = sectionIndex$.pipe(map((index) => sections[index]?.html || ''));
 
   const cssClassOverflowHidden = 'overflow-hidden';
 
@@ -197,9 +213,7 @@
 
   $: {
     if (browser) {
-      const tempContainer = document.createElement('div');
-      tempContainer.innerHTML = htmlContent;
-      sections = Array.from(tempContainer.children);
+      sections = createReaderSections(htmlContent);
       sectionIndex$.next(0);
     }
   }
@@ -209,7 +223,7 @@
       concretePageManager = new PageManagerPaginated(
         contentEl,
         scrollEl,
-        sections,
+        sections.map((section) => section.id),
         sectionIndex$,
         virtualScrollPos$,
         width,
@@ -237,7 +251,7 @@
       const sectionIndex = sectionIndex$.getValue();
       const section = sections[sectionIndex];
 
-      currentSectionId = section?.id.startsWith('ttu-') ? section.id : '';
+      currentSectionId = section?.id || '';
 
       sectionRenderComplete$.next(sectionIndex);
     }
@@ -334,9 +348,7 @@
     let targetSection = -1;
 
     for (let index = 0, { length } = sections; index < length; index += 1) {
-      const element = getExternalTargetElement(sections[index], selector);
-
-      if (element) {
+      if (sectionContainsSelector(sections[index], selector)) {
         targetSection = index;
         break;
       }
@@ -363,10 +375,44 @@
       calculatorInstance.calcExploredCharCount(nodeRange)
     );
   }
+
+  function createReaderSections(bookHtmlContent: string): ReaderSection[] {
+    const tempContainer = document.createElement('div');
+    tempContainer.innerHTML = bookHtmlContent;
+
+    const readerSections = Array.from(tempContainer.children).map((section) => ({
+      id: section.id,
+      html: section.innerHTML,
+      characterCount: getSectionCharacterCount(section)
+    }));
+
+    tempContainer.textContent = '';
+
+    return readerSections;
+  }
+
+  function getSectionCharacterCount(section: Element) {
+    return getParagraphNodes(section).reduce(
+      (characterCount, node) => characterCount + getCharacterCount(node),
+      0
+    );
+  }
+
+  function sectionContainsSelector(section: ReaderSection, selector: string) {
+    const tempContainer = document.createElement('div');
+    tempContainer.id = section.id;
+    tempContainer.innerHTML = section.html;
+
+    const hasMatch = !!getExternalTargetElement(tempContainer, selector);
+    tempContainer.textContent = '';
+
+    return hasMatch;
+  }
   /** Experimental Code - May be removed or changed any time without warning */
 
   onDestroy(() => {
     document.removeEventListener('ttu-action', handleAction, false);
+    clearFontLoadingListener();
 
     document.body.classList.remove(cssClassOverflowHidden);
 
@@ -494,7 +540,7 @@
 
     calculator = new SectionCharacterStatsCalculator(
       scrollEl,
-      sections,
+      sections.map((section) => section.characterCount),
       virtualScrollPos$,
       () => width,
       () => height,
@@ -522,15 +568,30 @@
       fontLoadingAdded = true;
 
       const timeout = isStoredFont(fontFamilyGroupOne, $userFonts$) ? 30000 : 10000;
-      const fontLoadTimer = setTimeout(() => {
+      fontLoadTimer = setTimeout(() => {
+        clearFontLoadingListener();
         logger.error(`Error loading primary Font: ${fontFamilyGroupOne}`);
         triggerContentChange();
       }, timeout);
 
-      document.fonts.addEventListener('loadingdone', () => {
-        clearTimeout(fontLoadTimer);
+      fontLoadingDoneHandler = () => {
+        clearFontLoadingListener();
         triggerContentChange();
-      });
+      };
+
+      document.fonts.addEventListener('loadingdone', fontLoadingDoneHandler);
+    }
+  }
+
+  function clearFontLoadingListener() {
+    if (fontLoadTimer) {
+      clearTimeout(fontLoadTimer);
+      fontLoadTimer = undefined;
+    }
+
+    if (fontLoadingDoneHandler) {
+      document.fonts.removeEventListener('loadingdone', fontLoadingDoneHandler);
+      fontLoadingDoneHandler = undefined;
     }
   }
 
@@ -659,7 +720,8 @@
 
   nextChapter$.pipe(takeUntil(destroy$)).subscribe((chapterId) => {
     const nextSectionIndex = sections.findIndex(
-      (section) => section.id === chapterId || section.querySelector(`[id="${chapterId}"]`)
+      (section) =>
+        section.id === chapterId || sectionContainsSelector(section, `[id="${chapterId}"]`)
     );
 
     if (nextSectionIndex > -1) {
@@ -692,6 +754,8 @@
   style:--font-family-sans-serif={fontFamilyGroupTwo}
   style:--book-content-hint-furigana-font-color={hintFuriganaFontColor}
   style:--book-content-hint-furigana-shadow-color={hintFuriganaShadowColor}
+  style:--book-content-selection-color={selectionFontColor || undefined}
+  style:--book-content-selection-background-color={selectionBackgroundColor || undefined}
   style:--book-content-child-width="{width}px"
   style:--book-content-child-height="{height}px"
   style:--book-content-child-column-width={!verticalMode && columnCount === 1 ? `${width}px` : ''}

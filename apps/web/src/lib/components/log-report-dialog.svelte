@@ -71,10 +71,6 @@
     lastReadingGoalsModified$,
     isOnline$,
     multiplier$,
-    showCharacterCounter$,
-    showPercentage$,
-    showFooterChapterCharacterCounter$,
-    showFooterChapterPercentage$,
     enableReaderWakeLock$
   } from '$lib/data/store';
 
@@ -116,10 +112,6 @@
           enableTextJustification: enableTextJustification$.getValue(),
           enableTextWrapPretty: enableTextWrapPretty$.getValue(),
           enableReaderWakeLock: enableReaderWakeLock$.getValue(),
-          showCharacterCounter$: showCharacterCounter$.getValue(),
-          showPercentage$: showPercentage$.getValue(),
-          showFooterChapterCharacterCounter: showFooterChapterCharacterCounter$.getValue(),
-          showFooterChapterPercentage: showFooterChapterPercentage$.getValue(),
           confirmClose: confirmClose$.getValue(),
           autoBookmark: autoBookmark$.getValue(),
           autoBookmarkTime: autoBookmarkTime$.getValue(),
@@ -186,7 +178,7 @@
   <svelte:fragment slot="footer">
     <a
       class={buttonClasses}
-      href="https://github.com/ttu-ttu/ebook-reader"
+      href="https://github.com/teksongeap/tek-custom-ebook-reader"
       target="_blank"
       rel="noreferrer"
     >

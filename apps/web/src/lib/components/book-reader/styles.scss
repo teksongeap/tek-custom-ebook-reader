@@ -1,8 +1,16 @@
 .book-content {
   font-family: var(--font-family-serif, 'Lora', 'Noto Serif JP', serif);
+  --book-content-selection-color: var(--font-color);
+  --book-content-selection-background-color: var(--app-accent-soft);
 }
 
 .book-content {
+  &::selection,
+  :global(*)::selection {
+    color: var(--book-content-selection-color);
+    background-color: var(--book-content-selection-background-color);
+  }
+
   :global(.ttu-book-html-wrapper.ttu-no-text),
   :global(.ttu-book-body-wrapper.ttu-no-text) {
     margin: 0 !important;

@@ -90,6 +90,9 @@
     verticalTextOrientation$
   } from '$lib/data/store';
   import BookCompletionConfetti from '$lib/components/book-reader/book-completion-confetti/book-completion-confetti.svelte';
+  import AnnotationSelectionToolbar from '$lib/components/book-reader/book-annotations/annotation-selection-toolbar.svelte';
+  import BookAnnotationsPanel from '$lib/components/book-reader/book-annotations/book-annotations-panel.svelte';
+  import { serializeAnnotationRange } from '$lib/components/book-reader/book-annotations/annotation-range';
   import BookReaderHeader from '$lib/components/book-reader/book-reader-header.svelte';
   import {
     readerImageGalleryPictures$,
@@ -118,6 +121,7 @@
   import { preFilteredTitlesForStatistics$ } from '$lib/components/statistics/statistics-types';
   import {
     currentDbVersion,
+    type BooksDbAnnotation,
     type BooksDbBookData,
     type BooksDbBookmarkData,
     type BooksDbStatistic
@@ -189,6 +193,21 @@
   let customReadingPointRange: Range | undefined;
   let lastSelectedRange: Range | undefined;
   let lastSelectedRangeWasEmpty = true;
+  let annotationSelectionRect: DOMRect | undefined;
+  let annotationSelectionText = '';
+  let annotations: BooksDbAnnotation[] = [];
+  let showAnnotationsPanel = false;
+  let activeAnnotationId = '';
+  let annotationPopoverResetKey = 0;
+  let selectionPointerStart:
+    | {
+        x: number;
+        y: number;
+        inReader: boolean;
+      }
+    | undefined;
+  let selectionPointerMovedInReader = false;
+  let lastReaderSelectionPointerUp = 0;
   let isSelectingCustomReadingPoint = false;
   let showCustomReadingPoint = false;
   let localStorageHandler: BrowserStorageHandler;
@@ -349,6 +368,14 @@
     reduceToEmptyString()
   );
 
+  const initAnnotations$ = rawBookData$.pipe(
+    switchMap((rawBookData) => (rawBookData ? database.getAnnotations(rawBookData.id) : of([]))),
+    tap((bookAnnotations) => {
+      annotations = bookAnnotations;
+    }),
+    reduceToEmptyString()
+  );
+
   const bookData$ = rawBookData$.pipe(
     switchMap((rawBookData) => {
       if (!rawBookData) return EMPTY;
@@ -453,15 +480,32 @@
   const textSelector$ = iffBrowser(() => fromEvent(document, 'selectionchange')).pipe(
     debounceTime(200),
     tap(() => {
-      const currentSelected = window.getSelection()?.toString() || '';
+      const selection = window.getSelection();
+      const currentSelected = selection?.toString().trim() || '';
+      const isUserReaderSelection =
+        (selectionPointerStart?.inReader && selectionPointerMovedInReader) ||
+        new Date().getTime() - lastReaderSelectionPointerUp < 900;
 
-      if (!currentSelected && lastSelectedRangeWasEmpty) {
-        lastSelectedRange = undefined;
-      } else if (currentSelected) {
-        lastSelectedRange = window.getSelection()?.getRangeAt(0);
+      if (currentSelected && selection?.rangeCount && isUserReaderSelection) {
+        const range = selection.getRangeAt(0).cloneRange();
+        const selectionRect = getRangeViewportRect(range);
+
+        if (!selectionRect) {
+          hideAnnotationComposer();
+          return;
+        }
+
+        lastSelectedRange = range;
         lastSelectedRangeWasEmpty = false;
+        annotationSelectionRect = selectionRect;
+        annotationSelectionText = currentSelected;
       } else {
         lastSelectedRangeWasEmpty = true;
+
+        if (!(document.activeElement instanceof HTMLElement && document.activeElement.closest('.annotation-toolbar'))) {
+          lastSelectedRange = undefined;
+          hideAnnotationComposer();
+        }
       }
     }),
     reduceToEmptyString()
@@ -1181,6 +1225,238 @@
     return bookId;
   }
 
+  function getRangeViewportRect(range: Range) {
+    if (!getRangeBookContent(range)) {
+      return undefined;
+    }
+
+    const rects = Array.from(range.getClientRects()).filter((rect) => rect.width || rect.height);
+
+    if (rects.length) {
+      const top = Math.min(...rects.map((rect) => rect.top));
+      const right = Math.max(...rects.map((rect) => rect.right));
+      const bottom = Math.max(...rects.map((rect) => rect.bottom));
+      const left = Math.min(...rects.map((rect) => rect.left));
+
+      return new DOMRect(left, top, right - left, bottom - top);
+    }
+
+    const rect = range.getBoundingClientRect();
+
+    return rect.width || rect.height ? rect : undefined;
+  }
+
+  function getRangeBookContent(range: Range) {
+    const container = range.commonAncestorContainer;
+    const containerElement =
+      container instanceof Element ? container : container.parentElement;
+
+    return containerElement?.closest('.book-content') as HTMLElement | undefined;
+  }
+
+  function hideAnnotationComposer() {
+    annotationSelectionRect = undefined;
+    annotationSelectionText = '';
+  }
+
+  function handleSelectionPointerDown(event: PointerEvent) {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
+
+    selectionPointerStart = {
+      x: event.clientX,
+      y: event.clientY,
+      inReader: isReaderSelectionTarget(event.target)
+    };
+    selectionPointerMovedInReader = false;
+  }
+
+  function handleSelectionPointerMove(event: PointerEvent) {
+    if (!selectionPointerStart?.inReader) {
+      return;
+    }
+
+    const selectionDistance = Math.hypot(
+      event.clientX - selectionPointerStart.x,
+      event.clientY - selectionPointerStart.y
+    );
+
+    if (selectionDistance > 4) {
+      selectionPointerMovedInReader = true;
+    }
+  }
+
+  function handleSelectionPointerUp() {
+    if (selectionPointerStart?.inReader && selectionPointerMovedInReader) {
+      lastReaderSelectionPointerUp = new Date().getTime();
+    }
+
+    selectionPointerStart = undefined;
+    selectionPointerMovedInReader = false;
+  }
+
+  function isReaderSelectionTarget(target: EventTarget | null) {
+    return (
+      target instanceof Element &&
+      !!target.closest('.book-content') &&
+      !target.closest('.annotation-toolbar') &&
+      !target.closest('[data-ttu-annotation-card]')
+    );
+  }
+
+  async function createAnnotation({
+    detail
+  }: CustomEvent<{ color: BooksDbAnnotation['color']; comment: string }>) {
+    const bookId = getBookIdSync();
+
+    if (!bookId || !lastSelectedRange) {
+      hideAnnotationComposer();
+      return;
+    }
+
+    const contentRoot = getRangeBookContent(lastSelectedRange);
+    const anchor = serializeAnnotationRange(lastSelectedRange, contentRoot);
+
+    if (!anchor) {
+      dialogManager.dialogs$.next([
+        {
+          component: MessageDialog,
+          props: {
+            title: 'Annotation',
+            message: 'Select text inside a single reader section to create an annotation.'
+          }
+        }
+      ]);
+      hideAnnotationComposer();
+      return;
+    }
+
+    const now = new Date().getTime();
+    const bookmarkPosition =
+      isPaginated && bookmarkManager
+        ? bookmarkManager.formatBookmarkDataByRange(bookId, lastSelectedRange)
+        : bookmarkManager?.formatBookmarkData(bookId, customReadingPointScrollOffset);
+    const annotationExploredCharCount = bookmarkPosition?.exploredCharCount || exploredCharCount;
+    const annotation: BooksDbAnnotation = {
+      id: createAnnotationId(),
+      dataId: bookId,
+      color: detail.color,
+      comment: detail.comment,
+      selectedText: annotationSelectionText || anchor.text,
+      anchor,
+      progress: bookCharCount ? annotationExploredCharCount / bookCharCount : 0,
+      exploredCharCount: annotationExploredCharCount,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    await database.putAnnotation(annotation);
+
+    annotations = [...annotations, annotation];
+    activeAnnotationId = annotation.id;
+    hideAnnotationComposer();
+    clearRange(window, 0);
+  }
+
+  function createAnnotationId() {
+    if (crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  async function deleteAnnotation(annotation: BooksDbAnnotation) {
+    await database.deleteAnnotation(annotation.id);
+
+    annotations = annotations.filter((item) => item.id !== annotation.id);
+
+    if (activeAnnotationId === annotation.id) {
+      activeAnnotationId = '';
+    }
+  }
+
+  async function jumpToAnnotation(annotation: BooksDbAnnotation) {
+    closeAnnotationsPanel();
+    showHeader = false;
+    activeAnnotationId = '';
+    annotationPopoverResetKey += 1;
+    await tick();
+
+    if (annotation.exploredCharCount !== exploredCharCount) {
+      pauseTracker(true);
+    }
+
+    if (bookmarkManager) {
+      bookmarkManager.scrollToBookmark(
+        {
+          dataId: annotation.dataId,
+          exploredCharCount: annotation.exploredCharCount,
+          progress: annotation.progress,
+          lastBookmarkModified: annotation.updatedAt
+        },
+        customReadingPointScrollOffset
+      );
+    } else {
+      nextChapter$.next(annotation.anchor.sectionId);
+    }
+
+    scrollToRenderedAnnotation(annotation.id);
+  }
+
+  function scrollToRenderedAnnotation(annotationId: string, attempt = 0) {
+    window.setTimeout(
+      () => {
+        const annotationElement = Array.from(
+          document.querySelectorAll<HTMLElement>('[data-ttu-annotation-id]')
+        ).find((element) => element.dataset.ttuAnnotationId === annotationId);
+
+        if (annotationElement) {
+          if (!isPaginated) {
+            annotationElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center',
+              inline: 'center'
+            });
+          }
+
+          pulseRenderedAnnotation(annotationId);
+          return;
+        }
+
+        if (attempt < 12) {
+          scrollToRenderedAnnotation(annotationId, attempt + 1);
+        }
+      },
+      attempt ? 120 : 20
+    );
+  }
+
+  function pulseRenderedAnnotation(annotationId: string) {
+    const annotationElements = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-ttu-annotation-id]')
+    ).filter((element) => element.dataset.ttuAnnotationId === annotationId);
+
+    annotationElements.forEach((element) =>
+      element.classList.add('book-annotation-highlight--active')
+    );
+
+    window.setTimeout(() => {
+      annotationElements.forEach((element) =>
+        element.classList.remove('book-annotation-highlight--active')
+      );
+    }, 1400);
+  }
+
+  function closeAnnotationsPanel() {
+    showAnnotationsPanel = false;
+
+    if ($statisticsEnabled$ && !wasTrackerPaused) {
+      isTrackerPaused$.next(false);
+    }
+  }
+
   async function bookmarkPage() {
     const bookId = getBookIdSync();
     if (!bookId || !bookmarkManager) return;
@@ -1652,6 +1928,7 @@
       showFullscreenButton={fullscreenManager.fullscreenEnabled}
       autoScrollMultiplier={$multiplier$}
       {hasBookmarkData}
+      annotationCount={annotations.length}
       bind:isBookmarkScreen
       on:tocClick={() => {
         pauseTracker();
@@ -1703,6 +1980,11 @@
       on:readerImageGalleryClick={() => {
         showHeader = false;
         showReaderImageGallery = true;
+      }}
+      on:annotationsClick={() => {
+        showHeader = false;
+        pauseTracker();
+        showAnnotationsPanel = true;
       }}
       on:settingsClick={() => leaveReader(mergeEntries.SETTINGS.routeId, false)}
       on:domainHintClick={onDomainHintClick}
@@ -1756,6 +2038,8 @@
     verticalMode={$verticalMode$}
     fontColor={$themeOption$?.fontColor}
     backgroundColor={$backgroundColor$}
+    selectionFontColor={$themeOption$?.selectionFontColor ?? ''}
+    selectionBackgroundColor={$themeOption$?.selectionBackgroundColor ?? ''}
     hintFuriganaFontColor={$themeOption$?.hintFuriganaFontColor}
     hintFuriganaShadowColor={$themeOption$?.hintFuriganaShadowColor}
     fontFamilyGroupOne={$fontFamilyGroupOne$}
@@ -1790,10 +2074,25 @@
     bind:customReadingPointScrollOffset
     bind:customReadingPointRange
     bind:showCustomReadingPoint
+    {annotations}
+    {activeAnnotationId}
+    {annotationPopoverResetKey}
+    on:annotationActivate={({ detail }) => (activeAnnotationId = detail)}
     on:bookmark={bookmarkPage}
     on:trackerPause={() => pauseTracker(true)}
   />
+  <AnnotationSelectionToolbar
+    selectionRect={annotationSelectionRect}
+    fontColor={$themeOption$?.fontColor ?? ''}
+    backgroundColor={$backgroundColor$ ?? ''}
+    on:save={createAnnotation}
+    on:cancel={() => {
+      hideAnnotationComposer();
+      clearRange(window, 0);
+    }}
+  />
   {$initBookmarkData$ ?? ''}
+  {$initAnnotations$ ?? ''}
   {$setBackgroundColor$ ?? ''}
   {$setWritingMode$ ?? ''}
   {$textSelector$ ?? ''}
@@ -1821,6 +2120,26 @@
       verticalMode={$verticalMode$}
       {exploredCharCount}
       {wasTrackerPaused}
+    />
+  </div>
+{/if}
+
+{#if showAnnotationsPanel}
+  <div
+    class="writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
+    style:color={$themeOption$?.fontColor}
+    style:background-color={$backgroundColor$}
+    in:fly|local={{ x: -100, duration: 100, easing: quintInOut }}
+    use:clickOutside={closeAnnotationsPanel}
+  >
+    <BookAnnotationsPanel
+      {annotations}
+      sectionData={$sectionData$ ?? []}
+      fontColor={$themeOption$?.fontColor ?? ''}
+      backgroundColor={$backgroundColor$ ?? ''}
+      on:close={closeAnnotationsPanel}
+      on:jump={({ detail }) => jumpToAnnotation(detail)}
+      on:delete={({ detail }) => deleteAnnotation(detail)}
     />
   </div>
 {/if}
@@ -1968,6 +2287,10 @@
 
 <svelte:window
   on:keydown={onKeydown}
+  on:pointerdown={handleSelectionPointerDown}
+  on:pointermove={handleSelectionPointerMove}
+  on:pointerup={handleSelectionPointerUp}
+  on:pointercancel={handleSelectionPointerUp}
   on:beforeunload={handleUnload}
   on:resize={() => {
     if ($statisticsEnabled$ && !$isTrackerPaused$) {
