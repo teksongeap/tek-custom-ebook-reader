@@ -48,9 +48,6 @@
     "onlyBuiltDependencies": [
       "svelte-preprocess",
       "unrs-resolver"
-    ],
-    "overrides": {
-      "svelte": "4.2.20"
-    }
+    ]
   }
 }

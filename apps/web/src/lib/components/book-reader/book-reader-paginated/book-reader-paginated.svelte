@@ -172,6 +172,8 @@
 
   let currentSectionId = '';
 
+  let swipeStartedWithTouch = false;
+
   const width$ = new Subject<number>();
 
   const height$ = new Subject<number>();
@@ -682,10 +684,23 @@
 
   function onSwipe(ev: CustomEvent<{ direction: 'top' | 'right' | 'left' | 'bottom' }>) {
     if (!concretePageManager || $skipKeyDownListener$) return;
+    if (!swipeStartedWithTouch) return;
     if (ev.detail.direction !== 'left' && ev.detail.direction !== 'right') return;
     const swipeLeft = ev.detail.direction === 'left';
     const nextPage = verticalMode ? !swipeLeft : swipeLeft;
     concretePageManager.flipPage(nextPage ? 1 : -1);
+  }
+
+  function onSwipePointerDown(ev: PointerEvent) {
+    swipeStartedWithTouch = ev.pointerType === 'touch';
+  }
+
+  function onSwipeTouchStart() {
+    swipeStartedWithTouch = true;
+  }
+
+  function onSwipeMouseDown() {
+    swipeStartedWithTouch = false;
   }
 
   function onKeydown(ev: KeyboardEvent) {
@@ -781,6 +796,9 @@
   class:ttu-text-wrap-pretty={enableTextWrapPretty}
   class="book-content m-auto"
   use:swipe={{ timeframe: 500, minSwipeDistance: $swipeThreshold$, touchAction: 'pan-y' }}
+  on:pointerdown={onSwipePointerDown}
+  on:touchstart={onSwipeTouchStart}
+  on:mousedown={onSwipeMouseDown}
   on:swipe={onSwipe}
 >
   <div class="book-content-container" id={currentSectionId || null} bind:this={contentEl}>
