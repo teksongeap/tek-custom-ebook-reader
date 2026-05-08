@@ -1,4 +1,4 @@
-<img src="assets/readme/icon.png" align="left" style="margin-right: 1rem;" alt="logo">
+<img src="" align="left" style="margin-right: 1rem;" alt="logo">
 
 ## とく Ebook Reader
 
