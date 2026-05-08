@@ -14,13 +14,14 @@
 - [x] Vertical / Horizontal reading mode
 - [x] Basic Time/Character and Reading Goals Tracker
 - [x] Reading Data Statistics
-- [x] Character count and progress display
+- [x] Progress bar with navigable chapter ticks
 - [x] Table of content support for EPUB files
 - [x] (Auto) bookmark functionality
 - [x] Auto scroll (continuous mode)
 - [x] Book manager
 - [x] Data import/export via local and external sources
 - [x] Installation and offline capabilities
+- [x] Color-coded Highlighting and Annotations 🤯
 
 # Usage
 
