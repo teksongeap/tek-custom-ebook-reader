@@ -1377,6 +1377,23 @@
     }
   }
 
+  async function updateAnnotationComment({
+    detail
+  }: CustomEvent<{ annotation: BooksDbAnnotation; comment: string }>) {
+    const updatedAnnotation: BooksDbAnnotation = {
+      ...detail.annotation,
+      comment: detail.comment,
+      updatedAt: new Date().getTime()
+    };
+
+    await database.putAnnotation(updatedAnnotation);
+
+    annotations = annotations.map((annotation) =>
+      annotation.id === updatedAnnotation.id ? updatedAnnotation : annotation
+    );
+    activeAnnotationId = updatedAnnotation.id;
+  }
+
   async function jumpToAnnotation(annotation: BooksDbAnnotation) {
     closeAnnotationsPanel();
     showHeader = false;
@@ -2078,6 +2095,8 @@
     {activeAnnotationId}
     {annotationPopoverResetKey}
     on:annotationActivate={({ detail }) => (activeAnnotationId = detail)}
+    on:annotationUpdate={updateAnnotationComment}
+    on:annotationDelete={({ detail }) => deleteAnnotation(detail)}
     on:bookmark={bookmarkPage}
     on:trackerPause={() => pauseTracker(true)}
   />
@@ -2139,6 +2158,7 @@
       backgroundColor={$backgroundColor$ ?? ''}
       on:close={closeAnnotationsPanel}
       on:jump={({ detail }) => jumpToAnnotation(detail)}
+      on:update={updateAnnotationComment}
       on:delete={({ detail }) => deleteAnnotation(detail)}
     />
   </div>

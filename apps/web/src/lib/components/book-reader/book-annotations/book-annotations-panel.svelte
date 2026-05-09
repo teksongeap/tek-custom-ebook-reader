@@ -2,8 +2,10 @@
   import { createEventDispatcher } from 'svelte';
   import Fa from 'svelte-fa';
   import {
+    faCheck,
     faChevronRight,
     faHighlighter,
+    faPen,
     faTrash,
     faXmark
   } from '@fortawesome/free-solid-svg-icons';
@@ -19,8 +21,12 @@
   const dispatch = createEventDispatcher<{
     close: void;
     jump: BooksDbAnnotation;
+    update: { annotation: BooksDbAnnotation; comment: string };
     delete: BooksDbAnnotation;
   }>();
+
+  let editingAnnotationId = '';
+  let draftComment = '';
 
   $: panelStyle = `--reader-page-text: ${
     fontColor || 'var(--font-color)'
@@ -28,6 +34,9 @@
   $: sortedAnnotations = annotations
     .slice()
     .sort((a, b) => a.exploredCharCount - b.exploredCharCount || a.createdAt - b.createdAt);
+  $: if (editingAnnotationId && !annotations.some((annotation) => annotation.id === editingAnnotationId)) {
+    cancelEditing();
+  }
 
   function getChapterLabel(annotation: BooksDbAnnotation) {
     const mainChapters = sectionData.filter((section) => !section.parentChapter);
@@ -41,6 +50,43 @@
 
   function getProgress(annotation: BooksDbAnnotation) {
     return `${Math.max(0, Math.min(100, annotation.progress * 100)).toFixed(1)}%`;
+  }
+
+  function handleAnnotationClick(annotation: BooksDbAnnotation) {
+    if (editingAnnotationId === annotation.id) {
+      return;
+    }
+
+    dispatch('jump', annotation);
+  }
+
+  function handleAnnotationKeydown(event: KeyboardEvent, annotation: BooksDbAnnotation) {
+    if (editingAnnotationId === annotation.id) {
+      return;
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      dispatch('jump', annotation);
+    }
+  }
+
+  function editAnnotation(annotation: BooksDbAnnotation) {
+    editingAnnotationId = annotation.id;
+    draftComment = annotation.comment;
+  }
+
+  function cancelEditing() {
+    editingAnnotationId = '';
+    draftComment = '';
+  }
+
+  function saveAnnotation(annotation: BooksDbAnnotation) {
+    dispatch('update', {
+      annotation,
+      comment: draftComment.trim()
+    });
+    cancelEditing();
   }
 </script>
 
@@ -71,14 +117,10 @@
           role="button"
           tabindex="0"
           class="annotation-item"
+          class:annotation-item--editing={editingAnnotationId === annotation.id}
           style:--book-annotation-base={getAnnotationColorValue(annotation.color)}
-          on:click={() => dispatch('jump', annotation)}
-          on:keydown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              dispatch('jump', annotation);
-            }
-          }}
+          on:click={() => handleAnnotationClick(annotation)}
+          on:keydown={(event) => handleAnnotationKeydown(event, annotation)}
         >
           <span class="annotation-item-swatch" aria-hidden="true"></span>
           <span class="annotation-item-content">
@@ -86,13 +128,57 @@
               <span>{getChapterLabel(annotation)}</span>
               <span>{getProgress(annotation)}</span>
             </span>
-            {#if annotation.comment}
+            {#if annotation.comment && editingAnnotationId !== annotation.id}
               <span class="annotation-item-comment">{annotation.comment}</span>
+            {/if}
+            {#if editingAnnotationId === annotation.id}
+              <span class="annotation-item-editor">
+                <textarea
+                  class="annotation-item-textarea"
+                  bind:value={draftComment}
+                  rows="3"
+                  placeholder="Add an optional comment"
+                  on:click|stopPropagation={() => {}}
+                  on:keydown|stopPropagation={() => {}}
+                ></textarea>
+                <span class="annotation-item-editor-actions">
+                  <button
+                    type="button"
+                    class="annotation-item-editor-secondary"
+                    on:click|stopPropagation={cancelEditing}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    class="annotation-item-editor-save"
+                    on:click|stopPropagation={() => saveAnnotation(annotation)}
+                  >
+                    <Fa icon={faCheck} />
+                    <span>Save</span>
+                  </button>
+                </span>
+              </span>
             {/if}
             <span class="annotation-item-quote">{annotation.selectedText}</span>
           </span>
           <span class="annotation-item-actions">
             <span class="annotation-item-go" aria-hidden="true"><Fa icon={faChevronRight} /></span>
+            <button
+              type="button"
+              class="annotation-item-edit"
+              title="Edit annotation"
+              aria-label="Edit annotation"
+              on:click|stopPropagation={() => editAnnotation(annotation)}
+              on:keydown|stopPropagation={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  editAnnotation(annotation);
+                }
+              }}
+            >
+              <Fa icon={faPen} />
+            </button>
             <button
               type="button"
               class="annotation-item-delete"
@@ -243,6 +329,11 @@
     transform: translateY(-1px);
   }
 
+  .annotation-item--editing {
+    border-color: color-mix(in srgb, var(--book-annotation-base) 58%, transparent);
+    box-shadow: 0 16px 34px rgba(5, 7, 10, 0.14);
+  }
+
   .annotation-item-swatch {
     height: 100%;
     min-height: 4.5rem;
@@ -284,6 +375,7 @@
     line-height: 1.25;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   .annotation-item-quote {
@@ -294,6 +386,7 @@
     line-height: 1.35;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
   }
 
   .annotation-item-actions {
@@ -304,6 +397,7 @@
   }
 
   .annotation-item-go,
+  .annotation-item-edit,
   .annotation-item-delete {
     display: inline-flex;
     height: 1.8rem;
@@ -318,11 +412,86 @@
     font: inherit;
   }
 
+  .annotation-item-edit:hover,
+  .annotation-item-edit:focus-visible {
+    background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+    color: var(--app-accent);
+    outline: none;
+  }
+
   .annotation-item-delete:hover,
   .annotation-item-delete:focus-visible {
     background: color-mix(in srgb, var(--app-danger) 14%, transparent);
     color: var(--app-danger);
     outline: none;
+  }
+
+  .annotation-item-editor {
+    display: block;
+    margin-top: 0.1rem;
+  }
+
+  .annotation-item-textarea {
+    width: 100%;
+    resize: vertical;
+    border: 1px solid color-mix(in srgb, var(--reader-page-text) 14%, transparent);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--reader-page-bg) 86%, transparent);
+    color: var(--reader-page-text);
+    font: inherit;
+    font-size: 0.86rem;
+    line-height: 1.35;
+    outline: none;
+    padding: 0.55rem 0.65rem;
+  }
+
+  .annotation-item-textarea:focus {
+    border-color: color-mix(in srgb, var(--app-accent) 62%, transparent);
+    box-shadow: var(--app-focus-ring);
+  }
+
+  .annotation-item-editor-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .annotation-item-editor-save,
+  .annotation-item-editor-secondary {
+    display: inline-flex;
+    min-height: 2.1rem;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 0.5rem;
+    font: inherit;
+    font-weight: 800;
+    outline: none;
+  }
+
+  .annotation-item-editor-save {
+    border: 1px solid color-mix(in srgb, var(--app-accent) 44%, transparent);
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--app-accent) 86%, #ffffff),
+      color-mix(in srgb, #25a7a0 78%, var(--app-accent))
+    );
+    color: #ffffff;
+  }
+
+  .annotation-item-editor-secondary {
+    border: 1px solid color-mix(in srgb, var(--reader-page-text) 14%, transparent);
+    background: color-mix(in srgb, var(--reader-page-text) 8%, transparent);
+    color: color-mix(in srgb, var(--reader-page-text) 76%, transparent);
+  }
+
+  .annotation-item-editor-save:hover,
+  .annotation-item-editor-save:focus-visible,
+  .annotation-item-editor-secondary:hover,
+  .annotation-item-editor-secondary:focus-visible {
+    box-shadow: 0 14px 28px color-mix(in srgb, var(--app-accent) 24%, transparent);
   }
 
   .annotations-panel-empty {

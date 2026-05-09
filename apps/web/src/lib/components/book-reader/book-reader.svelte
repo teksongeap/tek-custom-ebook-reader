@@ -153,6 +153,8 @@
 
   const dispatch = createEventDispatcher<{
     annotationActivate: string;
+    annotationUpdate: { annotation: BooksDbAnnotation; comment: string };
+    annotationDelete: BooksDbAnnotation;
   }>();
 
   const mutationObserver: MutationObserver = new MutationObserver(handleMutation);
@@ -448,6 +450,8 @@
   {backgroundColor}
   renderRevision={annotationRenderRevision}
   on:activate={({ detail }) => dispatch('annotationActivate', detail)}
+  on:update={({ detail }) => dispatch('annotationUpdate', detail)}
+  on:delete={({ detail }) => dispatch('annotationDelete', detail)}
 />
 {$blurListener$ ?? ''}
 {$reactiveElements$ ?? ''}

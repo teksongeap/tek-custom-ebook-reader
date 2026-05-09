@@ -2,7 +2,7 @@
   import type { BooksDbAnnotation } from '$lib/data/database/books-db/versions/books-db';
   import { createEventDispatcher, onDestroy, tick } from 'svelte';
   import Fa from 'svelte-fa';
-  import { faCommentDots } from '@fortawesome/free-solid-svg-icons';
+  import { faCheck, faCommentDots, faPen, faXmark } from '@fortawesome/free-solid-svg-icons';
   import {
     clearAnnotationHighlights,
     getAnnotationClientRect,
@@ -21,6 +21,8 @@
 
   const dispatch = createEventDispatcher<{
     activate: string;
+    update: { annotation: BooksDbAnnotation; comment: string };
+    delete: BooksDbAnnotation;
   }>();
 
   let renderedSpans: RenderedAnnotationSpan[] = [];
@@ -34,6 +36,10 @@
   let redrawToken = 0;
   let previousActiveAnnotationId = '';
   let previousAnnotationPopoverResetKey = annotationPopoverResetKey;
+  let editingAnnotationId = '';
+  let draftComment = '';
+  let draftTextAreaEl: HTMLTextAreaElement | undefined;
+  let isEditing = false;
   const cleanupBySpan = new WeakMap<HTMLSpanElement, () => void>();
 
   $: annotationKey = annotations
@@ -57,6 +63,8 @@
     previousAnnotationPopoverResetKey = annotationPopoverResetKey;
     closeAnnotationCard();
   }
+
+  $: isEditing = !!activeAnnotation && editingAnnotationId === activeAnnotation.id;
 
   $: {
     if (previousActiveAnnotationId && !activeAnnotationId) {
@@ -142,6 +150,10 @@
   }
 
   async function openAnnotation(annotation: BooksDbAnnotation, pinned: boolean) {
+    if (editingAnnotationId) {
+      return;
+    }
+
     window.clearTimeout(closeTimer);
 
     activeAnnotation = annotation;
@@ -209,7 +221,7 @@
   }
 
   function scheduleClose() {
-    if (isPinned) {
+    if (isPinned || editingAnnotationId) {
       return;
     }
 
@@ -241,8 +253,63 @@
     activeAnnotation = undefined;
     isPinned = false;
     popoverReady = false;
+    editingAnnotationId = '';
+    draftComment = '';
     updateActiveHighlight();
     document.removeEventListener('pointerdown', closePinnedPopover, true);
+  }
+
+  async function editActiveAnnotation() {
+    if (!activeAnnotation) {
+      return;
+    }
+
+    window.clearTimeout(closeTimer);
+    editingAnnotationId = activeAnnotation.id;
+    draftComment = activeAnnotation.comment;
+    isPinned = true;
+    handledActiveAnnotationId = activeAnnotation.id;
+    dispatch('activate', activeAnnotation.id);
+
+    document.removeEventListener('pointerdown', closePinnedPopover, true);
+    document.addEventListener('pointerdown', closePinnedPopover, true);
+
+    await tick();
+    draftTextAreaEl?.focus();
+    await updatePopoverPosition();
+  }
+
+  async function cancelEdit() {
+    editingAnnotationId = '';
+    draftComment = '';
+
+    await tick();
+    await updatePopoverPosition();
+  }
+
+  async function saveActiveAnnotation() {
+    if (!activeAnnotation) {
+      return;
+    }
+
+    const annotation = activeAnnotation;
+    const comment = draftComment.trim();
+    editingAnnotationId = '';
+    draftComment = '';
+    dispatch('update', { annotation, comment });
+
+    await tick();
+    await updatePopoverPosition();
+  }
+
+  function deleteActiveAnnotation() {
+    if (!activeAnnotation) {
+      return;
+    }
+
+    const annotation = activeAnnotation;
+    closeAnnotationCard();
+    dispatch('delete', annotation);
   }
 
   function updateActiveHighlight() {
@@ -283,10 +350,52 @@
   >
     <div class="book-annotation-card-accent" aria-hidden="true"></div>
     <div class="book-annotation-card-header">
-      <span class="book-annotation-card-icon"><Fa icon={faCommentDots} /></span>
-      <span class="book-annotation-card-title">Annotation</span>
+      <span class="book-annotation-card-heading">
+        <span class="book-annotation-card-icon"><Fa icon={faCommentDots} /></span>
+        <span class="book-annotation-card-title">Annotation</span>
+      </span>
+      <span class="book-annotation-card-actions">
+        <button
+          type="button"
+          class="book-annotation-card-action"
+          title="Edit annotation"
+          aria-label="Edit annotation"
+          on:click|stopPropagation={editActiveAnnotation}
+        >
+          <Fa icon={faPen} />
+        </button>
+        <button
+          type="button"
+          class="book-annotation-card-action book-annotation-card-action--danger"
+          title="Delete annotation"
+          aria-label="Delete annotation"
+          on:click|stopPropagation={deleteActiveAnnotation}
+        >
+          <Fa icon={faXmark} />
+        </button>
+      </span>
     </div>
-    {#if activeAnnotation.comment}
+    {#if isEditing}
+      <div class="book-annotation-card-editor">
+        <textarea
+          bind:this={draftTextAreaEl}
+          class="book-annotation-card-textarea"
+          bind:value={draftComment}
+          rows="3"
+          placeholder="Add an optional comment"
+          on:keydown|stopPropagation={() => {}}
+        ></textarea>
+        <div class="book-annotation-card-editor-actions">
+          <button type="button" class="book-annotation-card-secondary" on:click={cancelEdit}>
+            Cancel
+          </button>
+          <button type="button" class="book-annotation-card-save" on:click={saveActiveAnnotation}>
+            <Fa icon={faCheck} />
+            <span>Save</span>
+          </button>
+        </div>
+      </div>
+    {:else if activeAnnotation.comment}
       <div class="book-annotation-card-comment">{activeAnnotation.comment}</div>
     {/if}
     <div class="book-annotation-card-quote">{activeAnnotation.selectedText}</div>
@@ -363,7 +472,8 @@
   .book-annotation-card-header {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: space-between;
+    gap: 0.75rem;
     color: color-mix(in srgb, var(--reader-page-text) 72%, transparent);
     font-size: 0.75rem;
     font-weight: 700;
@@ -372,8 +482,46 @@
     text-transform: uppercase;
   }
 
+  .book-annotation-card-heading,
+  .book-annotation-card-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
   .book-annotation-card-icon {
     color: var(--book-annotation-base);
+  }
+
+  .book-annotation-card-actions {
+    flex: 0 0 auto;
+  }
+
+  .book-annotation-card-action {
+    display: inline-flex;
+    height: 1.75rem;
+    width: 1.75rem;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: color-mix(in srgb, var(--reader-page-text) 64%, transparent);
+    font: inherit;
+    outline: none;
+  }
+
+  .book-annotation-card-action:hover,
+  .book-annotation-card-action:focus-visible {
+    background: color-mix(in srgb, var(--reader-page-text) 10%, transparent);
+    color: var(--reader-page-text);
+  }
+
+  .book-annotation-card-action--danger:hover,
+  .book-annotation-card-action--danger:focus-visible {
+    background: color-mix(in srgb, var(--app-danger) 16%, transparent);
+    color: var(--app-danger);
   }
 
   .book-annotation-card-comment {
@@ -382,6 +530,73 @@
     font-size: 0.95rem;
     font-weight: 520;
     line-height: 1.45;
+  }
+
+  .book-annotation-card-editor {
+    margin-top: 0.75rem;
+  }
+
+  .book-annotation-card-textarea {
+    width: 100%;
+    resize: vertical;
+    border: 1px solid color-mix(in srgb, var(--reader-page-text) 14%, transparent);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--reader-page-bg) 86%, transparent);
+    color: var(--reader-page-text);
+    font: inherit;
+    font-size: 0.9rem;
+    line-height: 1.35;
+    outline: none;
+    padding: 0.55rem 0.65rem;
+  }
+
+  .book-annotation-card-textarea:focus {
+    border-color: color-mix(in srgb, var(--app-accent) 62%, transparent);
+    box-shadow: var(--app-focus-ring);
+  }
+
+  .book-annotation-card-editor-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+  }
+
+  .book-annotation-card-save,
+  .book-annotation-card-secondary {
+    display: inline-flex;
+    min-height: 2.15rem;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 0.5rem;
+    font: inherit;
+    font-weight: 800;
+    outline: none;
+  }
+
+  .book-annotation-card-save {
+    border: 1px solid color-mix(in srgb, var(--app-accent) 44%, transparent);
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--app-accent) 86%, #ffffff),
+      color-mix(in srgb, #25a7a0 78%, var(--app-accent))
+    );
+    color: #ffffff;
+  }
+
+  .book-annotation-card-secondary {
+    border: 1px solid color-mix(in srgb, var(--reader-page-text) 14%, transparent);
+    background: color-mix(in srgb, var(--reader-page-text) 8%, transparent);
+    color: color-mix(in srgb, var(--reader-page-text) 76%, transparent);
+  }
+
+  .book-annotation-card-save:hover,
+  .book-annotation-card-save:focus-visible,
+  .book-annotation-card-secondary:hover,
+  .book-annotation-card-secondary:focus-visible {
+    box-shadow: 0 14px 28px color-mix(in srgb, var(--app-accent) 24%, transparent);
   }
 
   .book-annotation-card-quote {
