@@ -6,6 +6,7 @@
 
 import type {
   BooksDbAudioBook,
+  BooksDbAnnotation,
   BooksDbBookData,
   BooksDbBookmarkData,
   BooksDbReadingGoal,
@@ -260,6 +261,22 @@ export abstract class ApiStorageHandler extends BaseStorageHandler {
     );
   }
 
+  async areAnnotationsPresentAndUpToDate(referenceFilename: string | undefined) {
+    if (!referenceFilename) {
+      BaseStorageHandler.reportProgress();
+      return false;
+    }
+
+    const { file } = await this.getExternalFile(FilePrefix.ANNOTATIONS);
+
+    return BaseStorageHandler.checkIsPresentAndUpToDate(
+      BaseStorageHandler.getAnnotationsMetadata,
+      'lastAnnotationModified',
+      referenceFilename,
+      file?.name
+    );
+  }
+
   async areReadingGoalsPresentAndUpToDate(referenceFilename: string | undefined) {
     if (!referenceFilename) {
       BaseStorageHandler.reportProgress();
@@ -349,6 +366,20 @@ export abstract class ApiStorageHandler extends BaseStorageHandler {
       statistics: data,
       lastStatisticModified: BaseStorageHandler.getStatisticsMetadata(file.name)
         .lastStatisticModified
+    };
+  }
+
+  async getAnnotations() {
+    const { file, data } = await this.getExternalFile(FilePrefix.ANNOTATIONS, 'json');
+
+    if (!file) {
+      return { annotations: undefined, lastAnnotationModified: 0 };
+    }
+
+    return {
+      annotations: data,
+      lastAnnotationModified:
+        BaseStorageHandler.getAnnotationsMetadata(file.name).lastAnnotationModified
     };
   }
 
@@ -482,6 +513,32 @@ export abstract class ApiStorageHandler extends BaseStorageHandler {
     await this.upload(titleId, filename, files, file, JSON.stringify(statisticsToStore));
 
     this.addBookCard(this.currentContext.title, {});
+  }
+
+  async saveAnnotations(annotations: BooksDbAnnotation[], lastAnnotationModified: number) {
+    const shouldMerge = this.saveBehavior === ReplicationSaveBehavior.NewOnly;
+    const {
+      titleId,
+      files,
+      file,
+      data: existingData
+    } = await this.getExternalFile(
+      FilePrefix.ANNOTATIONS,
+      shouldMerge ? 'json' : '',
+      0.2,
+      false
+    );
+
+    const annotationsToStore = shouldMerge
+      ? BaseStorageHandler.mergeAnnotations(annotations, existingData, true)
+      : annotations;
+    const newAnnotationModified = BaseStorageHandler.getLastAnnotationModified(annotationsToStore);
+    const filename = BaseStorageHandler.getAnnotationsFileName(
+      annotationsToStore,
+      newAnnotationModified || lastAnnotationModified
+    );
+
+    await this.upload(titleId, filename, files, file, JSON.stringify(annotationsToStore));
   }
 
   async saveCover(data: Blob | undefined) {

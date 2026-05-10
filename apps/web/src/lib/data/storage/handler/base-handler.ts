@@ -9,6 +9,7 @@ import {
   currentDbVersion,
   type BooksDbBookData,
   type BooksDbBookmarkData,
+  type BooksDbAnnotation,
   type BooksDbStatistic,
   type BooksDbReadingGoal,
   type BooksDbAudioBook,
@@ -38,6 +39,7 @@ import {
 } from '@zip.js/zip.js';
 
 export enum FilePrefix {
+  ANNOTATIONS = 'annotations_',
   AUDIO_BOOK = 'audioBook_',
   SUBTITLE = 'subtitles_'
 }
@@ -75,6 +77,10 @@ export abstract class BaseStorageHandler {
 
   abstract areStatisticsPresentAndUpToDate(referenceFilename: string | undefined): Promise<boolean>;
 
+  abstract areAnnotationsPresentAndUpToDate(
+    referenceFilename: string | undefined
+  ): Promise<boolean>;
+
   abstract areReadingGoalsPresentAndUpToDate(
     referenceFilename: string | undefined
   ): Promise<boolean>;
@@ -92,6 +98,11 @@ export abstract class BaseStorageHandler {
   abstract getStatistics(): Promise<{
     statistics: BooksDbStatistic[] | undefined;
     lastStatisticModified: number;
+  }>;
+
+  abstract getAnnotations(): Promise<{
+    annotations: BooksDbAnnotation[] | undefined;
+    lastAnnotationModified: number;
   }>;
 
   abstract getCover(): Promise<Blob | undefined>;
@@ -114,6 +125,11 @@ export abstract class BaseStorageHandler {
   abstract saveProgress(data: BooksDbBookmarkData | File): Promise<void>;
 
   abstract saveStatistics(data: BooksDbStatistic[], lastStatisticModified: number): Promise<void>;
+
+  abstract saveAnnotations(
+    data: BooksDbAnnotation[],
+    lastAnnotationModified: number
+  ): Promise<void>;
 
   abstract saveCover(data: Blob | undefined): Promise<void>;
 
@@ -700,6 +716,21 @@ export abstract class BaseStorageHandler {
       : `${FilePrefix.SUBTITLE}${exporterVersion}_${currentDbVersion}_${data.lastSubtitleDataModified}_${data.subtitleData.subtitles.length}.json`;
   }
 
+  protected static getLastAnnotationModified(annotations: BooksDbAnnotation[]) {
+    return annotations.reduce(
+      (lastModified, annotation) =>
+        Math.max(lastModified, annotation.updatedAt || annotation.createdAt || 0),
+      0
+    );
+  }
+
+  protected static getAnnotationsFileName(
+    annotations: BooksDbAnnotation[],
+    lastAnnotationModified = BaseStorageHandler.getLastAnnotationModified(annotations)
+  ) {
+    return `${FilePrefix.ANNOTATIONS}${exporterVersion}_${currentDbVersion}_${lastAnnotationModified}_${annotations.length}.json`;
+  }
+
   protected static async getCoverFileName(cover: Blob) {
     const type = (await BaseStorageHandler.determineImageExtension(cover)) || 'jpeg';
 
@@ -759,6 +790,51 @@ export abstract class BaseStorageHandler {
       lastSubtitleDataModified: +parts[3],
       subtitleCount: +parts[4]
     };
+  }
+
+  protected static getAnnotationsMetadata(filename: string) {
+    const parts = filename.split('_').map((part) => part.replace(/\.json$/, ''));
+
+    return {
+      exporterVersion: +parts[1],
+      dbVersion: +parts[2],
+      lastAnnotationModified: +parts[3],
+      annotationCount: +parts[4]
+    };
+  }
+
+  protected static mergeAnnotations(
+    incomingAnnotations: BooksDbAnnotation[],
+    existingAnnotations: BooksDbAnnotation[] | undefined,
+    preferNewerOnly: boolean
+  ) {
+    if (!preferNewerOnly) {
+      return incomingAnnotations;
+    }
+
+    const mergedAnnotations = new Map<string, BooksDbAnnotation>();
+
+    (existingAnnotations || []).forEach((annotation) => {
+      mergedAnnotations.set(annotation.id, annotation);
+    });
+
+    incomingAnnotations.forEach((annotation) => {
+      const existingAnnotation = mergedAnnotations.get(annotation.id);
+
+      if (
+        !existingAnnotation ||
+        (annotation.updatedAt || annotation.createdAt || 0) >
+          (existingAnnotation.updatedAt || existingAnnotation.createdAt || 0)
+      ) {
+        mergedAnnotations.set(annotation.id, annotation);
+      }
+    });
+
+    return [...mergedAnnotations.values()].sort(
+      (annotationA, annotationB) =>
+        annotationA.exploredCharCount - annotationB.exploredCharCount ||
+        annotationA.createdAt - annotationB.createdAt
+    );
   }
 
   private static async determineImageExtension(cover: Blob) {

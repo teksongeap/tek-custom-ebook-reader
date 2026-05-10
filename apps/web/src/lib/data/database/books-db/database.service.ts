@@ -354,6 +354,63 @@ export class DatabaseService {
     }
   }
 
+  async storeAnnotations(
+    dataId: number,
+    annotations: BooksDbAnnotation[],
+    saveBehavior: ReplicationSaveBehavior
+  ) {
+    const db = await this.db;
+    const tx = db.transaction('annotation', 'readwrite');
+
+    try {
+      const store = tx.objectStore('annotation');
+      const incomingAnnotations = annotations.map((annotation) => ({
+        ...annotation,
+        dataId
+      }));
+
+      if (saveBehavior === ReplicationSaveBehavior.Overwrite) {
+        const existingKeys = await store.index('dataId').getAllKeys(dataId);
+
+        await Promise.all(existingKeys.map((key) => store.delete(key)));
+        await Promise.all(incomingAnnotations.map((annotation) => store.put(annotation)));
+      } else {
+        const existingAnnotations = await store.index('dataId').getAll(dataId);
+        const existingById = new Map(
+          existingAnnotations.map((annotation) => [annotation.id, annotation])
+        );
+
+        await Promise.all(
+          incomingAnnotations.map((annotation) => {
+            const existingAnnotation = existingById.get(annotation.id);
+
+            if (
+              existingAnnotation &&
+              (existingAnnotation.updatedAt || existingAnnotation.createdAt || 0) >=
+                (annotation.updatedAt || annotation.createdAt || 0)
+            ) {
+              return Promise.resolve();
+            }
+
+            return store.put(annotation);
+          })
+        );
+      }
+
+      await tx.done;
+      this.annotationsChanged$.next(dataId);
+    } catch (error: any) {
+      try {
+        tx.abort();
+        await tx.done;
+      } catch (_) {
+        // no-op
+      }
+
+      throw error;
+    }
+  }
+
   async putAudioBook(audioBook: BooksDbAudioBook) {
     const db = await this.db;
 

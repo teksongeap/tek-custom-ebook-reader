@@ -7,6 +7,7 @@
 import { BaseStorageHandler, FilePrefix } from '$lib/data/storage/handler/base-handler';
 import type {
   BooksDbAudioBook,
+  BooksDbAnnotation,
   BooksDbBookData,
   BooksDbBookmarkData,
   BooksDbReadingGoal,
@@ -135,6 +136,15 @@ export class BrowserStorageHandler extends BaseStorageHandler {
       fileName = lastStatisticModifed
         ? BaseStorageHandler.getStatisticsFileName([], lastStatisticModifed)
         : undefined;
+    } else if (fileIdentifier === FilePrefix.ANNOTATIONS) {
+      const dataId =
+        this.currentContext.id || (await database.getDataByTitle(this.currentContext.title))?.id;
+      const annotations = dataId ? await database.getAnnotations(dataId) : [];
+      const lastAnnotationModified = BaseStorageHandler.getLastAnnotationModified(annotations);
+
+      fileName = lastAnnotationModified
+        ? BaseStorageHandler.getAnnotationsFileName(annotations, lastAnnotationModified)
+        : undefined;
     } else if (fileIdentifier === BaseStorageHandler.readingGoalsFilePrefix) {
       const lastGoalModified = lastReadingGoalsModified$.getValue();
 
@@ -229,6 +239,30 @@ export class BrowserStorageHandler extends BaseStorageHandler {
     );
   }
 
+  async areAnnotationsPresentAndUpToDate(referenceFilename: string | undefined) {
+    if (!referenceFilename) {
+      BaseStorageHandler.reportProgress();
+      return false;
+    }
+
+    const dataId =
+      this.currentContext.id || (await database.getDataByTitle(this.currentContext.title))?.id;
+    const annotations = dataId ? await database.getAnnotations(dataId) : [];
+    const lastAnnotationModified = BaseStorageHandler.getLastAnnotationModified(annotations);
+    const fileName = lastAnnotationModified
+      ? BaseStorageHandler.getAnnotationsFileName(annotations, lastAnnotationModified)
+      : undefined;
+
+    BaseStorageHandler.reportProgress();
+
+    return BaseStorageHandler.checkIsPresentAndUpToDate(
+      BaseStorageHandler.getAnnotationsMetadata,
+      'lastAnnotationModified',
+      referenceFilename,
+      fileName
+    );
+  }
+
   async isAudioBookPresentAndUpToDate(referenceFilename: string | undefined) {
     if (!referenceFilename) {
       BaseStorageHandler.reportProgress();
@@ -303,6 +337,27 @@ export class BrowserStorageHandler extends BaseStorageHandler {
     }
 
     return { statistics, lastStatisticModified };
+  }
+
+  async getAnnotations() {
+    const dataId =
+      this.currentContext.id || (await database.getDataByTitle(this.currentContext.title))?.id;
+
+    BaseStorageHandler.reportProgress(0.5);
+
+    const annotations = dataId ? await database.getAnnotations(dataId) : [];
+    const sortedAnnotations = annotations.sort(
+      (annotationA, annotationB) =>
+        annotationA.exploredCharCount - annotationB.exploredCharCount ||
+        annotationA.createdAt - annotationB.createdAt
+    );
+    const lastAnnotationModified =
+      BaseStorageHandler.getLastAnnotationModified(sortedAnnotations);
+
+    return {
+      annotations: sortedAnnotations.length ? sortedAnnotations : undefined,
+      lastAnnotationModified
+    };
   }
 
   async getCover() {
@@ -394,6 +449,19 @@ export class BrowserStorageHandler extends BaseStorageHandler {
     );
 
     BaseStorageHandler.reportProgress();
+  }
+
+  async saveAnnotations(annotations: BooksDbAnnotation[]) {
+    const dataId =
+      this.currentContext.id || (await database.getDataByTitle(this.currentContext.title))?.id;
+
+    BaseStorageHandler.reportProgress(0.5);
+
+    if (dataId && annotations.length) {
+      await database.storeAnnotations(dataId, annotations, this.saveBehavior);
+    }
+
+    BaseStorageHandler.reportProgress(0.5);
   }
 
   async saveReadingGoals(data: BooksDbReadingGoal[], lastGoalModified: number) {

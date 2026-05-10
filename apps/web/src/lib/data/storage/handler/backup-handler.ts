@@ -6,6 +6,7 @@
 
 import type {
   BooksDbAudioBook,
+  BooksDbAnnotation,
   BooksDbBookData,
   BooksDbBookmarkData,
   BooksDbReadingGoal,
@@ -49,6 +50,11 @@ export class BackupStorageHandler extends BaseStorageHandler {
   }
 
   areStatisticsPresentAndUpToDate() {
+    BaseStorageHandler.reportProgress();
+    return Promise.resolve(false);
+  }
+
+  areAnnotationsPresentAndUpToDate() {
     BaseStorageHandler.reportProgress();
     return Promise.resolve(false);
   }
@@ -193,6 +199,22 @@ export class BackupStorageHandler extends BaseStorageHandler {
     };
   }
 
+  async getAnnotations() {
+    const { zipEntry, filename } = this.findEntry(FilePrefix.ANNOTATIONS);
+
+    if (!zipEntry) {
+      return { annotations: undefined, lastAnnotationModified: 0 };
+    }
+
+    const annotations = await this.extractAsJSON(zipEntry, 'Unable to read annotations');
+
+    return {
+      annotations,
+      lastAnnotationModified:
+        BaseStorageHandler.getAnnotationsMetadata(filename).lastAnnotationModified
+    };
+  }
+
   async getCover() {
     if (this.currentContext.imagePath instanceof Blob) {
       BaseStorageHandler.reportProgress();
@@ -311,6 +333,25 @@ export class BackupStorageHandler extends BaseStorageHandler {
     )}`;
 
     data.sort((a, b) => (a.dateKey > b.dateKey ? 1 : -1));
+
+    this.exportZipWriter = await this.addDataToZip(
+      filename,
+      JSON.stringify(data),
+      this.exportZipWriter
+    );
+  }
+
+  async saveAnnotations(data: BooksDbAnnotation[], lastAnnotationModified: number) {
+    const filename = `${this.sanitizedTitle}/${BaseStorageHandler.getAnnotationsFileName(
+      data,
+      lastAnnotationModified
+    )}`;
+
+    data.sort(
+      (annotationA, annotationB) =>
+        annotationA.exploredCharCount - annotationB.exploredCharCount ||
+        annotationA.createdAt - annotationB.createdAt
+    );
 
     this.exportZipWriter = await this.addDataToZip(
       filename,

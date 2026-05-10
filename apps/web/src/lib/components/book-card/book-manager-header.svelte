@@ -40,6 +40,7 @@
     faChartLine,
     faCircleXmark,
     faCloudArrowUp,
+    faFileExport,
     faSortDown,
     faSortUp,
     faTimes,
@@ -70,6 +71,7 @@
     selectionToStatistics: void;
     deleteStatistics: void;
     replicateData: void;
+    replicateAllData: void;
     cancelReplication: void;
   }>();
 
@@ -352,6 +354,20 @@
               on:action={triggerInput}
             />
           </div>
+          {#if hasBooks}
+            <div
+              tabindex="0"
+              role="button"
+              title="Export Library"
+              class="transform-gpu {baseIconClasses}"
+              in:scale={inAnimationParams}
+              out:scale={outAnimationParams}
+              on:click={() => dispatch('replicateAllData')}
+              on:keyup={dummyFn}
+            >
+              <Fa icon={faFileExport} />
+            </div>
+          {/if}
           <div
             title="Select Storage Source"
             class="relative transform-gpu"

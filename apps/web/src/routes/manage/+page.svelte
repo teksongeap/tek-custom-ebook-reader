@@ -106,6 +106,7 @@
   let replicationDone = new Subject<void>();
   let progressBase = 0;
   let executionStart: number;
+  let exportAllBooks = false;
 
   $: {
     if (!selectMode) {
@@ -479,6 +480,12 @@
   }
 
   function onReplicateData() {
+    exportAllBooks = false;
+    dialogManager.dialogs$.next([{ component: BookExportDialog, disableCloseOnClick: true }]);
+  }
+
+  function onReplicateAllData() {
+    exportAllBooks = true;
     dialogManager.dialogs$.next([{ component: BookExportDialog, disableCloseOnClick: true }]);
   }
 
@@ -597,6 +604,7 @@
   const replicator$ = executeReplicate$.pipe(
     switchMap(async () => {
       if (!operationAllowed()) {
+        exportAllBooks = false;
         return;
       }
 
@@ -616,7 +624,9 @@
           $readingGoalsMergeMode$
         )
       );
-      const books = $bookCards$.filter((card) => selectedBookIds.has(card.id));
+      const books = exportAllBooks
+        ? $bookCards$
+        : $bookCards$.filter((card) => selectedBookIds.has(card.id));
       const error = await replicateData(
         handlers[0],
         handlers[1],
@@ -631,6 +641,8 @@
       if (error) {
         showError('Export failed', error, 'Error(s) occurred during export');
       }
+
+      exportAllBooks = false;
     }),
     reduceToEmptyString()
   );
@@ -679,6 +691,7 @@
     }}
     on:deleteStatistics={onDeleteStatistics}
     on:replicateData={onReplicateData}
+    on:replicateAllData={onReplicateAllData}
     on:importBackup={(ev) => onImportBackup(ev.detail)}
   />
 </div>

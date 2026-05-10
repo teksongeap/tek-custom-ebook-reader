@@ -151,6 +151,7 @@ export async function importBackup(
     [
       StorageDataType.DATA,
       StorageDataType.PROGRESS,
+      StorageDataType.ANNOTATIONS,
       StorageDataType.STATISTICS,
       StorageDataType.READING_GOALS,
       StorageDataType.AUDIOBOOK,
@@ -179,6 +180,7 @@ export async function replicateData(
     progressBaseForBookOperations * contexts.length + progressBaseForOtherOperations;
   const processBookData = dataToReplicate.includes(StorageDataType.DATA);
   const processProgressData = dataToReplicate.includes(StorageDataType.PROGRESS);
+  const processAnnotations = dataToReplicate.includes(StorageDataType.ANNOTATIONS);
   const processStatistics = dataToReplicate.includes(StorageDataType.STATISTICS);
   const processReadingGoals = dataToReplicate.includes(StorageDataType.READING_GOALS);
   const processAudioBook = dataToReplicate.includes(StorageDataType.AUDIOBOOK);
@@ -252,6 +254,29 @@ export async function replicateData(
               }
 
               checkCancelAndProgress(cancelSignal, !dataProcessed, !progressData);
+            }
+          }
+
+          if (processAnnotations) {
+            if (
+              await targetHandler.areAnnotationsPresentAndUpToDate(
+                await sourceHandler.getFilenameForRecentCheck(FilePrefix.ANNOTATIONS)
+              )
+            ) {
+              checkCancelAndProgress(cancelSignal, !dataProcessed, true);
+              checkCancelAndProgress(cancelSignal, !dataProcessed, true);
+            } else {
+              const { annotations, lastAnnotationModified } = await sourceHandler.getAnnotations();
+
+              checkCancelAndProgress(cancelSignal, !dataProcessed);
+
+              if (annotations) {
+                await targetHandler.saveAnnotations(annotations, lastAnnotationModified);
+
+                dataProcessed = true;
+              }
+
+              checkCancelAndProgress(cancelSignal, !dataProcessed, !annotations);
             }
           }
 

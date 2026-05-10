@@ -15,6 +15,7 @@ export enum StorageKey {
 export enum StorageDataType {
   DATA = 'data',
   PROGRESS = 'bookmark',
+  ANNOTATIONS = 'annotation',
   STATISTICS = 'statistic',
   READING_GOALS = 'readingGoal',
   AUDIOBOOK = 'audioBook',

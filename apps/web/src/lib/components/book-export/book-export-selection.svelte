@@ -58,6 +58,16 @@
   <div>
     <input
       type="checkbox"
+      id="bookannotations"
+      name="annotation"
+      value="annotation"
+      bind:group={dataToReplicate}
+    />
+    <label for="bookannotations">Annotations</label>
+  </div>
+  <div>
+    <input
+      type="checkbox"
       id="bookstatistic"
       name="statistic"
       value="statistic"
@@ -68,12 +78,22 @@
   <div>
     <input
       type="checkbox"
+      id="readingGoals"
+      name="readingGoal"
+      value="readingGoal"
+      bind:group={dataToReplicate}
+    />
+    <label for="readingGoals">Reading Goals</label>
+  </div>
+  <div>
+    <input
+      type="checkbox"
       id="audioBook"
       name="audioBook"
       value="audioBook"
       bind:group={dataToReplicate}
     />
-    <label for="bookstatistic">Audiobook</label>
+    <label for="audioBook">Audiobook</label>
   </div>
   <div>
     <input
@@ -83,6 +103,6 @@
       value="subtitle"
       bind:group={dataToReplicate}
     />
-    <label for="bookstatistic">Subtitles</label>
+    <label for="subtitle">Subtitles</label>
   </div>
 </div>

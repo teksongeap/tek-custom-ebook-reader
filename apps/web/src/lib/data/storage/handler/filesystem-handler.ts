@@ -6,6 +6,7 @@
 
 import type {
   BooksDbAudioBook,
+  BooksDbAnnotation,
   BooksDbBookData,
   BooksDbBookmarkData,
   BooksDbReadingGoal,
@@ -238,6 +239,22 @@ export class FilesystemStorageHandler extends BaseStorageHandler {
     );
   }
 
+  async areAnnotationsPresentAndUpToDate(referenceFilename: string | undefined) {
+    if (!referenceFilename) {
+      BaseStorageHandler.reportProgress();
+      return false;
+    }
+
+    const { file } = await this.getExternalFile(FilePrefix.ANNOTATIONS, 1);
+
+    return BaseStorageHandler.checkIsPresentAndUpToDate(
+      BaseStorageHandler.getAnnotationsMetadata,
+      'lastAnnotationModified',
+      referenceFilename,
+      file?.name
+    );
+  }
+
   async areReadingGoalsPresentAndUpToDate(referenceFilename: string | undefined) {
     if (!referenceFilename) {
       BaseStorageHandler.reportProgress();
@@ -334,6 +351,26 @@ export class FilesystemStorageHandler extends BaseStorageHandler {
       statistics,
       lastStatisticModified: BaseStorageHandler.getStatisticsMetadata(file.name)
         .lastStatisticModified
+    };
+  }
+
+  async getAnnotations() {
+    const { file } = await this.getExternalFile(FilePrefix.ANNOTATIONS, 0.6);
+
+    if (!file) {
+      return { annotations: undefined, lastAnnotationModified: 0 };
+    }
+
+    const annotationsFile = await file.getFile();
+    const annotationsFileData = await FilesystemStorageHandler.readFileObject(annotationsFile);
+    const annotations = JSON.parse(annotationsFileData);
+
+    BaseStorageHandler.reportProgress(0.4);
+
+    return {
+      annotations,
+      lastAnnotationModified:
+        BaseStorageHandler.getAnnotationsMetadata(file.name).lastAnnotationModified
     };
   }
 
@@ -517,6 +554,41 @@ export class FilesystemStorageHandler extends BaseStorageHandler {
     );
 
     this.addBookCard(this.currentContext.title, {});
+  }
+
+  async saveAnnotations(annotations: BooksDbAnnotation[], lastAnnotationModified: number) {
+    const { file, files, rootDirectory } = await this.getExternalFile(FilePrefix.ANNOTATIONS);
+
+    let annotationsToStore = annotations;
+    let newAnnotationModified = lastAnnotationModified;
+
+    if (this.saveBehavior === ReplicationSaveBehavior.NewOnly && file) {
+      const existingAnnotationsFile = await file.getFile();
+      const existingAnnotations = JSON.parse(
+        await FilesystemStorageHandler.readFileObject(existingAnnotationsFile)
+      );
+
+      annotationsToStore = BaseStorageHandler.mergeAnnotations(
+        annotations,
+        existingAnnotations,
+        true
+      );
+      newAnnotationModified = BaseStorageHandler.getLastAnnotationModified(annotationsToStore);
+    }
+
+    const filename = BaseStorageHandler.getAnnotationsFileName(
+      annotationsToStore,
+      newAnnotationModified
+    );
+
+    await this.writeFile(
+      rootDirectory,
+      filename,
+      JSON.stringify(annotationsToStore),
+      files,
+      file,
+      0.6
+    );
   }
 
   async saveCover(data: Blob | undefined) {
