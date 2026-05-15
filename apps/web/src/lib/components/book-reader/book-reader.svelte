@@ -31,7 +31,7 @@
   import { logger } from '$lib/data/logger';
   import { imageLoadingState } from './image-loading-state';
   import { reactiveElements } from './reactive-elements';
-  import type { AutoScroller, BookmarkManager, PageManager } from './types';
+  import type { AutoScroller, BookmarkManager, PageManager, SectionNavigator } from './types';
   import BookReaderPaginated from './book-reader-paginated/book-reader-paginated.svelte';
   import { hoverFocus } from './hover-focus';
   import { enableReaderWakeLock$, enableTapEdgeToFlip$, hoverFocusEnabled$ } from '$lib/data/store';
@@ -120,6 +120,8 @@
 
   export let pageManager: PageManager | undefined;
 
+  export let sectionNavigator: SectionNavigator | undefined;
+
   export let isBookmarkScreen: boolean;
 
   export let customReadingPoint: number;
@@ -137,6 +139,8 @@
   export let annotations: BooksDbAnnotation[] = [];
 
   export let activeAnnotationId = '';
+
+  export let activeAnnotationEditId = '';
 
   export let annotationPopoverResetKey = 0;
 
@@ -386,6 +390,7 @@
       bind:autoScroller
       bind:bookmarkManager
       bind:pageManager
+      bind:sectionNavigator
       bind:customReadingPoint
       bind:customReadingPointTop
       bind:customReadingPointLeft
@@ -433,6 +438,7 @@
       bind:bookmarkData
       bind:bookmarkManager
       bind:pageManager
+      bind:sectionNavigator
       bind:customReadingPointRange
       bind:showCustomReadingPoint
       on:contentChange={handleContentChange}
@@ -445,6 +451,7 @@
   {contentEl}
   {annotations}
   {activeAnnotationId}
+  editAnnotationId={activeAnnotationEditId}
   {annotationPopoverResetKey}
   {fontColor}
   {backgroundColor}

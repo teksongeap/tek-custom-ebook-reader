@@ -29,7 +29,8 @@
   import type {
     AutoScroller,
     BookmarkManager,
-    PageManager
+    PageManager,
+    SectionNavigator
   } from '$lib/components/book-reader/types';
   import LogReportDialog from '$lib/components/log-report-dialog.svelte';
   import MessageDialog from '$lib/components/message-dialog.svelte';
@@ -185,6 +186,7 @@
   let autoScroller: AutoScroller | undefined;
   let bookmarkManager: BookmarkManager | undefined;
   let pageManager: PageManager | undefined;
+  let sectionNavigator: SectionNavigator | undefined;
   let bookmarkData: Promise<BooksDbBookmarkData | undefined> = Promise.resolve(undefined);
   let customReadingPointTop = -2;
   let customReadingPointLeft = -2;
@@ -200,6 +202,7 @@
   let annotations: BooksDbAnnotation[] = [];
   let showAnnotationsPanel = false;
   let activeAnnotationId = '';
+  let activeAnnotationEditId = '';
   let annotationPopoverResetKey = 0;
   let selectionPointerStart:
     | {
@@ -1377,6 +1380,7 @@
 
     annotations = [...annotations, annotation];
     activeAnnotationId = annotation.id;
+    activeAnnotationEditId = annotation.id;
     hideAnnotationComposer();
     clearRange(window, 0);
   }
@@ -1397,6 +1401,9 @@
     if (activeAnnotationId === annotation.id) {
       activeAnnotationId = '';
     }
+    if (activeAnnotationEditId === annotation.id) {
+      activeAnnotationEditId = '';
+    }
   }
 
   async function updateAnnotationComment({
@@ -1414,6 +1421,9 @@
       annotation.id === updatedAnnotation.id ? updatedAnnotation : annotation
     );
     activeAnnotationId = updatedAnnotation.id;
+    if (activeAnnotationEditId === updatedAnnotation.id) {
+      activeAnnotationEditId = '';
+    }
   }
 
   async function jumpToAnnotation(annotation: BooksDbAnnotation) {
@@ -1427,9 +1437,11 @@
       pauseTracker(true);
     }
 
-    if (annotation.anchor.sectionId) {
-      nextChapter$.next(annotation.anchor.sectionId);
-    } else if (bookmarkManager) {
+    const sectionLoaded = annotation.anchor.sectionId
+      ? await sectionNavigator?.jumpToSectionTarget(annotation.anchor.sectionId, true)
+      : false;
+
+    if (!sectionLoaded && bookmarkManager) {
       bookmarkManager.scrollToBookmark(
         {
           dataId: annotation.dataId,
@@ -1439,41 +1451,50 @@
         },
         customReadingPointScrollOffset
       );
-    } else {
+    } else if (!sectionLoaded) {
       nextChapter$.next(annotation.anchor.sectionId);
     }
 
-    scrollToRenderedAnnotation(annotation.id);
+    await scrollToRenderedAnnotation(annotation.id);
   }
 
-  function scrollToRenderedAnnotation(annotationId: string, attempt = 0) {
-    window.setTimeout(
-      () => {
-        const annotationElement = Array.from(
-          document.querySelectorAll<HTMLElement>('[data-ttu-annotation-id]')
-        ).find((element) => element.dataset.ttuAnnotationId === annotationId);
+  async function scrollToRenderedAnnotation(annotationId: string) {
+    for (let attempt = 0; attempt < 18; attempt += 1) {
+      if (attempt) {
+        await waitForAnnotationRenderAttempt();
+      } else {
+        await tick();
+      }
 
-        if (annotationElement) {
-          if (isPaginated) {
-            scrollPaginatedAnnotationIntoView(annotationElement);
-          } else {
-            annotationElement.scrollIntoView({
-              behavior: 'smooth',
-              block: 'center',
-              inline: 'center'
-            });
-          }
+      const annotationElement = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-ttu-annotation-id]')
+      ).find((element) => element.dataset.ttuAnnotationId === annotationId);
 
-          pulseRenderedAnnotation(annotationId);
-          return;
-        }
+      if (!annotationElement) {
+        continue;
+      }
 
-        if (attempt < 12) {
-          scrollToRenderedAnnotation(annotationId, attempt + 1);
-        }
-      },
-      attempt ? 120 : 20
-    );
+      if (isPaginated) {
+        scrollPaginatedAnnotationIntoView(annotationElement);
+      } else {
+        annotationElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'center'
+        });
+      }
+
+      pulseRenderedAnnotation(annotationId);
+      return true;
+    }
+
+    return false;
+  }
+
+  function waitForAnnotationRenderAttempt() {
+    return new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 120);
+    });
   }
 
   function scrollPaginatedAnnotationIntoView(annotationElement: HTMLElement) {
@@ -2135,6 +2156,7 @@
     bind:autoScroller
     bind:bookmarkManager
     bind:pageManager
+    bind:sectionNavigator
     bind:customReadingPoint
     bind:customReadingPointTop
     bind:customReadingPointLeft
@@ -2143,6 +2165,7 @@
     bind:showCustomReadingPoint
     {annotations}
     {activeAnnotationId}
+    {activeAnnotationEditId}
     {annotationPopoverResetKey}
     on:annotationActivate={({ detail }) => (activeAnnotationId = detail)}
     on:annotationUpdate={updateAnnotationComment}

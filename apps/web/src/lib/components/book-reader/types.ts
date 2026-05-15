@@ -39,3 +39,7 @@ export interface PageManager {
 
   updateSectionDataByOffset: (offset: number) => void;
 }
+
+export interface SectionNavigator {
+  jumpToSectionTarget: (targetId: string, isUser?: boolean) => Promise<boolean>;
+}

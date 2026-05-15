@@ -41,7 +41,7 @@
   } from 'rxjs';
   import { createEventDispatcher, onDestroy, onMount } from 'svelte';
   import Fa from 'svelte-fa';
-  import type { AutoScroller, BookmarkManager, PageManager } from '../types';
+  import type { AutoScroller, BookmarkManager, PageManager, SectionNavigator } from '../types';
   import { AutoScrollerContinuous } from './auto-scroller-continuous';
   import { BookmarkManagerContinuous, type BookmarkPosData } from './bookmark-manager-continuous';
   import { CharacterStatsCalculator } from './character-stats-calculator';
@@ -121,6 +121,8 @@
   export let bookmarkManager: BookmarkManager | undefined;
 
   export let pageManager: PageManager | undefined;
+
+  export let sectionNavigator: SectionNavigator | undefined;
 
   export let customReadingPoint: number;
 
@@ -262,7 +264,13 @@
   }
 
   /** Experimental Code - May be removed any time without warning */
-  onMount(() => document.addEventListener('ttu-action', handleAction, false));
+  onMount(() => {
+    sectionNavigator = {
+      jumpToSectionTarget
+    };
+
+    document.addEventListener('ttu-action', handleAction, false);
+  });
 
   function handleAction({ detail }: any) {
     if (!detail.type) {
@@ -360,6 +368,7 @@
 
   onDestroy(() => {
     document.removeEventListener('ttu-action', handleAction, false);
+    sectionNavigator = undefined;
     clearFontLoadingListener();
 
     destroy$.next();
@@ -628,14 +637,14 @@
     }
   }
 
-  nextChapter$.pipe(takeUntil(destroy$)).subscribe((chapterId) => {
-    let targetElement = document.getElementById(chapterId);
+  async function jumpToSectionTarget(targetId: string) {
+    let targetElement = document.getElementById(targetId);
 
     if (!targetElement) {
-      return;
+      return false;
     }
 
-    const checkForParent = !chapterId.startsWith(prependValue);
+    const checkForParent = !targetId.startsWith(prependValue);
 
     targetElement = checkForParent
       ? targetElement.closest(`div[id^="${prependValue}"]`) || targetElement
@@ -671,6 +680,12 @@
             : 0)
       );
     }
+
+    return true;
+  }
+
+  nextChapter$.pipe(takeUntil(destroy$)).subscribe((chapterId) => {
+    void jumpToSectionTarget(chapterId);
   });
 </script>
 

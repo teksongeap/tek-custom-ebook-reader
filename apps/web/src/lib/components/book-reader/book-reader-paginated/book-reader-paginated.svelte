@@ -38,7 +38,7 @@
   } from 'rxjs';
   import Fa from 'svelte-fa';
   import { swipe } from 'svelte-gestures';
-  import type { BookmarkManager, PageManager } from '../types';
+  import type { BookmarkManager, PageManager, SectionNavigator } from '../types';
   import { BookmarkManagerPaginated } from './bookmark-manager-paginated';
   import { PageManagerPaginated } from './page-manager-paginated';
   import { SectionCharacterStatsCalculator } from './section-character-stats-calculator';
@@ -100,6 +100,8 @@
   export let pageManager: PageManager | undefined;
 
   export let bookmarkManager: BookmarkManager | undefined;
+
+  export let sectionNavigator: SectionNavigator | undefined;
 
   export let exploredCharCount: number;
 
@@ -318,7 +320,13 @@
   $: updateAfterCustomReadingPointUpdate(customReadingPointRange);
 
   /** Experimental Code - May be removed any time without warning */
-  onMount(() => document.addEventListener('ttu-action', handleAction, false));
+  onMount(() => {
+    sectionNavigator = {
+      jumpToSectionTarget
+    };
+
+    document.addEventListener('ttu-action', handleAction, false);
+  });
 
   async function handleAction({ detail }: any) {
     if (!detail.type || !calculator || !concretePageManager) {
@@ -450,6 +458,7 @@
 
   onDestroy(() => {
     document.removeEventListener('ttu-action', handleAction, false);
+    sectionNavigator = undefined;
     clearFontLoadingListener();
     clearWheelNavigationLock();
 
@@ -677,6 +686,18 @@
         sectionJumpPending = false;
       }
     }
+  }
+
+  async function jumpToSectionTarget(targetId: string, isUser = true) {
+    const nextSectionIndex = sections.findIndex(
+      (section) => section.id === targetId || sectionContainsSelector(section, `[id="${targetId}"]`)
+    );
+
+    if (nextSectionIndex < 0) {
+      return false;
+    }
+
+    return !!(await jumpToSectionStart(nextSectionIndex, isUser));
   }
 
   function onHtmlLoad() {
@@ -916,14 +937,7 @@
   }
 
   nextChapter$.pipe(takeUntil(destroy$)).subscribe((chapterId) => {
-    const nextSectionIndex = sections.findIndex(
-      (section) =>
-        section.id === chapterId || sectionContainsSelector(section, `[id="${chapterId}"]`)
-    );
-
-    if (nextSectionIndex > -1) {
-      void jumpToSectionStart(nextSectionIndex, true);
-    }
+    void jumpToSectionTarget(chapterId, true);
   });
 </script>
 

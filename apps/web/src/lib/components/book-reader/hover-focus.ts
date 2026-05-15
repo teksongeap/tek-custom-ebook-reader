@@ -112,6 +112,12 @@ function getBookContentEl(target: Element) {
 }
 
 function getHoverFocusBlock(contentEl: HTMLElement, target: Element) {
+  const blockquote = target.closest('blockquote');
+
+  if (blockquote && contentEl.contains(blockquote)) {
+    return blockquote;
+  }
+
   const explicitBlock = target.closest(hoverFocusBlockSelector);
 
   if (explicitBlock && contentEl.contains(explicitBlock)) {
