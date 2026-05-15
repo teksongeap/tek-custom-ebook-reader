@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, tick } from 'svelte';
   import Fa from 'svelte-fa';
-  import { faHighlighter, faXmark } from '@fortawesome/free-solid-svg-icons';
+  import { faHighlighter } from '@fortawesome/free-solid-svg-icons';
   import { annotationColorOptions, type AnnotationColor } from './annotation-colors';
 
   export let selectionRect: DOMRect | undefined;
@@ -90,6 +90,18 @@
     saveAnnotation(colorOption.id);
   }
 
+  function handleDocumentPointerdown(event: PointerEvent) {
+    if (
+      !selectionRect ||
+      !toolbarEl ||
+      (event.target instanceof Node && toolbarEl.contains(event.target))
+    ) {
+      return;
+    }
+
+    dispatch('cancel');
+  }
+
   function limitToRange(min: number, max: number, value: number) {
     return Math.min(Math.max(value, min), Math.max(min, max));
   }
@@ -104,7 +116,7 @@
   }
 </script>
 
-<svelte:document on:keydown={handleDocumentKeydown} />
+<svelte:document on:keydown={handleDocumentKeydown} on:pointerdown={handleDocumentPointerdown} />
 
 {#if selectionRect}
   <div
@@ -134,16 +146,6 @@
           </button>
         {/each}
       </div>
-      <button
-        type="button"
-        class="annotation-toolbar-icon"
-        title="Cancel"
-        aria-label="Cancel annotation"
-        on:click={() => dispatch('cancel')}
-        on:keydown|stopPropagation={() => {}}
-      >
-        <Fa icon={faXmark} />
-      </button>
     </div>
   </div>
 {/if}
@@ -202,25 +204,6 @@
     display: none;
   }
 
-  .annotation-toolbar-icon {
-    display: inline-flex;
-    height: 1.65rem;
-    width: 1.65rem;
-    align-items: center;
-    justify-content: center;
-    border: 0;
-    border-radius: 0.375rem;
-    background: transparent;
-    color: color-mix(in srgb, var(--reader-page-text) 64%, transparent);
-    outline: none;
-  }
-
-  .annotation-toolbar-icon:hover,
-  .annotation-toolbar-icon:focus-visible {
-    background: color-mix(in srgb, var(--reader-page-text) 9%, transparent);
-    color: var(--reader-page-text);
-  }
-
   .annotation-toolbar-colors {
     display: flex;
     flex: 1 1 auto;
@@ -237,9 +220,7 @@
     cursor: pointer;
     border: 1px solid color-mix(in srgb, var(--reader-page-text) 18%, transparent);
     border-radius: 999px;
-    background:
-      radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.55), transparent 36%),
-      var(--book-annotation-base);
+    background: var(--book-annotation-base);
     box-shadow: 0 8px 18px color-mix(in srgb, var(--book-annotation-base) 20%, transparent);
     outline: none;
     transition:
@@ -266,12 +247,13 @@
     align-items: center;
     justify-content: center;
     border-radius: 999px;
-    background: color-mix(in srgb, #ffffff 62%, transparent);
-    color: rgba(0, 0, 0, 0.76);
+    color: rgba(0, 0, 0, 0.84);
     font-size: 0.65rem;
     font-weight: 900;
     line-height: 1;
     pointer-events: none;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+    text-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.54),
+      0 -1px 0 rgba(255, 255, 255, 0.28);
   }
 </style>

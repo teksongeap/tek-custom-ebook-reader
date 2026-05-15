@@ -305,14 +305,6 @@
     await updatePopoverPosition();
   }
 
-  async function cancelEdit() {
-    editingAnnotationId = '';
-    draftComment = '';
-
-    await tick();
-    await updatePopoverPosition();
-  }
-
   async function saveActiveAnnotation(closeAfterSave = false) {
     if (!activeAnnotation) {
       return;
@@ -397,15 +389,17 @@
         <span class="book-annotation-card-title">Annotation</span>
       </span>
       <span class="book-annotation-card-actions">
-        <button
-          type="button"
-          class="book-annotation-card-action"
-          title="Edit annotation"
-          aria-label="Edit annotation"
-          on:click|stopPropagation={editActiveAnnotation}
-        >
-          <Fa icon={faPen} />
-        </button>
+        {#if !isEditing}
+          <button
+            type="button"
+            class="book-annotation-card-action"
+            title="Edit annotation"
+            aria-label="Edit annotation"
+            on:click|stopPropagation={editActiveAnnotation}
+          >
+            <Fa icon={faPen} />
+          </button>
+        {/if}
         <button
           type="button"
           class="book-annotation-card-action book-annotation-card-action--danger"
@@ -427,11 +421,6 @@
           placeholder="Add an optional comment"
           on:keydown={handleDraftCommentKeydown}
         ></textarea>
-        <div class="book-annotation-card-editor-actions">
-          <button type="button" class="book-annotation-card-secondary" on:click={cancelEdit}>
-            Cancel
-          </button>
-        </div>
       </div>
     {:else if activeAnnotation.comment}
       <div class="book-annotation-card-comment">{activeAnnotation.comment}</div>
@@ -589,37 +578,6 @@
   .book-annotation-card-textarea:focus {
     border-color: color-mix(in srgb, var(--app-accent) 62%, transparent);
     box-shadow: var(--app-focus-ring);
-  }
-
-  .book-annotation-card-editor-actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 0.6rem;
-  }
-
-  .book-annotation-card-secondary {
-    display: inline-flex;
-    min-width: 6.5rem;
-    min-height: 2.15rem;
-    cursor: pointer;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    border-radius: 0.5rem;
-    font: inherit;
-    font-weight: 800;
-    outline: none;
-  }
-
-  .book-annotation-card-secondary {
-    border: 1px solid color-mix(in srgb, var(--reader-page-text) 14%, transparent);
-    background: color-mix(in srgb, var(--reader-page-text) 8%, transparent);
-    color: color-mix(in srgb, var(--reader-page-text) 76%, transparent);
-  }
-
-  .book-annotation-card-secondary:hover,
-  .book-annotation-card-secondary:focus-visible {
-    box-shadow: 0 14px 28px color-mix(in srgb, var(--app-accent) 24%, transparent);
   }
 
   .book-annotation-card-quote {
