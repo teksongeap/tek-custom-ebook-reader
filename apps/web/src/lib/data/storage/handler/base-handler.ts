@@ -149,6 +149,14 @@ export abstract class BaseStorageHandler {
 
   static readingGoalsFilePrefix = 'ttu-user-goals_';
 
+  private static readonly annotationColors: BooksDbAnnotation['color'][] = [
+    'yellow',
+    'green',
+    'blue',
+    'pink',
+    'violet'
+  ];
+
   storageType: StorageKey;
 
   protected window: Window;
@@ -697,11 +705,15 @@ export abstract class BaseStorageHandler {
   }
 
   protected static getProgressFileName(progress: BooksDbBookmarkData | File) {
-    return progress instanceof File
-      ? progress.name
-      : `progress_${exporterVersion}_${currentDbVersion}_${progress.lastBookmarkModified || 0}_${
-          progress.progress || 0
-        }.json`;
+    if (progress instanceof File) {
+      return progress.name;
+    }
+
+    const normalizedProgress = BaseStorageHandler.normalizeProgressData(progress);
+
+    return `progress_${exporterVersion}_${currentDbVersion}_${
+      normalizedProgress.lastBookmarkModified || 0
+    }_${normalizedProgress.progress || 0}.json`;
   }
 
   protected static getAudioBookFileName(audioBook: BooksDbAudioBook | File) {
@@ -728,7 +740,9 @@ export abstract class BaseStorageHandler {
     annotations: BooksDbAnnotation[],
     lastAnnotationModified = BaseStorageHandler.getLastAnnotationModified(annotations)
   ) {
-    return `${FilePrefix.ANNOTATIONS}${exporterVersion}_${currentDbVersion}_${lastAnnotationModified}_${annotations.length}.json`;
+    const normalizedAnnotations = BaseStorageHandler.normalizeAnnotations(annotations);
+
+    return `${FilePrefix.ANNOTATIONS}${exporterVersion}_${currentDbVersion}_${lastAnnotationModified}_${normalizedAnnotations.length}.json`;
   }
 
   protected static async getCoverFileName(cover: Blob) {
@@ -755,8 +769,8 @@ export abstract class BaseStorageHandler {
     return {
       exporterVersion: +parts[1],
       dbVersion: +parts[2],
-      lastBookmarkModified: +parts[3],
-      progress: +parts[4]
+      lastBookmarkModified: BaseStorageHandler.toFiniteNumber(parts[3], 0),
+      progress: BaseStorageHandler.normalizeProgressRatio(parts[4])
     };
   }
 
@@ -808,17 +822,23 @@ export abstract class BaseStorageHandler {
     existingAnnotations: BooksDbAnnotation[] | undefined,
     preferNewerOnly: boolean
   ) {
+    const normalizedIncomingAnnotations =
+      BaseStorageHandler.normalizeAnnotations(incomingAnnotations);
+    const normalizedExistingAnnotations = BaseStorageHandler.normalizeAnnotations(
+      existingAnnotations || []
+    );
+
     if (!preferNewerOnly) {
-      return incomingAnnotations;
+      return normalizedIncomingAnnotations;
     }
 
     const mergedAnnotations = new Map<string, BooksDbAnnotation>();
 
-    (existingAnnotations || []).forEach((annotation) => {
+    normalizedExistingAnnotations.forEach((annotation) => {
       mergedAnnotations.set(annotation.id, annotation);
     });
 
-    incomingAnnotations.forEach((annotation) => {
+    normalizedIncomingAnnotations.forEach((annotation) => {
       const existingAnnotation = mergedAnnotations.get(annotation.id);
 
       if (
@@ -830,11 +850,189 @@ export abstract class BaseStorageHandler {
       }
     });
 
-    return [...mergedAnnotations.values()].sort(
-      (annotationA, annotationB) =>
-        annotationA.exploredCharCount - annotationB.exploredCharCount ||
-        annotationA.createdAt - annotationB.createdAt
+    return BaseStorageHandler.sortAnnotations([...mergedAnnotations.values()]);
+  }
+
+  protected static normalizeProgressData(progress: BooksDbBookmarkData) {
+    const normalizedProgress = { ...progress };
+    const scrollX = BaseStorageHandler.toOptionalFiniteNumber(progress.scrollX);
+    const scrollY = BaseStorageHandler.toOptionalFiniteNumber(progress.scrollY);
+    const exploredCharCount = BaseStorageHandler.toOptionalFiniteNumber(progress.exploredCharCount);
+
+    normalizedProgress.progress = BaseStorageHandler.normalizeProgressRatio(progress.progress);
+    normalizedProgress.lastBookmarkModified = BaseStorageHandler.toFiniteNumber(
+      progress.lastBookmarkModified,
+      0
     );
+
+    if (scrollX === undefined) {
+      delete normalizedProgress.scrollX;
+    } else {
+      normalizedProgress.scrollX = scrollX;
+    }
+
+    if (scrollY === undefined) {
+      delete normalizedProgress.scrollY;
+    } else {
+      normalizedProgress.scrollY = scrollY;
+    }
+
+    if (exploredCharCount === undefined) {
+      delete normalizedProgress.exploredCharCount;
+    } else {
+      normalizedProgress.exploredCharCount = Math.max(0, exploredCharCount);
+    }
+
+    return normalizedProgress;
+  }
+
+  protected static normalizeProgressRatio(progress: BooksDbBookmarkData['progress'] | unknown) {
+    const stringProgress = typeof progress === 'string' ? progress.trim() : '';
+    const isPercentString = stringProgress.endsWith('%');
+    let progressValue =
+      typeof progress === 'number'
+        ? progress
+        : BaseStorageHandler.toFiniteNumber(
+            isPercentString ? stringProgress.slice(0, -1) : stringProgress,
+            0
+          );
+
+    if (isPercentString || progressValue > 1) {
+      progressValue /= 100;
+    }
+
+    return Math.min(1, Math.max(0, progressValue));
+  }
+
+  protected static normalizeAnnotations(annotations: unknown, dataId?: number) {
+    if (!Array.isArray(annotations)) {
+      return [];
+    }
+
+    return BaseStorageHandler.sortAnnotations(
+      annotations
+        .map((annotation) => BaseStorageHandler.normalizeAnnotation(annotation, dataId))
+        .filter((annotation): annotation is BooksDbAnnotation => !!annotation)
+    );
+  }
+
+  protected static sortAnnotations(annotations: BooksDbAnnotation[]) {
+    return [...annotations].sort((annotationA, annotationB) =>
+      BaseStorageHandler.compareAnnotations(annotationA, annotationB)
+    );
+  }
+
+  private static normalizeAnnotation(annotation: unknown, dataId?: number) {
+    if (!BaseStorageHandler.isRecord(annotation)) {
+      return undefined;
+    }
+
+    const anchor = BaseStorageHandler.normalizeAnnotationAnchor(
+      annotation.anchor,
+      annotation.selectedText
+    );
+
+    if (!anchor) {
+      return undefined;
+    }
+
+    const createdAt = BaseStorageHandler.toFiniteNumber(annotation.createdAt, 0);
+    const updatedAt = BaseStorageHandler.toFiniteNumber(annotation.updatedAt, createdAt);
+    const annotationDataId = BaseStorageHandler.toFiniteNumber(annotation.dataId, 0);
+    const color = BaseStorageHandler.annotationColors.includes(
+      annotation.color as BooksDbAnnotation['color']
+    )
+      ? (annotation.color as BooksDbAnnotation['color'])
+      : 'yellow';
+    const selectedText =
+      typeof annotation.selectedText === 'string' && annotation.selectedText
+        ? annotation.selectedText
+        : anchor.text;
+    const id =
+      typeof annotation.id === 'string' && annotation.id
+        ? annotation.id
+        : `${anchor.sectionId}_${anchor.startOffset}_${anchor.endOffset}_${createdAt}`;
+
+    return {
+      id,
+      dataId: dataId || annotationDataId,
+      color,
+      comment: typeof annotation.comment === 'string' ? annotation.comment : '',
+      selectedText,
+      anchor,
+      progress: BaseStorageHandler.normalizeProgressRatio(annotation.progress),
+      exploredCharCount: Math.max(
+        0,
+        BaseStorageHandler.toFiniteNumber(annotation.exploredCharCount, 0)
+      ),
+      createdAt,
+      updatedAt
+    };
+  }
+
+  private static normalizeAnnotationAnchor(anchor: unknown, selectedText: unknown) {
+    if (!BaseStorageHandler.isRecord(anchor)) {
+      return undefined;
+    }
+
+    const sectionId = typeof anchor.sectionId === 'string' ? anchor.sectionId : '';
+    const startOffset = BaseStorageHandler.toFiniteNumber(anchor.startOffset, Number.NaN);
+    const endOffset = BaseStorageHandler.toFiniteNumber(anchor.endOffset, Number.NaN);
+    const text =
+      typeof anchor.text === 'string' && anchor.text
+        ? anchor.text
+        : typeof selectedText === 'string'
+          ? selectedText
+          : '';
+
+    if (
+      !sectionId ||
+      !text ||
+      !Number.isFinite(startOffset) ||
+      !Number.isFinite(endOffset) ||
+      startOffset < 0 ||
+      endOffset <= startOffset
+    ) {
+      return undefined;
+    }
+
+    return {
+      sectionId,
+      startOffset,
+      endOffset,
+      text,
+      prefix: typeof anchor.prefix === 'string' ? anchor.prefix : '',
+      suffix: typeof anchor.suffix === 'string' ? anchor.suffix : ''
+    };
+  }
+
+  private static compareAnnotations(
+    annotationA: BooksDbAnnotation,
+    annotationB: BooksDbAnnotation
+  ) {
+    return (
+      annotationA.anchor.sectionId.localeCompare(annotationB.anchor.sectionId) ||
+      annotationA.anchor.startOffset - annotationB.anchor.startOffset ||
+      annotationA.anchor.endOffset - annotationB.anchor.endOffset ||
+      annotationA.exploredCharCount - annotationB.exploredCharCount ||
+      annotationA.createdAt - annotationB.createdAt
+    );
+  }
+
+  private static toFiniteNumber(value: unknown, fallback: number) {
+    const numericValue = Number(value);
+
+    return Number.isFinite(numericValue) ? numericValue : fallback;
+  }
+
+  private static toOptionalFiniteNumber(value: unknown) {
+    const numericValue = Number(value);
+
+    return Number.isFinite(numericValue) ? numericValue : undefined;
+  }
+
+  private static isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
   }
 
   private static async determineImageExtension(cover: Blob) {

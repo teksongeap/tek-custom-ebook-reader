@@ -31,25 +31,45 @@
   $: panelStyle = `--reader-page-text: ${
     fontColor || 'var(--font-color)'
   }; --reader-page-bg: ${backgroundColor || 'var(--background-color)'};`;
+  $: sectionOrder = new Map(sectionData.map((section, index) => [section.reference, index]));
   $: sortedAnnotations = annotations
     .slice()
-    .sort((a, b) => a.exploredCharCount - b.exploredCharCount || a.createdAt - b.createdAt);
-  $: if (editingAnnotationId && !annotations.some((annotation) => annotation.id === editingAnnotationId)) {
+    .sort(
+      (a, b) =>
+        getAnnotationSectionOrder(a) - getAnnotationSectionOrder(b) ||
+        a.anchor.startOffset - b.anchor.startOffset ||
+        a.createdAt - b.createdAt
+    );
+  $: if (
+    editingAnnotationId &&
+    !annotations.some((annotation) => annotation.id === editingAnnotationId)
+  ) {
     cancelEditing();
+  }
+
+  function getAnnotationSectionOrder(annotation: BooksDbAnnotation) {
+    return (
+      sectionOrder.get(annotation.anchor.sectionId) ??
+      sectionData.length + annotation.exploredCharCount
+    );
   }
 
   function getChapterLabel(annotation: BooksDbAnnotation) {
     const mainChapters = sectionData.filter((section) => !section.parentChapter);
-    const chapter = mainChapters
+    const annotationSection = sectionData.find(
+      (section) => section.reference === annotation.anchor.sectionId
+    );
+    const anchorChapter = annotationSection?.parentChapter
+      ? mainChapters.find((section) => section.reference === annotationSection.parentChapter)
+      : annotationSection && !annotationSection.parentChapter
+        ? annotationSection
+        : undefined;
+    const fallbackChapter = mainChapters
       .slice()
       .reverse()
       .find((section) => (section.startCharacter || 0) <= annotation.exploredCharCount);
 
-    return chapter?.label || 'Current Book';
-  }
-
-  function getProgress(annotation: BooksDbAnnotation) {
-    return `${Math.max(0, Math.min(100, annotation.progress * 100)).toFixed(1)}%`;
+    return anchorChapter?.label || fallbackChapter?.label || 'Current Book';
   }
 
   function handleAnnotationClick(annotation: BooksDbAnnotation) {
@@ -126,7 +146,6 @@
           <span class="annotation-item-content">
             <span class="annotation-item-meta">
               <span>{getChapterLabel(annotation)}</span>
-              <span>{getProgress(annotation)}</span>
             </span>
             {#if annotation.comment && editingAnnotationId !== annotation.id}
               <span class="annotation-item-comment">{annotation.comment}</span>
@@ -201,7 +220,9 @@
       <div class="annotations-panel-empty">
         <div class="annotations-panel-empty-icon"><Fa icon={faHighlighter} /></div>
         <div class="annotations-panel-empty-title">No annotations yet</div>
-        <div class="annotations-panel-empty-copy">Select text in the reader to save a highlight.</div>
+        <div class="annotations-panel-empty-copy">
+          Select text in the reader to save a highlight.
+        </div>
       </div>
     {/if}
   </div>

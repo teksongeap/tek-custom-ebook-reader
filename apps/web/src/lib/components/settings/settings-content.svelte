@@ -20,6 +20,7 @@
     optionsForFuriganaStyle,
     optionsForImportHTMLFixes,
     optionsForMergeMode,
+    optionsForPaginationTransitionMode,
     optionsForReplicationSaveBehavior,
     optionsForTextMarginMode,
     optionsForTrackerAutoPause,
@@ -36,6 +37,7 @@
   import { FuriganaStyle } from '$lib/data/furigana-style';
   import { ImportHTMLFixMode } from '$lib/data/import-html-fix-mode';
   import { logger } from '$lib/data/logger';
+  import { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
   import { isAppDefault } from '$lib/data/storage/storage-source-manager';
   import { defaultStorageSources } from '$lib/data/storage/storage-types';
   import { isStorageSourceAvailable } from '$lib/data/storage/storage-view';
@@ -109,6 +111,8 @@
 
   export let enableReaderWakeLock: boolean;
 
+  export let showCharacterCounter: boolean;
+
   export let secondDimensionMaxValue: number;
 
   export let firstDimensionMargin: number;
@@ -130,6 +134,8 @@
   export let enableTapEdgeToFlip: boolean;
 
   export let pageColumns: number;
+
+  export let paginationTransitionMode: PaginationTransitionMode;
 
   export let storageQuota: string;
 
@@ -642,6 +648,9 @@
         />
       </SettingsItemGroup>
     {/if}
+    <SettingsItemGroup title="Show Character Counter">
+      <ButtonToggleGroup options={optionsForToggle} bind:selectedOptionId={showCharacterCounter} />
+    </SettingsItemGroup>
     <SettingsItemGroup title="Disable Wheel Navigation">
       <ButtonToggleGroup
         options={optionsForToggle}
@@ -747,6 +756,12 @@
       >
         <ButtonToggleGroup options={optionsForToggle} bind:selectedOptionId={enableTapEdgeToFlip} />
       </SettingsItemGroup>
+      <SettingsItemGroup title="Pagination style">
+        <ButtonToggleGroup
+          options={optionsForPaginationTransitionMode}
+          bind:selectedOptionId={paginationTransitionMode}
+        />
+      </SettingsItemGroup>
       {#if !verticalMode}
         <SettingsItemGroup title="Page Columns" tooltip="# of text columns rendered">
           <input type="number" class={inputClasses} step="1" min="0" bind:value={pageColumns} />
@@ -811,11 +826,11 @@
           options={optionsForToggle}
           bind:selectedOptionId={keepLocalStatisticsOnDeletion}
         />
-          <div
-            tabindex="0"
-            role="button"
-            class="settings-inline-action ml-3"
-            on:click={() => {
+        <div
+          tabindex="0"
+          role="button"
+          class="settings-inline-action ml-3"
+          on:click={() => {
             showSpinner = true;
             database
               .clearZombieStatistics()

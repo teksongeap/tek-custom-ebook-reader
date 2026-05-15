@@ -22,6 +22,7 @@
     BooksDbBookmarkData
   } from '$lib/data/database/books-db/versions/books-db';
   import type { FuriganaStyle } from '$lib/data/furigana-style';
+  import type { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
   import { ViewMode } from '$lib/data/view-mode';
   import { iffBrowser } from '$lib/functions/rxjs/iff-browser';
   import { reduceToEmptyString } from '$lib/functions/rxjs/reduce-to-empty-string';
@@ -33,11 +34,7 @@
   import type { AutoScroller, BookmarkManager, PageManager } from './types';
   import BookReaderPaginated from './book-reader-paginated/book-reader-paginated.svelte';
   import { hoverFocus } from './hover-focus';
-  import {
-    enableReaderWakeLock$,
-    enableTapEdgeToFlip$,
-    hoverFocusEnabled$
-  } from '$lib/data/store';
+  import { enableReaderWakeLock$, enableTapEdgeToFlip$, hoverFocusEnabled$ } from '$lib/data/store';
   import { createEventDispatcher, onDestroy } from 'svelte';
   import BookAnnotationsRenderer from './book-annotations/book-annotations-renderer.svelte';
 
@@ -100,6 +97,8 @@
   export let avoidPageBreak: boolean;
 
   export let pageColumns: number;
+
+  export let paginationTransitionMode: PaginationTransitionMode;
 
   export let autoBookmark: boolean;
 
@@ -343,7 +342,7 @@
 {/if}
 <div
   bind:this={$containerEl$}
-  class="{pxReader}"
+  class={pxReader}
   style:padding-top="2.375rem"
   style:padding-bottom={`calc(2rem + ${bottomChromeClearance}px)`}
   use:hoverFocus={$hoverFocusEnabled$}
@@ -424,6 +423,7 @@
       loadingState={$imageLoadingState$ ?? true}
       {avoidPageBreak}
       {pageColumns}
+      {paginationTransitionMode}
       {autoBookmark}
       {autoBookmarkTime}
       {firstDimensionMargin}

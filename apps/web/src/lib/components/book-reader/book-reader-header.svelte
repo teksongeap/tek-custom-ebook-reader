@@ -168,7 +168,9 @@
     {/if}
   </div>
 
-  <div class="reader-header-title hidden max-w-[42vw] truncate px-3 text-center text-sm font-normal sm:block">
+  <div
+    class="reader-header-title hidden max-w-[42vw] truncate px-3 text-center text-sm font-normal sm:block"
+  >
     {bookTitle}
   </div>
 

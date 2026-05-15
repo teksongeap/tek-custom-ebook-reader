@@ -237,7 +237,8 @@
     }
 
     const target = event.target;
-    const clickedPopover = target instanceof Element && target.closest('[data-ttu-annotation-card]');
+    const clickedPopover =
+      target instanceof Element && target.closest('[data-ttu-annotation-card]');
     const clickedHighlight =
       target instanceof Element &&
       target.closest(`[data-ttu-annotation-id="${activeAnnotation.id}"]`);
@@ -406,12 +407,11 @@
   :global(.book-annotation-highlight) {
     --book-annotation-base: #f5c84b;
     border-radius: 0.18em;
-    background:
-      linear-gradient(
-        to top,
-        color-mix(in srgb, var(--book-annotation-base) 44%, transparent) 0 62%,
-        transparent 62%
-      );
+    background: linear-gradient(
+      to top,
+      color-mix(in srgb, var(--book-annotation-base) 44%, transparent) 0 62%,
+      transparent 62%
+    );
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
     cursor: pointer;
@@ -426,12 +426,11 @@
 
   :global(.book-annotation-highlight:hover),
   :global(.book-annotation-highlight:focus-visible) {
-    background:
-      linear-gradient(
-        to top,
-        color-mix(in srgb, var(--book-annotation-base) 64%, transparent) 0 72%,
-        color-mix(in srgb, var(--book-annotation-base) 16%, transparent) 72%
-      );
+    background: linear-gradient(
+      to top,
+      color-mix(in srgb, var(--book-annotation-base) 64%, transparent) 0 72%,
+      color-mix(in srgb, var(--book-annotation-base) 16%, transparent) 72%
+    );
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--book-annotation-base) 42%, transparent);
     filter: saturate(1.1);
   }

@@ -53,6 +53,7 @@
     hideSpoilerImage$,
     multiplier$,
     pageColumns$,
+    paginationTransitionMode$,
     prioritizeReaderStyles$,
     secondDimensionMaxValue$,
     textIndentation$,
@@ -87,7 +88,8 @@
     hideSpoilerImageMode$,
     enableVerticalFontKerning$,
     enableFontVPAL$,
-    verticalTextOrientation$
+    verticalTextOrientation$,
+    showCharacterCounter$
   } from '$lib/data/store';
   import BookCompletionConfetti from '$lib/components/book-reader/book-completion-confetti/book-completion-confetti.svelte';
   import AnnotationSelectionToolbar from '$lib/components/book-reader/book-annotations/annotation-selection-toolbar.svelte';
@@ -502,7 +504,12 @@
       } else {
         lastSelectedRangeWasEmpty = true;
 
-        if (!(document.activeElement instanceof HTMLElement && document.activeElement.closest('.annotation-toolbar'))) {
+        if (
+          !(
+            document.activeElement instanceof HTMLElement &&
+            document.activeElement.closest('.annotation-toolbar')
+          )
+        ) {
           lastSelectedRange = undefined;
           hideAnnotationComposer();
         }
@@ -581,6 +588,17 @@
     : 0;
 
   $: readerProgressText = `${readerProgressPercent.toFixed(2)}%`;
+
+  $: readerProgressCounterText = `${formatCharacterCount(
+    exploredCharCount
+  )} / ${formatCharacterCount(bookCharCount)}`;
+
+  $: readerProgressSummaryText = [
+    $showCharacterCounter$ ? readerProgressCounterText : '',
+    readerProgressText
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   $: footerChapterLabel = getCurrentChapterLabel(
     $sectionData$,
@@ -969,7 +987,11 @@
       return;
     }
 
-    pulseElement(currentTarget.closest('.reader-progress-card'), 'add', 0.5, 500);
+    pulseElement(currentTarget.closest<HTMLElement>('.reader-progress-card'), 'add', 0.5, 500);
+  }
+
+  function formatCharacterCount(characterCount: number) {
+    return Math.max(0, Math.floor(characterCount || 0)).toLocaleString();
   }
 
   function freezeTrackerPosition() {
@@ -1187,6 +1209,7 @@
   function onKeydown(ev: KeyboardEvent) {
     if (
       $skipKeyDownListener$ ||
+      ev.defaultPrevented ||
       ev.altKey ||
       ev.ctrlKey ||
       ev.shiftKey ||
@@ -1248,8 +1271,7 @@
 
   function getRangeBookContent(range: Range) {
     const container = range.commonAncestorContainer;
-    const containerElement =
-      container instanceof Element ? container : container.parentElement;
+    const containerElement = container instanceof Element ? container : container.parentElement;
 
     return containerElement?.closest('.book-content') as HTMLElement | undefined;
   }
@@ -1405,7 +1427,9 @@
       pauseTracker(true);
     }
 
-    if (bookmarkManager) {
+    if (annotation.anchor.sectionId) {
+      nextChapter$.next(annotation.anchor.sectionId);
+    } else if (bookmarkManager) {
       bookmarkManager.scrollToBookmark(
         {
           dataId: annotation.dataId,
@@ -1430,7 +1454,9 @@
         ).find((element) => element.dataset.ttuAnnotationId === annotationId);
 
         if (annotationElement) {
-          if (!isPaginated) {
+          if (isPaginated) {
+            scrollPaginatedAnnotationIntoView(annotationElement);
+          } else {
             annotationElement.scrollIntoView({
               behavior: 'smooth',
               block: 'center',
@@ -1448,6 +1474,29 @@
       },
       attempt ? 120 : 20
     );
+  }
+
+  function scrollPaginatedAnnotationIntoView(annotationElement: HTMLElement) {
+    if (!pageManager) {
+      return;
+    }
+
+    const readerElement = annotationElement.closest<HTMLElement>('.book-content');
+
+    if (!readerElement) {
+      return;
+    }
+
+    const readerRect = readerElement.getBoundingClientRect();
+    const annotationRect = annotationElement.getBoundingClientRect();
+    const scrollProperty = $verticalMode$ ? 'scrollTop' : 'scrollLeft';
+    const viewportSize = $verticalMode$ ? readerElement.clientHeight : readerElement.clientWidth;
+    const offset = $verticalMode$
+      ? annotationRect.top - readerRect.top
+      : annotationRect.left - readerRect.left;
+    const targetScroll = Math.max(0, readerElement[scrollProperty] + offset);
+
+    pageManager.scrollTo(targetScroll, false);
   }
 
   function pulseRenderedAnnotation(annotationId: string) {
@@ -2075,6 +2124,7 @@
     autoPositionOnResize={$autoPositionOnResize$}
     avoidPageBreak={$avoidPageBreak$}
     pageColumns={$pageColumns$}
+    paginationTransitionMode={$paginationTransitionMode$}
     autoBookmark={$autoBookmark$}
     autoBookmarkTime={$autoBookmarkTime$}
     multiplier={$multiplier$}
@@ -2223,7 +2273,10 @@
   ></button>
   {#if showFooter && bookCharCount}
     {#if footerChapterLabel}
-      <div class="reader-chapter-card writing-horizontal-tb relative z-10" title={footerChapterLabel}>
+      <div
+        class="reader-chapter-card writing-horizontal-tb relative z-10"
+        title={footerChapterLabel}
+      >
         <span class="reader-chapter-card-label">{footerChapterLabel}</span>
       </div>
     {/if}
@@ -2267,9 +2320,12 @@
     {/if}
   </div>
   {#if showFooter && bookCharCount}
-    {@const footerCopyText = [footerChapterLabel, readerProgressText].filter(Boolean).join(' - ')}
+    {@const footerCopyText = [footerChapterLabel, readerProgressSummaryText]
+      .filter(Boolean)
+      .join(' - ')}
     <div
       class="reader-progress-card writing-horizontal-tb relative z-10 px-3 py-1.5 text-left text-xs leading-none select-none sm:px-4"
+      class:reader-progress-card--with-counter={$showCharacterCounter$}
     >
       <span class="reader-progress-layout">
         <span class="reader-progress-track">
@@ -2294,7 +2350,10 @@
           on:click|stopPropagation={({ currentTarget }) =>
             copyFooterProgress(footerCopyText, currentTarget)}
         >
-          {readerProgressText}
+          {#if $showCharacterCounter$}
+            <span class="reader-progress-counter">{readerProgressCounterText}</span>
+          {/if}
+          <span>{readerProgressText}</span>
         </button>
       </span>
     </div>

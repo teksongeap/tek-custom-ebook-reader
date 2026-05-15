@@ -170,7 +170,9 @@ export class BackupStorageHandler extends BaseStorageHandler {
     }
 
     if (this.isForBrowser) {
-      return this.extractAsJSON(zipEntry, 'Unable to read progress data');
+      const progress = await this.extractAsJSON(zipEntry, 'Unable to read progress data');
+
+      return progress ? BaseStorageHandler.normalizeProgressData(progress) : undefined;
     }
 
     const progressBlob = await this.readFromZip(
@@ -206,10 +208,12 @@ export class BackupStorageHandler extends BaseStorageHandler {
       return { annotations: undefined, lastAnnotationModified: 0 };
     }
 
-    const annotations = await this.extractAsJSON(zipEntry, 'Unable to read annotations');
+    const annotations = BaseStorageHandler.normalizeAnnotations(
+      await this.extractAsJSON(zipEntry, 'Unable to read annotations')
+    );
 
     return {
-      annotations,
+      annotations: annotations.length ? annotations : undefined,
       lastAnnotationModified:
         BaseStorageHandler.getAnnotationsMetadata(filename).lastAnnotationModified
     };
@@ -313,14 +317,18 @@ export class BackupStorageHandler extends BaseStorageHandler {
   }
 
   async saveProgress(data: BooksDbBookmarkData | File) {
-    const filename = `${this.sanitizedTitle}/${BaseStorageHandler.getProgressFileName(data)}`;
+    const progressData =
+      data instanceof File ? data : BaseStorageHandler.normalizeProgressData(data);
+    const filename = `${this.sanitizedTitle}/${BaseStorageHandler.getProgressFileName(
+      progressData
+    )}`;
 
-    if (data instanceof File) {
-      this.exportZipWriter = await this.addDataToZip(filename, data, this.exportZipWriter);
+    if (progressData instanceof File) {
+      this.exportZipWriter = await this.addDataToZip(filename, progressData, this.exportZipWriter);
     } else {
       this.exportZipWriter = await this.addDataToZip(
         filename,
-        JSON.stringify(data),
+        JSON.stringify(progressData),
         this.exportZipWriter
       );
     }
@@ -342,20 +350,17 @@ export class BackupStorageHandler extends BaseStorageHandler {
   }
 
   async saveAnnotations(data: BooksDbAnnotation[], lastAnnotationModified: number) {
+    const annotationsToStore = BaseStorageHandler.normalizeAnnotations(data);
+    const newAnnotationModified =
+      BaseStorageHandler.getLastAnnotationModified(annotationsToStore) || lastAnnotationModified;
     const filename = `${this.sanitizedTitle}/${BaseStorageHandler.getAnnotationsFileName(
-      data,
-      lastAnnotationModified
+      annotationsToStore,
+      newAnnotationModified
     )}`;
-
-    data.sort(
-      (annotationA, annotationB) =>
-        annotationA.exploredCharCount - annotationB.exploredCharCount ||
-        annotationA.createdAt - annotationB.createdAt
-    );
 
     this.exportZipWriter = await this.addDataToZip(
       filename,
-      JSON.stringify(data),
+      JSON.stringify(annotationsToStore),
       this.exportZipWriter
     );
   }

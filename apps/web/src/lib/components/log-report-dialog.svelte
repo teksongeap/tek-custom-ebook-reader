@@ -71,7 +71,8 @@
     lastReadingGoalsModified$,
     isOnline$,
     multiplier$,
-    enableReaderWakeLock$
+    enableReaderWakeLock$,
+    showCharacterCounter$
   } from '$lib/data/store';
 
   export let title = 'Error';
@@ -112,6 +113,7 @@
           enableTextJustification: enableTextJustification$.getValue(),
           enableTextWrapPretty: enableTextWrapPretty$.getValue(),
           enableReaderWakeLock: enableReaderWakeLock$.getValue(),
+          showCharacterCounter: showCharacterCounter$.getValue(),
           confirmClose: confirmClose$.getValue(),
           autoBookmark: autoBookmark$.getValue(),
           autoBookmarkTime: autoBookmarkTime$.getValue(),

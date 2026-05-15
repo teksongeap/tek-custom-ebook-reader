@@ -13,6 +13,7 @@ import { BlurMode } from '$lib/data/blur-mode';
 import { FuriganaStyle } from '$lib/data/furigana-style';
 import { ImportHTMLFixMode } from '$lib/data/import-html-fix-mode';
 import { MergeMode } from '$lib/data/merge-mode';
+import { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
 import type { TextMarginMode } from '$lib/data/text-margin-mode';
 import type { VerticalTextOrientation } from '$lib/data/vertical-text-orientation';
 import { ViewMode } from '$lib/data/view-mode';
@@ -47,6 +48,11 @@ export const optionsForTextMarginMode: ToggleOption<TextMarginMode>[] = [
 export const optionsForViewMode: ToggleOption<ViewMode>[] = [
   { id: ViewMode.Continuous, text: 'Continuous' },
   { id: ViewMode.Paginated, text: 'Paginated' }
+];
+
+export const optionsForPaginationTransitionMode: ToggleOption<PaginationTransitionMode>[] = [
+  { id: PaginationTransitionMode.Glide, text: 'Glide' },
+  { id: PaginationTransitionMode.Instant, text: 'Instant' }
 ];
 
 export const optionsForBlurMode: ToggleOption<BlurMode>[] = [

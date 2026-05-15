@@ -285,6 +285,11 @@
     border-radius: 0.5rem;
   }
 
+  .reader-progress-card--with-counter {
+    width: 58vw;
+    min-width: 17rem;
+  }
+
   .reader-footer-pill:hover,
   .reader-footer-pill:focus-visible,
   .reader-progress-card:hover,
@@ -324,12 +329,27 @@
     border: 0;
     border-radius: 0.25rem;
     background: transparent;
+    display: inline-flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 0.45rem;
+    justify-content: flex-end;
     padding: 0;
     color: color-mix(in srgb, var(--reader-page-text) 76%, transparent);
     font: inherit;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     line-height: 1;
+    white-space: nowrap;
+  }
+
+  .reader-progress-counter {
+    display: inline-block;
+    max-width: min(12rem, 35vw);
+    overflow: hidden;
+    color: color-mix(in srgb, var(--reader-page-text) 60%, transparent);
+    font-weight: 500;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
@@ -437,17 +457,20 @@
     transform: translate(-50%, 0);
   }
 
+  @container (max-width: 19rem) {
+    .reader-progress-counter {
+      display: none;
+    }
+  }
+
   @container (max-width: 15rem) {
     .reader-progress-layout {
-      grid-template-columns: minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.5rem;
     }
 
     .reader-progress-track {
       min-width: 0;
-    }
-
-    .reader-progress-percent {
-      display: none;
     }
   }
 
@@ -463,6 +486,11 @@
     .reader-progress-card {
       width: 44vw;
       min-width: 8rem;
+    }
+
+    .reader-progress-card--with-counter {
+      width: 58vw;
+      min-width: 12rem;
     }
   }
 

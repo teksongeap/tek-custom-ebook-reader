@@ -38,12 +38,14 @@
     openTrackerOnCompletion$,
     overwriteBookCompletion$,
     pageColumns$,
+    paginationTransitionMode$,
     pauseTrackerOnCustomPointChange$,
     prioritizeReaderStyles$,
     replicationSaveBehavior$,
     restrictImportFixToAnchor$,
     secondDimensionMaxValue$,
     selectionToBookmarkEnabled$,
+    showCharacterCounter$,
     showExternalPlaceholder$,
     startDayHoursForTracker$,
     statisticsEnabled$,
@@ -165,6 +167,7 @@
       bind:hoverFocusEnabled={$hoverFocusEnabled$}
       bind:textMarginMode={$textMarginMode$}
       bind:enableReaderWakeLock={$enableReaderWakeLock$}
+      bind:showCharacterCounter={$showCharacterCounter$}
       bind:viewMode={$viewMode$}
       bind:secondDimensionMaxValue={$secondDimensionMaxValue$}
       bind:firstDimensionMargin={$firstDimensionMargin$}
@@ -177,6 +180,7 @@
       bind:selectionToBookmarkEnabled={$selectionToBookmarkEnabled$}
       bind:enableTapEdgeToFlip={$enableTapEdgeToFlip$}
       bind:pageColumns={$pageColumns$}
+      bind:paginationTransitionMode={$paginationTransitionMode$}
       bind:persistentStorage={$persistentStorage$}
       bind:confirmClose={$confirmClose$}
       bind:manualBookmark={$manualBookmark$}

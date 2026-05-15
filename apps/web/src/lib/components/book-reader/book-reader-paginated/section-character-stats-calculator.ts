@@ -74,6 +74,11 @@ export class SectionCharacterStatsCalculator {
     return this.getCharCountByScrollPos(this.virtualScrollPos$.getValue() + offset);
   }
 
+  getCharCountByBookmarkScrollPos(scrollPos: number) {
+    const offset = this.verticalMode ? 0 : -this.screenSize;
+    return this.getCharCountByScrollPos(scrollPos + offset);
+  }
+
   getCharCountByScrollPos(scrollPos: number) {
     if (!this.calculator) return -1;
     const startCount = this.getSectionStartCount();

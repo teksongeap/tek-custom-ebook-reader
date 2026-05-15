@@ -35,5 +35,7 @@ export interface PageManager {
 
   prevPage: () => void;
 
+  scrollTo: (pos: number, isUser: boolean) => void;
+
   updateSectionDataByOffset: (offset: number) => void;
 }

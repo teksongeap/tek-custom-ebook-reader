@@ -6,6 +6,7 @@
   import { SECTION_CHANGE } from '$lib/data/events';
   import { isStoredFont } from '$lib/data/fonts';
   import { FuriganaStyle } from '$lib/data/furigana-style';
+  import { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
   import { logger } from '$lib/data/logger';
   import { getCharacterCount } from '$lib/functions/get-character-count';
   import {
@@ -110,6 +111,8 @@
 
   export let pageColumns: number;
 
+  export let paginationTransitionMode: PaginationTransitionMode;
+
   export let firstDimensionMargin: number;
 
   export let autoBookmark = false;
@@ -130,7 +133,11 @@
 
   let contentEl: HTMLElement | undefined;
 
+  let tailSpacerEl: HTMLElement | undefined;
+
   let calculator: SectionCharacterStatsCalculator | undefined;
+
+  let calculatorSectionIndex = -1;
 
   type ReaderSection = {
     id: string;
@@ -149,6 +156,10 @@
   let allowDisplay = false;
 
   let displayedHtml = '';
+
+  let displayedSectionIndex = -1;
+
+  let displayedSectionRenderToken = 0;
 
   let skipFirstHtmlLoad = true;
 
@@ -174,6 +185,14 @@
 
   let swipeStartedWithTouch = false;
 
+  let sectionJumpToken = 0;
+
+  let sectionJumpPending = false;
+
+  let wheelNavigationLocked = false;
+
+  let wheelNavigationUnlockTimer: ReturnType<typeof setTimeout> | undefined;
+
   const width$ = new Subject<number>();
 
   const height$ = new Subject<number>();
@@ -188,7 +207,17 @@
 
   const sectionReady$ = new Subject<SectionCharacterStatsCalculator>();
 
-  const currentSection$ = sectionIndex$.pipe(map((index) => sections[index]?.html || ''));
+  const sectionReadyWithIndex$ = new Subject<{
+    index: number;
+    calculator: SectionCharacterStatsCalculator;
+  }>();
+
+  const currentSection$ = sectionIndex$.pipe(
+    map((index) => ({
+      index,
+      html: sections[index]?.html || ''
+    }))
+  );
 
   const cssClassOverflowHidden = 'overflow-hidden';
 
@@ -221,17 +250,20 @@
   }
 
   $: {
-    if (contentEl && scrollEl && sections) {
+    if (contentEl && scrollEl && tailSpacerEl && sections) {
       concretePageManager = new PageManagerPaginated(
         contentEl,
         scrollEl,
+        tailSpacerEl,
         sections.map((section) => section.id),
         sectionIndex$,
         virtualScrollPos$,
         width,
         height,
         gap,
+        columnCount,
         verticalMode,
+        paginationTransitionMode,
         pageChange$,
         sectionRenderComplete$
       );
@@ -242,20 +274,26 @@
   $: {
     if (calculator && width && height && !loadingState) {
       const c = calculator;
+      const sectionIndex = calculatorSectionIndex;
+
       requestAnimationFrame(() => {
-        onContentDisplayChange(c);
+        if (c !== calculator || sectionIndex !== calculatorSectionIndex) {
+          return;
+        }
+
+        onContentDisplayChange(c, sectionIndex);
       });
     }
   }
 
   $: {
     if (calculator && !loadingState) {
-      const sectionIndex = sectionIndex$.getValue();
+      const sectionIndex = displayedSectionIndex;
       const section = sections[sectionIndex];
 
-      currentSectionId = section?.id || '';
-
-      sectionRenderComplete$.next(sectionIndex);
+      if (section) {
+        currentSectionId = section.id;
+      }
     }
   }
 
@@ -264,7 +302,7 @@
       concreteBookmarkManager = new BookmarkManagerPaginated(
         calculator,
         concretePageManager,
-        sectionReady$,
+        sectionReadyWithIndex$,
         sectionIndex$,
         (c) => (previousIntendedCount = c)
       );
@@ -295,19 +333,17 @@
       }
 
       const currentSection = sectionIndex$.getValue();
+      let activeCalculator: SectionCharacterStatsCalculator | undefined = calculator;
 
       if (currentSection !== targetSection) {
-        const waitForSection = new Promise<void>((resolve) => {
-          sectionReady$.pipe(take(1)).subscribe(() => resolve());
-        });
-
-        sectionIndex$.next(targetSection);
-        concretePageManager.scrollTo(0, false);
-
-        await waitForSection;
+        activeCalculator = await jumpToSectionStart(targetSection, false);
       }
 
-      const scrollPos = getTargetScrollPos(calculator, detail.selector);
+      if (!activeCalculator) {
+        return;
+      }
+
+      const scrollPos = getTargetScrollPos(activeCalculator, detail.selector);
 
       if (scrollPos < 0) {
         return;
@@ -415,6 +451,7 @@
   onDestroy(() => {
     document.removeEventListener('ttu-action', handleAction, false);
     clearFontLoadingListener();
+    clearWheelNavigationLock();
 
     document.body.classList.remove(cssClassOverflowHidden);
 
@@ -479,11 +516,20 @@
       });
   }
 
-  currentSection$.pipe(distinctUntilChanged(), takeUntil(destroy$)).subscribe(() => {
-    allowDisplay = false;
-  });
+  currentSection$
+    .pipe(
+      distinctUntilChanged(
+        (previous, current) => previous.index === current.index && previous.html === current.html
+      ),
+      takeUntil(destroy$)
+    )
+    .subscribe(() => {
+      allowDisplay = false;
+    });
 
-  currentSection$.pipe(takeUntil(destroy$)).subscribe((html) => {
+  currentSection$.pipe(takeUntil(destroy$)).subscribe(({ index, html }) => {
+    const renderToken = ++displayedSectionRenderToken;
+
     const nestAnimationFrame = (fn: () => void, count: number) => {
       if (count === 0) {
         fn();
@@ -494,13 +540,24 @@
 
     // 2x for loading screen to render
     nestAnimationFrame(() => {
+      if (renderToken !== displayedSectionRenderToken || sectionIndex$.getValue() !== index) {
+        return;
+      }
+
+      displayedSectionIndex = index;
       displayedHtml = html;
     }, 2);
   });
 
   iffBrowser(() => fromEvent<WheelEvent>(document.body, 'wheel', { passive: true }))
     .pipe(
-      filter(() => !$disableWheelNavigation$ && !$skipKeyDownListener$),
+      filter(
+        () =>
+          !sectionJumpPending &&
+          !wheelNavigationLocked &&
+          !$disableWheelNavigation$ &&
+          !$skipKeyDownListener$
+      ),
       throttleTime(50),
       takeUntil(destroy$)
     )
@@ -509,7 +566,16 @@
       if (!ev.deltaX) {
         multiplier = ev.deltaY < 0 ? -1 : 1;
       }
-      concretePageManager?.flipPage(multiplier as -1 | 1);
+
+      if (paginationTransitionMode === PaginationTransitionMode.Glide) {
+        concretePageManager?.flipColumn(multiplier as -1 | 1);
+      } else {
+        concretePageManager?.flipPage(multiplier as -1 | 1);
+      }
+
+      if (concretePageManager?.isSectionTransitionPending()) {
+        lockWheelNavigation();
+      }
     });
 
   function updateAfterCustomReadingPointUpdate(updatedCustomReadingPosition: Range | undefined) {
@@ -533,14 +599,95 @@
     );
   }
 
+  function waitForSectionReady(sectionIndex: number) {
+    return new Promise<SectionCharacterStatsCalculator>((resolve) => {
+      const subscription = sectionReadyWithIndex$
+        .pipe(
+          filter(({ index }) => index === sectionIndex),
+          take(1)
+        )
+        .subscribe(({ calculator: readyCalculator }) => {
+          subscription.unsubscribe();
+          resolve(readyCalculator);
+        });
+    });
+  }
+
+  function lockWheelNavigation() {
+    wheelNavigationLocked = true;
+
+    if (wheelNavigationUnlockTimer) {
+      clearTimeout(wheelNavigationUnlockTimer);
+    }
+
+    wheelNavigationUnlockTimer = setTimeout(() => {
+      wheelNavigationLocked = false;
+      wheelNavigationUnlockTimer = undefined;
+    }, 700);
+  }
+
+  function clearWheelNavigationLock() {
+    if (wheelNavigationUnlockTimer) {
+      clearTimeout(wheelNavigationUnlockTimer);
+      wheelNavigationUnlockTimer = undefined;
+    }
+
+    wheelNavigationLocked = false;
+  }
+
+  async function jumpToSectionStart(sectionIndex: number, isUser: boolean) {
+    const pageManagerInstance = concretePageManager;
+
+    if (!pageManagerInstance || sectionIndex < 0 || sectionIndex >= sections.length) {
+      return undefined;
+    }
+
+    const jumpToken = ++sectionJumpToken;
+    sectionJumpPending = true;
+
+    try {
+      pageManagerInstance.beginSectionTransition(sectionIndex);
+
+      if (
+        sectionIndex$.getValue() !== sectionIndex ||
+        displayedSectionIndex !== sectionIndex ||
+        calculatorSectionIndex !== sectionIndex
+      ) {
+        const sectionReadyPromise = waitForSectionReady(sectionIndex);
+
+        sectionIndex$.next(sectionIndex);
+
+        const updatedCalculator = await sectionReadyPromise;
+
+        if (jumpToken !== sectionJumpToken || sectionIndex$.getValue() !== sectionIndex) {
+          return undefined;
+        }
+
+        pageManagerInstance.jumpTo(0, isUser);
+        updatedCalculator.updateParagraphPos();
+        return updatedCalculator;
+      }
+
+      pageManagerInstance.jumpTo(0, isUser);
+      calculator?.updateParagraphPos();
+      return calculator;
+    } finally {
+      if (jumpToken === sectionJumpToken) {
+        pageManagerInstance.completeSectionTransition(sectionIndex);
+        sectionJumpPending = false;
+      }
+    }
+  }
+
   function onHtmlLoad() {
     if (skipFirstHtmlLoad) {
       skipFirstHtmlLoad = false;
       return;
     }
-    if (!scrollEl) return;
+    if (!scrollEl || displayedSectionIndex < 0) return;
 
-    calculator = new SectionCharacterStatsCalculator(
+    const loadedSectionIndex = displayedSectionIndex;
+    const nextCalculator = new SectionCharacterStatsCalculator(
       scrollEl,
       sections.map((section) => section.characterCount),
       virtualScrollPos$,
@@ -551,9 +698,11 @@
       scrollEl,
       document
     );
+    calculator = nextCalculator;
+    calculatorSectionIndex = loadedSectionIndex;
     exploredCharCount = 0;
     previousIntendedCount = 0;
-    bookCharCount = calculator.charCount;
+    bookCharCount = nextCalculator.charCount;
 
     let fontLoaded = false;
 
@@ -565,7 +714,7 @@
     }
 
     if (fontLoaded || fontLoadingAdded) {
-      triggerContentChange();
+      triggerContentChange(nextCalculator, loadedSectionIndex);
     } else if (!fontLoadingAdded) {
       fontLoadingAdded = true;
 
@@ -573,12 +722,12 @@
       fontLoadTimer = setTimeout(() => {
         clearFontLoadingListener();
         logger.error(`Error loading primary Font: ${fontFamilyGroupOne}`);
-        triggerContentChange();
+        triggerContentChange(nextCalculator, loadedSectionIndex);
       }, timeout);
 
       fontLoadingDoneHandler = () => {
         clearFontLoadingListener();
-        triggerContentChange();
+        triggerContentChange(nextCalculator, loadedSectionIndex);
       };
 
       document.fonts.addEventListener('loadingdone', fontLoadingDoneHandler);
@@ -597,17 +746,44 @@
     }
   }
 
-  function triggerContentChange() {
-    if (!calculator || !scrollEl) return;
+  function triggerContentChange(
+    calculatorInstance = calculator,
+    sectionIndex = calculatorSectionIndex
+  ) {
+    if (
+      !calculatorInstance ||
+      !scrollEl ||
+      sectionIndex < 0 ||
+      calculatorInstance !== calculator ||
+      sectionIndex !== calculatorSectionIndex
+    )
+      return;
 
-    calculator.updateCurrentSection(sectionIndex$.getValue());
+    calculatorInstance.updateCurrentSection(sectionIndex);
     dispatch('contentChange', scrollEl);
   }
 
-  function onContentDisplayChange(_calculator: SectionCharacterStatsCalculator) {
+  function onContentDisplayChange(
+    _calculator: SectionCharacterStatsCalculator,
+    sectionIndex: number
+  ) {
+    if (
+      sectionIndex < 0 ||
+      _calculator !== calculator ||
+      sectionIndex !== calculatorSectionIndex ||
+      displayedSectionIndex !== sectionIndex
+    ) {
+      return;
+    }
+
     _calculator.updateParagraphPos();
     exploredCharCount = _calculator.calcExploredCharCount(customReadingPointRange);
     sectionReady$.next(_calculator);
+    sectionReadyWithIndex$.next({
+      index: sectionIndex,
+      calculator: _calculator
+    });
+    sectionRenderComplete$.next(sectionIndex);
 
     if (scrollWhenReady) {
       scrollWhenReady = false;
@@ -682,8 +858,8 @@
     }
   }
 
-  function onSwipe(ev: CustomEvent<{ direction: 'top' | 'right' | 'left' | 'bottom' }>) {
-    if (!concretePageManager || $skipKeyDownListener$) return;
+  function onSwipe(ev: CustomEvent<{ direction: 'top' | 'right' | 'left' | 'bottom' | null }>) {
+    if (!concretePageManager || sectionJumpPending || $skipKeyDownListener$) return;
     if (!swipeStartedWithTouch) return;
     if (ev.detail.direction !== 'left' && ev.detail.direction !== 'right') return;
     const swipeLeft = ev.detail.direction === 'left';
@@ -706,7 +882,9 @@
   function onKeydown(ev: KeyboardEvent) {
     if (
       !concretePageManager ||
+      sectionJumpPending ||
       $skipKeyDownListener$ ||
+      ev.defaultPrevented ||
       ev.altKey ||
       ev.ctrlKey ||
       ev.shiftKey ||
@@ -730,7 +908,11 @@
         concretePageManager.nextPage();
         break;
       default:
+        return;
     }
+
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
   }
 
   nextChapter$.pipe(takeUntil(destroy$)).subscribe((chapterId) => {
@@ -740,8 +922,7 @@
     );
 
     if (nextSectionIndex > -1) {
-      sectionIndex$.next(nextSectionIndex);
-      concretePageManager?.scrollTo(0, true);
+      void jumpToSectionStart(nextSectionIndex, true);
     }
   });
 </script>
@@ -804,6 +985,7 @@
   <div class="book-content-container" id={currentSectionId || null} bind:this={contentEl}>
     <HtmlRenderer html={displayedHtml} on:load={onHtmlLoad} />
   </div>
+  <div class="book-content-tail-spacer" bind:this={tailSpacerEl} aria-hidden="true"></div>
 </div>
 
 {#if !allowDisplay}
@@ -833,6 +1015,29 @@
 <style lang="scss">
   @use '../styles';
 
+  @mixin ruby-edge-clearance($property) {
+    :global(
+      .book-content-container
+        > *:not(.ttu-book-html-wrapper)
+        > *:has(ruby):has(rt):not(:has(> :is(p, div, section, article, blockquote, ul, ol)))
+    ),
+    :global(
+      .book-content-container
+        > div.ttu-book-html-wrapper
+        > div.ttu-book-body-wrapper
+        > *:has(ruby):has(rt):not(:has(> :is(p, div, section, article, blockquote, ul, ol)))
+    ),
+    :global(
+      .book-content-container
+        > div.ttu-book-html-wrapper
+        > div.ttu-book-body-wrapper
+        > *
+        > *:has(ruby):has(rt)
+    ) {
+      #{$property}: var(--book-content-ruby-edge-clearance) !important;
+    }
+  }
+
   .book-content {
     overflow: hidden;
     width: var(--book-content-child-width, 95vh);
@@ -852,6 +1057,13 @@
       max-width: var(--book-content-image-max-width, 95vh) !important;
       max-height: var(--book-content-child-height, 95vh) !important;
     }
+  }
+
+  .book-content-tail-spacer {
+    visibility: hidden;
+    pointer-events: none;
+    width: 0;
+    height: 0;
   }
 
   .book-content {
@@ -880,28 +1092,10 @@
       height: auto;
     }
 
-    :global(.book-content-container > *:not(.ttu-book-html-wrapper) > *:has(ruby):has(rt)),
-    :global(
-      .book-content-container
-        > div.ttu-book-html-wrapper
-        > div.ttu-book-body-wrapper
-        > *
-        > *:has(ruby):has(rt)
-    ) {
-      padding-right: 10px !important;
-    }
+    @include ruby-edge-clearance('padding-right');
   }
 
   .book-content--writing-horizontal-rl {
-    :global(.book-content-container > *:not(.ttu-book-html-wrapper) > *:has(ruby):has(rt)),
-    :global(
-      .book-content-container
-        > div.ttu-book-html-wrapper
-        > div.ttu-book-body-wrapper
-        > *
-        > *:has(ruby):has(rt)
-    ) {
-      padding-top: 10px !important;
-    }
+    @include ruby-edge-clearance('padding-top');
   }
 </style>

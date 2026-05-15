@@ -67,7 +67,7 @@
         role="button"
         title={$lastStatisticsTab$ === StatisticsTab.SUMMARY
           ? 'You are already on the Summary Tab'
-        : 'Switch to Summary Tab'}
+          : 'Switch to Summary Tab'}
         class={baseIconClasses}
         class:app-icon-button--active={$lastStatisticsTab$ === StatisticsTab.SUMMARY}
         on:click={() => ($lastStatisticsTab$ = StatisticsTab.SUMMARY)}
@@ -80,7 +80,7 @@
         role="button"
         title={$lastStatisticsTab$ === StatisticsTab.OVERVIEW
           ? 'You are already on the Heatmap Tab'
-        : 'Switch to Heatmap Tab'}
+          : 'Switch to Heatmap Tab'}
         class={baseIconClasses}
         class:app-icon-button--active={$lastStatisticsTab$ === StatisticsTab.OVERVIEW}
         on:click={() => ($lastStatisticsTab$ = StatisticsTab.OVERVIEW)}

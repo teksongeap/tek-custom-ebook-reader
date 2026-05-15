@@ -29,7 +29,8 @@
   $: actionItems = items.filter((item) => item.routeId !== $page.route.id);
 
   $: resolvedLeavePageLink =
-    leavePageLink || (actionItems.length === 1 && actionItems[0].routeId ? actionItems[0].routeId : '');
+    leavePageLink ||
+    (actionItems.length === 1 && actionItems[0].routeId ? actionItems[0].routeId : '');
 
   function handleActionMenuItem(target: string) {
     dispatch('action', target);

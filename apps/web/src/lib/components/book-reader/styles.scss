@@ -1,5 +1,6 @@
 .book-content {
   font-family: var(--font-family-serif, 'Lora', 'Noto Serif JP', serif);
+  --book-content-ruby-edge-clearance: max(0.65em, 12px);
   --book-content-selection-color: var(--font-color);
   --book-content-selection-background-color: var(--app-accent-soft);
 }

@@ -100,10 +100,7 @@
         <span class="line-clamp-3">{title}</span>
       </div>
       <div class="book-progress-track h-2">
-        <div
-          class="book-progress-fill h-full rounded-r-full"
-          style:width="{progress * 100}%"
-        />
+        <div class="book-progress-fill h-full rounded-r-full" style:width="{progress * 100}%" />
       </div>
     </div>
   </div>

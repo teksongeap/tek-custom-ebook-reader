@@ -328,7 +328,7 @@ export class FilesystemStorageHandler extends BaseStorageHandler {
       const progress = JSON.parse(await FilesystemStorageHandler.readFileObject(progressFile));
 
       BaseStorageHandler.reportProgress(0.4);
-      return progress;
+      return BaseStorageHandler.normalizeProgressData(progress);
     }
 
     return progressFile;
@@ -363,14 +363,14 @@ export class FilesystemStorageHandler extends BaseStorageHandler {
 
     const annotationsFile = await file.getFile();
     const annotationsFileData = await FilesystemStorageHandler.readFileObject(annotationsFile);
-    const annotations = JSON.parse(annotationsFileData);
+    const annotations = BaseStorageHandler.normalizeAnnotations(JSON.parse(annotationsFileData));
 
     BaseStorageHandler.reportProgress(0.4);
 
     return {
-      annotations,
-      lastAnnotationModified:
-        BaseStorageHandler.getAnnotationsMetadata(file.name).lastAnnotationModified
+      annotations: annotations.length ? annotations : undefined,
+      lastAnnotationModified: BaseStorageHandler.getAnnotationsMetadata(file.name)
+        .lastAnnotationModified
     };
   }
 
@@ -495,14 +495,16 @@ export class FilesystemStorageHandler extends BaseStorageHandler {
   }
 
   async saveProgress(data: BooksDbBookmarkData | File) {
-    const filename = BaseStorageHandler.getProgressFileName(data);
+    const progressData =
+      data instanceof File ? data : BaseStorageHandler.normalizeProgressData(data);
+    const filename = BaseStorageHandler.getProgressFileName(progressData);
     const { lastBookmarkModified, progress } = BaseStorageHandler.getProgressMetadata(filename);
     const { file, files, rootDirectory } = await this.getExternalFile('progress_');
 
     await this.writeFile(
       rootDirectory,
       filename,
-      data instanceof File ? data : JSON.stringify(data),
+      progressData instanceof File ? progressData : JSON.stringify(progressData),
       files,
       file,
       0.6
@@ -559,17 +561,18 @@ export class FilesystemStorageHandler extends BaseStorageHandler {
   async saveAnnotations(annotations: BooksDbAnnotation[], lastAnnotationModified: number) {
     const { file, files, rootDirectory } = await this.getExternalFile(FilePrefix.ANNOTATIONS);
 
-    let annotationsToStore = annotations;
-    let newAnnotationModified = lastAnnotationModified;
+    let annotationsToStore = BaseStorageHandler.normalizeAnnotations(annotations);
+    let newAnnotationModified =
+      BaseStorageHandler.getLastAnnotationModified(annotationsToStore) || lastAnnotationModified;
 
     if (this.saveBehavior === ReplicationSaveBehavior.NewOnly && file) {
       const existingAnnotationsFile = await file.getFile();
-      const existingAnnotations = JSON.parse(
-        await FilesystemStorageHandler.readFileObject(existingAnnotationsFile)
+      const existingAnnotations = BaseStorageHandler.normalizeAnnotations(
+        JSON.parse(await FilesystemStorageHandler.readFileObject(existingAnnotationsFile))
       );
 
       annotationsToStore = BaseStorageHandler.mergeAnnotations(
-        annotations,
+        annotationsToStore,
         existingAnnotations,
         true
       );

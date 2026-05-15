@@ -10,26 +10,39 @@ import {
   sectionList$,
   type SectionWithProgress
 } from '$lib/components/book-reader/book-toc/book-toc';
+import { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
 import type { PageManager } from '../types';
 
 export class PageManagerPaginated implements PageManager {
-  private translateX = 0;
+  private animationFrame: number | undefined;
+
+  private animationTargetPos: number | undefined;
+
+  private sectionTransitionIndex: number | undefined;
+
+  private trailingBlankSpace = 0;
 
   private sectionData: Map<string, SectionWithProgress> = new Map();
 
   constructor(
     private contentEl: HTMLElement,
     private scrollEl: HTMLElement,
+    private trailingBlankEl: HTMLElement,
     private sectionIds: string[],
     private sectionIndex$: BehaviorSubject<number>,
     private virtualScrollPos$: BehaviorSubject<number>,
     private width: number,
     private height: number,
     private pageGap: number,
+    private columnCount: number,
     private verticalMode: boolean,
+    private transitionMode: PaginationTransitionMode,
     private pageChange$: Subject<boolean>,
     private sectionRenderComplete$: Subject<number>
   ) {
+    this.clearTrailingBlankSpace();
+    this.clearContentTransform();
+
     sectionList$.pipe(take(1)).subscribe((entries) => {
       if (!entries.length) {
         return;
@@ -53,16 +66,17 @@ export class PageManagerPaginated implements PageManager {
 
   updateSectionDataByOffset(offset = 0) {
     const viewportSize = this.verticalMode ? this.height : this.width;
-    const currentPercentage =
-      (this.virtualScrollPos$.getValue() /
-        this.scrollEl[this.verticalMode ? 'scrollHeight' : 'scrollWidth']) *
-      100;
+    const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
+    const scrollSize = this.getMeasuredScrollSize(scrollSizeProp);
+    const currentPercentage = this.getProgressPercentage(
+      this.virtualScrollPos$.getValue(),
+      scrollSize
+    );
 
     if (offset) {
       const nextPageOffset = this.virtualScrollPos$.getValue() + viewportSize + this.pageGap;
       const diffPercentage =
-        (nextPageOffset / this.scrollEl[this.verticalMode ? 'scrollHeight' : 'scrollWidth']) * 100 -
-        currentPercentage;
+        this.getProgressPercentage(nextPageOffset, scrollSize) - currentPercentage;
 
       this.updateSectionData(
         this.sectionIds[this.sectionIndex$.getValue()],
@@ -74,59 +88,113 @@ export class PageManagerPaginated implements PageManager {
   }
 
   flipPage(multiplier: 1 | -1) {
-    const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
-    const viewportSize = this.verticalMode ? this.height : this.width;
+    this.flipBy(this.getSpreadPitch(), multiplier);
+  }
 
-    const offset = viewportSize + this.pageGap;
-    const isUser = true;
-
-    if (this.translateX) {
-      const clearTranslateX = () => {
-        this.contentEl.style.removeProperty('transform');
-        this.translateX = 0;
-      };
-
-      if (multiplier < 0) {
-        const prevTranslateX = this.translateX;
-        clearTranslateX();
-        this.scrollToPos(-prevTranslateX - offset, isUser);
-        return;
-      }
-
-      if (this.nextSection(isUser)) {
-        clearTranslateX();
-        return;
-      }
-      return;
-    }
-
-    const minValue = 0;
-    const maxValue = this.scrollEl[scrollSizeProp];
-    const currentValue = this.virtualScrollPos$.getValue();
-    const newValue = currentValue + offset * multiplier;
-    const newValueCeil = Math.ceil(newValue);
-
-    if (newValueCeil < minValue) {
-      if (currentValue !== minValue) {
-        this.scrollToPos(minValue, isUser);
-        return;
-      }
-
-      this.prevSection(offset, scrollSizeProp, viewportSize, isUser);
-      return;
-    }
-    if (newValueCeil >= maxValue) {
-      this.nextSection(isUser);
-      return;
-    }
-
-    this.scrollOrTranslateToPos(newValue, maxValue, viewportSize, isUser);
+  flipColumn(multiplier: 1 | -1) {
+    this.flipBy(this.getColumnPitch(), multiplier, this.getSpreadPitch());
   }
 
   scrollTo(scrollPos: number, isUser: boolean) {
     const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
     const viewportSize = this.verticalMode ? this.height : this.width;
-    this.scrollOrTranslateToPos(scrollPos, this.scrollEl[scrollSizeProp], viewportSize, isUser);
+    this.moveToPos(
+      this.snapToPageStart(scrollPos, viewportSize),
+      this.getMeasuredScrollSize(scrollSizeProp),
+      viewportSize,
+      isUser
+    );
+  }
+
+  scrollToBookmarkPosition(scrollPos: number, isUser: boolean) {
+    const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
+    const viewportSize = this.verticalMode ? this.height : this.width;
+    this.moveToPos(
+      this.snapToColumnStart(scrollPos),
+      this.getMeasuredScrollSize(scrollSizeProp),
+      viewportSize,
+      isUser
+    );
+  }
+
+  getCurrentBookmarkPosition() {
+    const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
+    const currentPosition = this.getCurrentVisualPos(
+      this.getMeasuredScrollSize(scrollSizeProp),
+      this.getColumnPitch()
+    );
+
+    return this.snapToColumnStart(currentPosition);
+  }
+
+  beginSectionTransition(index: number) {
+    this.cancelAnimation();
+    this.clearTrailingBlankSpace();
+    this.clearContentTransform();
+    this.sectionTransitionIndex = index;
+  }
+
+  completeSectionTransition(index: number) {
+    if (this.sectionTransitionIndex === index) {
+      this.sectionTransitionIndex = undefined;
+    }
+  }
+
+  isSectionTransitionPending() {
+    return this.sectionTransitionIndex !== undefined;
+  }
+
+  jumpTo(scrollPos: number, isUser: boolean, scrollSize?: number) {
+    const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
+    const viewportSize = this.verticalMode ? this.height : this.width;
+    this.jumpToPos(
+      scrollPos,
+      scrollSize ?? this.getMeasuredScrollSize(scrollSizeProp),
+      viewportSize,
+      isUser
+    );
+  }
+
+  private flipBy(offset: number, multiplier: 1 | -1, boundaryOffset = offset) {
+    if (this.sectionTransitionIndex !== undefined) {
+      return;
+    }
+
+    const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
+    const viewportSize = this.verticalMode ? this.height : this.width;
+    const isUser = true;
+
+    const minValue = 0;
+    const maxValue = this.getMeasuredScrollSize(scrollSizeProp);
+    const currentValue = this.getCurrentVisualPos(maxValue, offset);
+    const newValue = currentValue + offset * multiplier;
+    const newValueCeil = Math.ceil(newValue);
+
+    if (newValueCeil < minValue) {
+      if (currentValue !== minValue) {
+        this.moveToPos(minValue, maxValue, viewportSize, isUser);
+        return;
+      }
+
+      this.prevSection(boundaryOffset, scrollSizeProp, viewportSize, isUser);
+      return;
+    }
+    if (newValueCeil >= maxValue) {
+      if (multiplier < 0) {
+        this.moveToPos(
+          this.getLastScrollPos(maxValue, offset),
+          maxValue,
+          viewportSize,
+          isUser
+        );
+        return;
+      }
+
+      this.nextSection(isUser);
+      return;
+    }
+
+    this.moveToPos(newValue, maxValue, viewportSize, isUser);
   }
 
   private prevSection(
@@ -138,13 +206,17 @@ export class PageManagerPaginated implements PageManager {
     const nextPage = this.sectionIndex$.getValue() - 1;
     if (nextPage < 0) return false;
 
-    this.updateSectionIndex(nextPage).subscribe(() => {
-      const scrollSize = this.scrollEl[scrollSizeProp];
-      let scrollValue = offset * (Math.ceil(scrollSize / offset) - 1);
-      if (Math.ceil(scrollValue) >= scrollSize) {
-        scrollValue -= offset;
+    this.beginSectionTransition(nextPage);
+    this.updateSectionIndex(nextPage).subscribe({
+      next: () => {
+        const scrollSize = this.scrollEl[scrollSizeProp];
+        // Boundaries must use the newly rendered section's real scroll size.
+        this.jumpToPos(this.getLastScrollPos(scrollSize, offset), scrollSize, viewportSize, isUser);
+        this.completeSectionTransition(nextPage);
+      },
+      error: () => {
+        this.completeSectionTransition(nextPage);
       }
-      this.scrollOrTranslateToPos(scrollValue, scrollSize, viewportSize, isUser);
     });
     return true;
   }
@@ -153,49 +225,198 @@ export class PageManagerPaginated implements PageManager {
     const nextPage = this.sectionIndex$.getValue() + 1;
     if (nextPage >= this.sectionIds.length) return false;
 
-    this.updateSectionIndex(nextPage).subscribe(() => {
-      this.scrollToPos(0, isUser);
-      this.updateSectionData(this.sectionIds[nextPage - 1], 100, false);
-      this.updateSectionData(this.sectionIds[nextPage], 0);
+    this.beginSectionTransition(nextPage);
+    this.updateSectionIndex(nextPage).subscribe({
+      next: () => {
+        const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
+        const viewportSize = this.verticalMode ? this.height : this.width;
+
+        // Boundaries must use the newly rendered section's real scroll size.
+        this.jumpToPos(0, this.getMeasuredScrollSize(scrollSizeProp), viewportSize, isUser);
+        this.updateSectionData(this.sectionIds[nextPage - 1], 100, false);
+        this.updateSectionData(this.sectionIds[nextPage], 0);
+        this.completeSectionTransition(nextPage);
+      },
+      error: () => {
+        this.completeSectionTransition(nextPage);
+      }
     });
     return true;
   }
 
-  private scrollOrTranslateToPos(
-    pos: number,
-    scrollSize: number,
-    viewportSize: number,
-    isUser: boolean
-  ) {
+  private moveToPos(pos: number, scrollSize: number, viewportSize: number, isUser: boolean) {
+    const targetPos = Math.max(0, pos);
+
+    if (this.transitionMode === PaginationTransitionMode.Glide) {
+      this.animateToPos(targetPos, scrollSize, viewportSize, isUser);
+      return;
+    }
+
+    this.jumpToPos(targetPos, scrollSize, viewportSize, isUser);
+  }
+
+  private jumpToPos(pos: number, scrollSize: number, viewportSize: number, isUser: boolean) {
+    this.cancelAnimation();
     this.updateSectionData(
       this.sectionIds[this.sectionIndex$.getValue()],
-      (pos / scrollSize) * 100
+      this.getProgressPercentage(pos, scrollSize)
     );
-
-    if (this.verticalMode) {
-      this.scrollToPos(pos, isUser);
-      return;
-    }
-
-    const screenRight = pos + viewportSize;
-    if (screenRight <= scrollSize) {
-      this.scrollToPos(pos, isUser);
-      return;
-    }
-    this.translateXToPos(-pos, isUser);
+    this.setVisualPos(pos, scrollSize, viewportSize);
+    this.pageChange$.next(isUser);
   }
 
-  private scrollToPos(pos: number, isUser: boolean) {
+  private animateToPos(pos: number, scrollSize: number, viewportSize: number, isUser: boolean) {
+    const start = this.virtualScrollPos$.getValue();
+    const distance = Math.abs(pos - start);
+
+    if (
+      distance < 1 ||
+      (typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    ) {
+      this.jumpToPos(pos, scrollSize, viewportSize, isUser);
+      return;
+    }
+
+    this.cancelAnimation();
+    this.animationTargetPos = pos;
+
+    const startedAt = performance.now();
+    const duration = Math.min(360, Math.max(180, distance * 0.35));
+
+    const animate = (timestamp: number) => {
+      const elapsed = Math.min(1, (timestamp - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - elapsed, 3);
+      const nextPos = start + (pos - start) * eased;
+
+      this.setVisualPos(nextPos, scrollSize, viewportSize);
+
+      if (elapsed < 1) {
+        this.animationFrame = requestAnimationFrame(animate);
+        return;
+      }
+
+      this.animationFrame = undefined;
+      this.animationTargetPos = undefined;
+      this.setVisualPos(pos, scrollSize, viewportSize);
+      this.updateSectionData(
+        this.sectionIds[this.sectionIndex$.getValue()],
+        this.getProgressPercentage(pos, scrollSize)
+      );
+      this.pageChange$.next(isUser);
+    };
+
+    this.animationFrame = requestAnimationFrame(animate);
+  }
+
+  private setVisualPos(pos: number, scrollSize: number, viewportSize: number) {
+    this.setTrailingBlankSpace(Math.max(0, Math.ceil(pos + viewportSize - scrollSize)), scrollSize);
+    this.scrollToPos(pos);
+  }
+
+  private scrollToPos(pos: number) {
+    this.clearContentTransform();
     this.virtualScrollPos$.next(pos);
     this.scrollEl.scrollTo({ [this.verticalMode ? 'top' : 'left']: pos });
-    this.pageChange$.next(isUser);
   }
 
-  private translateXToPos(pos: number, isUser: boolean) {
-    this.virtualScrollPos$.next(-pos);
-    this.contentEl.style.transform = `translateX(${pos}px)`;
-    this.translateX = pos;
-    this.pageChange$.next(isUser);
+  private snapToPageStart(pos: number, viewportSize: number) {
+    return this.snapToPitchStart(pos, viewportSize + this.pageGap);
+  }
+
+  private snapToColumnStart(pos: number) {
+    return this.snapToPitchStart(pos, this.getColumnPitch());
+  }
+
+  private snapToPitchStart(pos: number, pitch: number) {
+    if (pitch <= 0) {
+      return Math.max(0, pos);
+    }
+
+    return Math.max(0, Math.floor((pos + 0.5) / pitch) * pitch);
+  }
+
+  private getSpreadPitch() {
+    return (this.verticalMode ? this.height : this.width) + this.pageGap;
+  }
+
+  private getColumnPitch() {
+    if (this.verticalMode) {
+      return this.getSpreadPitch();
+    }
+
+    return this.getSpreadPitch() / Math.max(1, this.columnCount);
+  }
+
+  private getProgressPercentage(pos: number, scrollSize: number) {
+    if (!scrollSize) {
+      return 0;
+    }
+
+    return (pos / scrollSize) * 100;
+  }
+
+  private getMeasuredScrollSize(scrollSizeProp: 'scrollWidth' | 'scrollHeight') {
+    return Math.max(0, this.scrollEl[scrollSizeProp] - this.trailingBlankSpace);
+  }
+
+  private getCurrentVisualPos(scrollSize: number, offset: number) {
+    const currentPos = this.animationTargetPos ?? this.virtualScrollPos$.getValue();
+
+    if (currentPos > scrollSize) {
+      return this.getLastScrollPos(scrollSize, offset);
+    }
+
+    return Math.max(0, currentPos);
+  }
+
+  private getLastScrollPos(scrollSize: number, offset: number) {
+    if (offset <= 0) {
+      return 0;
+    }
+
+    let scrollValue = offset * (Math.ceil(scrollSize / offset) - 1);
+    if (Math.ceil(scrollValue) >= scrollSize) {
+      scrollValue -= offset;
+    }
+
+    return Math.max(0, scrollValue);
+  }
+
+  private cancelAnimation() {
+    if (this.animationFrame !== undefined) {
+      cancelAnimationFrame(this.animationFrame);
+    }
+
+    this.animationFrame = undefined;
+    this.animationTargetPos = undefined;
+  }
+
+  private clearContentTransform() {
+    if (!this.contentEl.style.transform) {
+      return;
+    }
+
+    this.contentEl.style.removeProperty('transform');
+  }
+
+  private setTrailingBlankSpace(size: number, scrollSize: number) {
+    const nextSize = Math.max(0, size);
+    this.trailingBlankSpace = nextSize;
+    const extent = Math.ceil(scrollSize + nextSize);
+
+    if (nextSize) {
+      this.trailingBlankEl.style.width = this.verticalMode ? '1px' : `${extent}px`;
+      this.trailingBlankEl.style.height = this.verticalMode ? `${extent}px` : '1px';
+      return;
+    }
+
+    this.trailingBlankEl.style.width = '';
+    this.trailingBlankEl.style.height = '';
+  }
+
+  private clearTrailingBlankSpace() {
+    this.setTrailingBlankSpace(0, 0);
   }
 
   /**
@@ -214,9 +435,9 @@ export class PageManagerPaginated implements PageManager {
       const subscription = this.sectionRenderComplete$.subscribe((newIndex) => {
         if (newIndex === index) {
           subscriber.next();
+          subscriber.complete();
+          subscription.unsubscribe();
         }
-        subscriber.complete();
-        subscription.unsubscribe();
       });
       this.sectionIndex$.next(index);
       return subscription;

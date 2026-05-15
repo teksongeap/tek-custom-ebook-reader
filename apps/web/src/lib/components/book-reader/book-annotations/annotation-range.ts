@@ -222,11 +222,7 @@ function getTextPointAtOffset(root: HTMLElement, targetOffset: number) {
   return undefined;
 }
 
-function wrapRangeWithAnnotation(
-  document: Document,
-  range: Range,
-  annotation: BooksDbAnnotation
-) {
+function wrapRangeWithAnnotation(document: Document, range: Range, annotation: BooksDbAnnotation) {
   const textNodes = getTextNodesInRange(document, range);
   const spans: HTMLSpanElement[] = [];
 

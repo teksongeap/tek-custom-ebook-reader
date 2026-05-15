@@ -351,7 +351,7 @@ export abstract class ApiStorageHandler extends BaseStorageHandler {
     }
 
     return this.isForBrowser
-      ? data
+      ? BaseStorageHandler.normalizeProgressData(data)
       : new File([new Blob([JSON.stringify(data)])], file.name, { type: 'application/json' });
   }
 
@@ -376,10 +376,12 @@ export abstract class ApiStorageHandler extends BaseStorageHandler {
       return { annotations: undefined, lastAnnotationModified: 0 };
     }
 
+    const annotations = BaseStorageHandler.normalizeAnnotations(data);
+
     return {
-      annotations: data,
-      lastAnnotationModified:
-        BaseStorageHandler.getAnnotationsMetadata(file.name).lastAnnotationModified
+      annotations: annotations.length ? annotations : undefined,
+      lastAnnotationModified: BaseStorageHandler.getAnnotationsMetadata(file.name)
+        .lastAnnotationModified
     };
   }
 
@@ -470,8 +472,11 @@ export abstract class ApiStorageHandler extends BaseStorageHandler {
   }
 
   async saveProgress(data: File | BooksDbBookmarkData) {
-    const filename = BaseStorageHandler.getProgressFileName(data);
-    const progressData = data instanceof File ? data : JSON.stringify(data);
+    const normalizedData =
+      data instanceof File ? data : BaseStorageHandler.normalizeProgressData(data);
+    const filename = BaseStorageHandler.getProgressFileName(normalizedData);
+    const progressData =
+      normalizedData instanceof File ? normalizedData : JSON.stringify(normalizedData);
     const { titleId, files, file } = await this.getExternalFile('progress_', '', 0.2, false);
     const { lastBookmarkModified, progress } = BaseStorageHandler.getProgressMetadata(filename);
 
@@ -522,16 +527,11 @@ export abstract class ApiStorageHandler extends BaseStorageHandler {
       files,
       file,
       data: existingData
-    } = await this.getExternalFile(
-      FilePrefix.ANNOTATIONS,
-      shouldMerge ? 'json' : '',
-      0.2,
-      false
-    );
+    } = await this.getExternalFile(FilePrefix.ANNOTATIONS, shouldMerge ? 'json' : '', 0.2, false);
 
     const annotationsToStore = shouldMerge
       ? BaseStorageHandler.mergeAnnotations(annotations, existingData, true)
-      : annotations;
+      : BaseStorageHandler.normalizeAnnotations(annotations);
     const newAnnotationModified = BaseStorageHandler.getLastAnnotationModified(annotationsToStore);
     const filename = BaseStorageHandler.getAnnotationsFileName(
       annotationsToStore,

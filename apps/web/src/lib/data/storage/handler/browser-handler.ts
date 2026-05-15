@@ -139,7 +139,10 @@ export class BrowserStorageHandler extends BaseStorageHandler {
     } else if (fileIdentifier === FilePrefix.ANNOTATIONS) {
       const dataId =
         this.currentContext.id || (await database.getDataByTitle(this.currentContext.title))?.id;
-      const annotations = dataId ? await database.getAnnotations(dataId) : [];
+      const annotations = BaseStorageHandler.normalizeAnnotations(
+        dataId ? await database.getAnnotations(dataId) : [],
+        dataId
+      );
       const lastAnnotationModified = BaseStorageHandler.getLastAnnotationModified(annotations);
 
       fileName = lastAnnotationModified
@@ -247,7 +250,10 @@ export class BrowserStorageHandler extends BaseStorageHandler {
 
     const dataId =
       this.currentContext.id || (await database.getDataByTitle(this.currentContext.title))?.id;
-    const annotations = dataId ? await database.getAnnotations(dataId) : [];
+    const annotations = BaseStorageHandler.normalizeAnnotations(
+      dataId ? await database.getAnnotations(dataId) : [],
+      dataId
+    );
     const lastAnnotationModified = BaseStorageHandler.getLastAnnotationModified(annotations);
     const fileName = lastAnnotationModified
       ? BaseStorageHandler.getAnnotationsFileName(annotations, lastAnnotationModified)
@@ -319,7 +325,7 @@ export class BrowserStorageHandler extends BaseStorageHandler {
 
     const progress = dataId ? await database.getBookmark(dataId) : undefined;
 
-    return progress;
+    return progress ? BaseStorageHandler.normalizeProgressData(progress) : undefined;
   }
 
   async getStatistics() {
@@ -346,13 +352,8 @@ export class BrowserStorageHandler extends BaseStorageHandler {
     BaseStorageHandler.reportProgress(0.5);
 
     const annotations = dataId ? await database.getAnnotations(dataId) : [];
-    const sortedAnnotations = annotations.sort(
-      (annotationA, annotationB) =>
-        annotationA.exploredCharCount - annotationB.exploredCharCount ||
-        annotationA.createdAt - annotationB.createdAt
-    );
-    const lastAnnotationModified =
-      BaseStorageHandler.getLastAnnotationModified(sortedAnnotations);
+    const sortedAnnotations = BaseStorageHandler.normalizeAnnotations(annotations, dataId);
+    const lastAnnotationModified = BaseStorageHandler.getLastAnnotationModified(sortedAnnotations);
 
     return {
       annotations: sortedAnnotations.length ? sortedAnnotations : undefined,
@@ -431,7 +432,7 @@ export class BrowserStorageHandler extends BaseStorageHandler {
     BaseStorageHandler.reportProgress(0.5);
 
     if (dataId) {
-      const bookmarkData = data;
+      const bookmarkData = BaseStorageHandler.normalizeProgressData(data);
 
       bookmarkData.dataId = dataId;
 
@@ -457,8 +458,10 @@ export class BrowserStorageHandler extends BaseStorageHandler {
 
     BaseStorageHandler.reportProgress(0.5);
 
-    if (dataId && annotations.length) {
-      await database.storeAnnotations(dataId, annotations, this.saveBehavior);
+    const annotationsToStore = BaseStorageHandler.normalizeAnnotations(annotations, dataId);
+
+    if (dataId && annotationsToStore.length) {
+      await database.storeAnnotations(dataId, annotationsToStore, this.saveBehavior);
     }
 
     BaseStorageHandler.reportProgress(0.5);

@@ -14,6 +14,7 @@
   }>();
 
   let toolbarEl: HTMLElement | undefined;
+  let commentTextAreaEl: HTMLTextAreaElement | undefined;
   let selectedColor: AnnotationColor | undefined;
   let comment = '';
   let toolbarStyle = '';
@@ -61,8 +62,11 @@
     toolbarStyle = `${chromeStyle}; top: ${top}px; left: ${left}px; max-width: ${viewportWidth - 24}px`;
   }
 
-  function selectColor(color: AnnotationColor) {
+  async function selectColor(color: AnnotationColor) {
     selectedColor = color;
+
+    await tick();
+    commentTextAreaEl?.focus();
   }
 
   function saveAnnotation(commentValue = comment.trim()) {
@@ -78,19 +82,46 @@
     comment = '';
   }
 
+  function handleDocumentPointerDown(event: PointerEvent) {
+    if (!selectedColor || !toolbarEl) {
+      return;
+    }
+
+    const target = event.target;
+
+    if (target instanceof Node && toolbarEl.contains(target)) {
+      return;
+    }
+
+    saveAnnotation();
+  }
+
+  function handleCommentKeydown(event: KeyboardEvent) {
+    event.stopPropagation();
+
+    if (event.key !== 'Enter' || event.shiftKey || event.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    saveAnnotation();
+  }
+
   function limitToRange(min: number, max: number, value: number) {
     return Math.min(Math.max(value, min), Math.max(min, max));
   }
 </script>
+
+<svelte:document on:pointerdown={handleDocumentPointerDown} />
 
 {#if selectionRect}
   <div
     bind:this={toolbarEl}
     class="annotation-toolbar writing-horizontal-tb fixed z-50"
     class:annotation-toolbar--expanded={!!selectedColor}
+    role="dialog"
+    aria-label="Create annotation"
     style={toolbarStyle || chromeStyle}
-    on:keydown|stopPropagation={() => {}}
-    on:pointerdown|stopPropagation={() => {}}
   >
     <div class="annotation-toolbar-main">
       <div class="annotation-toolbar-title">
@@ -107,6 +138,7 @@
             aria-label={colorOption.label}
             style:--book-annotation-base={colorOption.value}
             on:click={() => selectColor(colorOption.id)}
+            on:keydown|stopPropagation={() => {}}
           ></button>
         {/each}
       </div>
@@ -116,6 +148,7 @@
         title="Cancel"
         aria-label="Cancel annotation"
         on:click={() => dispatch('cancel')}
+        on:keydown|stopPropagation={() => {}}
       >
         <Fa icon={faXmark} />
       </button>
@@ -123,20 +156,20 @@
     {#if selectedColor}
       <div class="annotation-toolbar-comment-shell">
         <textarea
+          bind:this={commentTextAreaEl}
           class="annotation-toolbar-comment"
           bind:value={comment}
           rows="3"
           placeholder="Add an optional comment"
+          on:keydown={handleCommentKeydown}
         ></textarea>
         <div class="annotation-toolbar-actions">
           <button
             type="button"
-            class="annotation-toolbar-secondary"
-            on:click={() => saveAnnotation('')}
+            class="annotation-toolbar-save"
+            on:click={() => saveAnnotation()}
+            on:keydown|stopPropagation={() => {}}
           >
-            Highlight Only
-          </button>
-          <button type="button" class="annotation-toolbar-save" on:click={() => saveAnnotation()}>
             Save
           </button>
         </div>
@@ -295,15 +328,13 @@
   }
 
   .annotation-toolbar-actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 0.5rem;
+    display: flex;
+    justify-content: flex-end;
     margin-top: 0.65rem;
   }
 
-  .annotation-toolbar-save,
-  .annotation-toolbar-secondary {
-    width: 100%;
+  .annotation-toolbar-save {
+    min-width: 8rem;
     min-height: 2.25rem;
     cursor: pointer;
     font-weight: 800;
@@ -321,17 +352,8 @@
     color: #ffffff;
   }
 
-  .annotation-toolbar-secondary {
-    border: 1px solid color-mix(in srgb, var(--reader-page-text) 14%, transparent);
-    border-radius: 0.5rem;
-    background: color-mix(in srgb, var(--reader-page-text) 8%, transparent);
-    color: color-mix(in srgb, var(--reader-page-text) 76%, transparent);
-  }
-
   .annotation-toolbar-save:hover,
-  .annotation-toolbar-save:focus-visible,
-  .annotation-toolbar-secondary:hover,
-  .annotation-toolbar-secondary:focus-visible {
+  .annotation-toolbar-save:focus-visible {
     box-shadow: 0 14px 28px color-mix(in srgb, var(--app-accent) 26%, transparent);
   }
 </style>

@@ -24,6 +24,7 @@ import {
 import { BlurMode } from '$lib/data/blur-mode';
 import type { UserFont } from '$lib/data/fonts';
 import { MergeMode } from '$lib/data/merge-mode';
+import { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
 import type { ReadingGoal } from '$lib/data/reading-goal';
 import { SortDirection, type SortOption } from '$lib/data/sort-types';
 import {
@@ -122,6 +123,10 @@ export const enableReaderWakeLock$ = writableBooleanLocalStorageSubject()(
   false
 );
 export const verticalMode$ = writingMode$.pipe(map((writingMode) => writingMode === 'vertical-rl'));
+export const showCharacterCounter$ = writableBooleanLocalStorageSubject()(
+  'showCharacterCounter',
+  true
+);
 export const viewMode$ = writableStringLocalStorageSubject<ViewMode>()(
   'viewMode',
   ViewMode.Paginated
@@ -176,6 +181,12 @@ export const autoBookmark$ = writableBooleanLocalStorageSubject()('autoBookmark'
 export const autoBookmarkTime$ = writableNumberLocalStorageSubject()('autoBookmarkTime', 3);
 
 export const pageColumns$ = writableNumberLocalStorageSubject()('pageColumns', 0);
+
+export const paginationTransitionMode$ =
+  writableStringLocalStorageSubject<PaginationTransitionMode>()(
+    'paginationTransitionMode',
+    PaginationTransitionMode.Glide
+  );
 
 export const requestPersistentStorage$ = writableBooleanLocalStorageSubject()(
   'requestPersistentStorage',
