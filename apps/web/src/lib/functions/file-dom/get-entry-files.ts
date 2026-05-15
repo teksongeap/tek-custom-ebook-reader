@@ -9,8 +9,13 @@ export async function getEntryFiles(entry: FileSystemEntry): Promise<File[]> {
     const dirReader = entry.createReader();
 
     const entries = await getDirectoryEntries(dirReader);
-    const nestedFiles = await Promise.all(entries.map((e) => getEntryFiles(e)));
-    return nestedFiles.flat();
+    const nestedFiles: File[] = [];
+
+    for (let index = 0, { length } = entries; index < length; index += 1) {
+      nestedFiles.push(...(await getEntryFiles(entries[index])));
+    }
+
+    return nestedFiles;
   }
   const file = await new Promise<File>((resolve, reject) => {
     (entry as FileSystemFileEntry).file(resolve, reject);

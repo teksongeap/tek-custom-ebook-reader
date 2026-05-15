@@ -11,7 +11,7 @@
   import { PAGE_CHANGE } from '$lib/data/events';
   import { skipKeyDownListener$, statisticsEnabled$ } from '$lib/data/store';
   import { dummyFn, getWeightedAverage } from '$lib/functions/utils';
-  import { debounceTime, fromEvent, merge, take } from 'rxjs';
+  import { debounceTime, fromEvent, Subject, take, takeUntil } from 'rxjs';
   import { onMount } from 'svelte';
   import Fa from 'svelte-fa';
 
@@ -25,6 +25,8 @@
   let currentChapterIndex = -1;
   let currentChapterCharacterProgress = '0/0';
   let currentChapterProgress = '0.00';
+
+  const destroy$ = new Subject<void>();
 
   $: prevChapterAvailable = verticalMode
     ? currentChapterIndex < chapters.length - 1
@@ -71,6 +73,8 @@
     }
 
     return () => {
+      destroy$.next();
+      destroy$.complete();
       $skipKeyDownListener$ = false;
       dialogManager.dialogs$.next([]);
     };
@@ -101,8 +105,8 @@
     const hasCharacterChange = exploredCharCount !== nextChapter?.startCharacter;
 
     if ($statisticsEnabled$ && closeToc && hasCharacterChange && !wasTrackerPaused) {
-      merge(fromEvent(document, PAGE_CHANGE))
-        .pipe(debounceTime(200), take(1))
+      fromEvent(document, PAGE_CHANGE)
+        .pipe(debounceTime(200), take(1), takeUntil(destroy$))
         .subscribe(() => {
           if (closeToc) {
             closeTocMenu();

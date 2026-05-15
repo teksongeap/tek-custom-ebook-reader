@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-import { Observable, take, type Subject, type BehaviorSubject } from 'rxjs';
+import { Observable, take, type Subject, type BehaviorSubject, type Subscription } from 'rxjs';
 import {
   sectionProgress$,
   sectionList$,
@@ -19,6 +19,8 @@ export class PageManagerPaginated implements PageManager {
   private animationTargetPos: number | undefined;
 
   private sectionTransitionIndex: number | undefined;
+
+  private sectionTransitionSubscription: Subscription | undefined;
 
   private trailingBlankSpace = 0;
 
@@ -129,6 +131,7 @@ export class PageManagerPaginated implements PageManager {
 
   beginSectionTransition(index: number) {
     this.cancelAnimation();
+    this.clearSectionTransitionSubscription();
     this.clearTrailingBlankSpace();
     this.clearContentTransform();
     this.sectionTransitionIndex = index;
@@ -142,6 +145,14 @@ export class PageManagerPaginated implements PageManager {
 
   isSectionTransitionPending() {
     return this.sectionTransitionIndex !== undefined;
+  }
+
+  destroy() {
+    this.cancelAnimation();
+    this.clearSectionTransitionSubscription();
+    this.clearTrailingBlankSpace();
+    this.clearContentTransform();
+    this.sectionTransitionIndex = undefined;
   }
 
   jumpTo(scrollPos: number, isUser: boolean, scrollSize?: number) {
@@ -207,7 +218,7 @@ export class PageManagerPaginated implements PageManager {
     if (nextPage < 0) return false;
 
     this.beginSectionTransition(nextPage);
-    this.updateSectionIndex(nextPage).subscribe({
+    this.sectionTransitionSubscription = this.updateSectionIndex(nextPage).subscribe({
       next: () => {
         const scrollSize = this.scrollEl[scrollSizeProp];
         // Boundaries must use the newly rendered section's real scroll size.
@@ -216,6 +227,10 @@ export class PageManagerPaginated implements PageManager {
       },
       error: () => {
         this.completeSectionTransition(nextPage);
+        this.clearSectionTransitionSubscription();
+      },
+      complete: () => {
+        this.clearSectionTransitionSubscription();
       }
     });
     return true;
@@ -226,7 +241,7 @@ export class PageManagerPaginated implements PageManager {
     if (nextPage >= this.sectionIds.length) return false;
 
     this.beginSectionTransition(nextPage);
-    this.updateSectionIndex(nextPage).subscribe({
+    this.sectionTransitionSubscription = this.updateSectionIndex(nextPage).subscribe({
       next: () => {
         const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
         const viewportSize = this.verticalMode ? this.height : this.width;
@@ -239,6 +254,10 @@ export class PageManagerPaginated implements PageManager {
       },
       error: () => {
         this.completeSectionTransition(nextPage);
+        this.clearSectionTransitionSubscription();
+      },
+      complete: () => {
+        this.clearSectionTransitionSubscription();
       }
     });
     return true;
@@ -390,6 +409,11 @@ export class PageManagerPaginated implements PageManager {
 
     this.animationFrame = undefined;
     this.animationTargetPos = undefined;
+  }
+
+  private clearSectionTransitionSubscription() {
+    this.sectionTransitionSubscription?.unsubscribe();
+    this.sectionTransitionSubscription = undefined;
   }
 
   private clearContentTransform() {

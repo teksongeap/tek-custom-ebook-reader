@@ -253,23 +253,24 @@
 
   $: {
     if (contentEl && scrollEl && tailSpacerEl && sections) {
-      concretePageManager = new PageManagerPaginated(
-        contentEl,
-        scrollEl,
-        tailSpacerEl,
-        sections.map((section) => section.id),
-        sectionIndex$,
-        virtualScrollPos$,
-        width,
-        height,
-        gap,
-        columnCount,
-        verticalMode,
-        paginationTransitionMode,
-        pageChange$,
-        sectionRenderComplete$
+      setPageManager(
+        new PageManagerPaginated(
+          contentEl,
+          scrollEl,
+          tailSpacerEl,
+          sections.map((section) => section.id),
+          sectionIndex$,
+          virtualScrollPos$,
+          width,
+          height,
+          gap,
+          columnCount,
+          verticalMode,
+          paginationTransitionMode,
+          pageChange$,
+          sectionRenderComplete$
+        )
       );
-      pageManager = concretePageManager;
     }
   }
 
@@ -306,7 +307,8 @@
         concretePageManager,
         sectionReadyWithIndex$,
         sectionIndex$,
-        (c) => (previousIntendedCount = c)
+        (c) => (previousIntendedCount = c),
+        destroy$
       );
       bookmarkManager = concreteBookmarkManager;
     }
@@ -464,6 +466,10 @@
 
     document.body.classList.remove(cssClassOverflowHidden);
 
+    calculator?.destroy();
+    concretePageManager?.destroy();
+    pageManager = undefined;
+
     destroy$.next();
     destroy$.complete();
   });
@@ -609,17 +615,35 @@
   }
 
   function waitForSectionReady(sectionIndex: number) {
-    return new Promise<SectionCharacterStatsCalculator>((resolve) => {
-      const subscription = sectionReadyWithIndex$
+    return new Promise<SectionCharacterStatsCalculator | undefined>((resolve) => {
+      let resolved = false;
+
+      sectionReadyWithIndex$
         .pipe(
           filter(({ index }) => index === sectionIndex),
-          take(1)
+          take(1),
+          takeUntil(destroy$)
         )
-        .subscribe(({ calculator: readyCalculator }) => {
-          subscription.unsubscribe();
-          resolve(readyCalculator);
+        .subscribe({
+          next: ({ calculator: readyCalculator }) => {
+            resolved = true;
+            resolve(readyCalculator);
+          },
+          complete: () => {
+            if (!resolved) {
+              resolve(undefined);
+            }
+          }
         });
     });
+  }
+
+  function setPageManager(nextPageManager: PageManagerPaginated) {
+    sectionJumpToken += 1;
+    sectionJumpPending = false;
+    concretePageManager?.destroy();
+    concretePageManager = nextPageManager;
+    pageManager = nextPageManager;
   }
 
   function lockWheelNavigation() {
@@ -668,7 +692,11 @@
 
         const updatedCalculator = await sectionReadyPromise;
 
-        if (jumpToken !== sectionJumpToken || sectionIndex$.getValue() !== sectionIndex) {
+        if (
+          !updatedCalculator ||
+          jumpToken !== sectionJumpToken ||
+          sectionIndex$.getValue() !== sectionIndex
+        ) {
           return undefined;
         }
 
@@ -719,6 +747,7 @@
       scrollEl,
       document
     );
+    calculator?.destroy();
     calculator = nextCalculator;
     calculatorSectionIndex = loadedSectionIndex;
     exploredCharCount = 0;

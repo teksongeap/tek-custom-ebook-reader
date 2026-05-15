@@ -13,8 +13,10 @@
     shareReplay,
     skip,
     startWith,
+    Subject,
     switchMap,
     take,
+    takeUntil,
     takeWhile,
     tap,
     timer
@@ -246,6 +248,7 @@
   const syncedPromise = new Promise<void>((resolver) => {
     syncedResolver = resolver;
   });
+  const routeDestroy$ = new Subject<void>();
   const queuedReaderImageGalleryPictures = new Map<string, boolean>();
   const fontFeatureSettings = [
     $enableVerticalFontKerning$ && '"vkrn"',
@@ -557,7 +560,7 @@
     pulseElement(customReadingPointRange?.endContainer?.parentElement, 'add', 1);
 
     fromEvent(document, 'click')
-      .pipe(skip(1), take(1))
+      .pipe(skip(1), take(1), takeUntil(routeDestroy$))
       .subscribe(() => {
         showCustomReadingPoint = false;
         pulseElement(customReadingPointRange?.endContainer?.parentElement, 'remove', 1);
@@ -664,6 +667,9 @@
     if (dismissDialogs) {
       dialogManager.dialogs$.next([]);
     }
+
+    routeDestroy$.next();
+    routeDestroy$.complete();
   });
 
   function handleUnload(event: BeforeUnloadEvent) {
@@ -884,7 +890,7 @@
 
       if ($statisticsEnabled$ && $openTrackerOnCompletion$) {
         confettiWidthModifier = 36;
-        confettiMaxRuns = 0;
+        confettiMaxRuns = 6;
         bookCompleted = window.matchMedia('(min-width: 900px)').matches;
         isTrackerMenuOpen$.next(true);
       } else {
@@ -894,7 +900,7 @@
         bookCompleted = true;
 
         merge(fromEvent(document, 'pointerup'), timer(10000))
-          .pipe(take(1))
+          .pipe(take(1), takeUntil(routeDestroy$))
           .subscribe(() => {
             bookCompleted = false;
           });
@@ -1872,7 +1878,10 @@
 
     merge(fromEvent(document, 'pointerup'), fromEvent(document, 'pointermove'))
       // eslint-disable-next-line rxjs/no-ignored-takewhile-value
-      .pipe(takeWhile(() => isSelectingCustomReadingPoint))
+      .pipe(
+        takeWhile(() => isSelectingCustomReadingPoint),
+        takeUntil(routeDestroy$)
+      )
       .subscribe((event: Event) => {
         if (!(event instanceof PointerEvent)) {
           return;
@@ -1957,7 +1966,7 @@
     }
 
     merge(fromEvent(document, PAGE_CHANGE), timerAmount ? timer(timerAmount) : NEVER)
-      .pipe(debounceTime(200), take(1))
+      .pipe(debounceTime(200), take(1), takeUntil(routeDestroy$))
       .subscribe(() => {
         wasTrackerPaused = false;
         $isTrackerPaused$ = false;
@@ -2399,7 +2408,7 @@
       pauseTracker();
 
       merge(fromEvent(document, PAGE_CHANGE), timer(1000))
-        .pipe(debounceTime(1000), take(1))
+        .pipe(debounceTime(1000), take(1), takeUntil(routeDestroy$))
         .subscribe(() => {
           restartTrackerAfterCharacterChangeOrTime(1000);
         });

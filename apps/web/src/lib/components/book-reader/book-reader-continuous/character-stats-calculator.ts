@@ -61,6 +61,11 @@ export class CharacterStatsCalculator {
     });
   }
 
+  destroy() {
+    window.clearTimeout(this.forcedInitTimer);
+    this.forcedInitTimer = undefined;
+  }
+
   updateParagraphPos(scrollPos = 0) {
     window.clearTimeout(this.forcedInitTimer);
     const scrollElRect = this.scrollEl.getBoundingClientRect();

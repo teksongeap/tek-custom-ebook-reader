@@ -31,6 +31,7 @@
     filter,
     fromEvent,
     map,
+    merge,
     observeOn,
     skip,
     Subject,
@@ -178,6 +179,8 @@
 
   const destroy$ = new Subject<void>();
 
+  const contentReset$ = new Subject<void>();
+
   const sectionToElement = new Map<string, HTMLElement>();
 
   const sectionData = new Map<string, SectionWithProgress>();
@@ -210,6 +213,7 @@
 
   $: {
     if (htmlContent) {
+      resetContentState();
       scrollWhenReady = true;
     }
   }
@@ -370,6 +374,9 @@
     document.removeEventListener('ttu-action', handleAction, false);
     sectionNavigator = undefined;
     clearFontLoadingListener();
+    calculator?.destroy();
+    contentReset$.next();
+    contentReset$.complete();
 
     destroy$.next();
     destroy$.complete();
@@ -463,7 +470,11 @@
         .finally(() => {
           if (autoBookmark) {
             fromEvent(window, 'scroll')
-              .pipe(skip(1), debounceTime(autoBookmarkTime * 1000), takeUntil(destroy$))
+              .pipe(
+                skip(1),
+                debounceTime(autoBookmarkTime * 1000),
+                takeUntil(merge(destroy$, contentReset$))
+              )
               .subscribe(() => {
                 dispatch('bookmark');
               });
@@ -504,7 +515,7 @@
                 return EMPTY;
               }),
               debounce(() => timer(willNavigate ? 100 : 500)),
-              takeUntil(destroy$)
+              takeUntil(merge(destroy$, contentReset$))
             )
             .subscribe(updateSectionProgress);
         });
@@ -576,6 +587,7 @@
   function onHtmlLoad() {
     if (!contentEl) return;
 
+    calculator?.destroy();
     calculator = new CharacterStatsCalculator(
       contentEl,
       verticalMode ? 'vertical' : 'horizontal',
@@ -635,6 +647,14 @@
       document.fonts.removeEventListener('loadingdone', fontLoadingDoneHandler);
       fontLoadingDoneHandler = undefined;
     }
+  }
+
+  function resetContentState() {
+    contentReset$.next();
+    sectionToElement.clear();
+    sectionData.clear();
+    scrollAdjustment = 0;
+    willNavigate = false;
   }
 
   async function jumpToSectionTarget(targetId: string) {

@@ -46,10 +46,18 @@
 
     confetiiCanvasContext.clearRect(0, 0, confettiContainer.width, confettiContainer.height);
 
+    const activeConfettiElements: Confetti[] = [];
+
     for (let index = 0, { length } = confettiElements; index < length; index += 1) {
       const confettiElement = confettiElements[index];
 
       confettiElement.update();
+
+      if (!isConfettiInBounds(confettiElement)) {
+        continue;
+      }
+
+      activeConfettiElements.push(confettiElement);
       confetiiCanvasContext.translate(confettiElement.position.x, confettiElement.position.y);
       confetiiCanvasContext.rotate(confettiElement.rotation);
 
@@ -61,11 +69,17 @@
       confetiiCanvasContext.setTransform(1, 0, 0, 1, 0, 0);
     }
 
+    confettiElements = activeConfettiElements;
+
     if (confettiAnimationTimer) {
       window.cancelAnimationFrame(confettiAnimationTimer);
     }
 
-    confettiAnimationTimer = window.requestAnimationFrame(updateConfetti);
+    if (confettiElements.length || addConfettiTimer) {
+      confettiAnimationTimer = window.requestAnimationFrame(updateConfetti);
+    } else {
+      confettiAnimationTimer = undefined;
+    }
   }
 
   function addConfetti() {
@@ -82,12 +96,18 @@
   }
 
   function confettiLoop() {
-    if (confettiMaxRuns && confettiRuns > confettiMaxRuns) {
+    if (confettiMaxRuns && confettiRuns >= confettiMaxRuns) {
+      addConfettiTimer = undefined;
       return;
     }
 
     confettiRuns += 1;
     addConfetti();
+
+    if (!confettiAnimationTimer) {
+      updateConfetti();
+    }
+
     addConfettiTimer = window.setTimeout(confettiLoop, 700 + Math.random() * 1700);
   }
 
@@ -103,6 +123,17 @@
     confettiElements = [];
     confettiAnimationTimer = undefined;
     addConfettiTimer = undefined;
+    confettiRuns = 0;
+  }
+
+  function isConfettiInBounds(confettiElement: Confetti) {
+    const margin = 80;
+
+    return (
+      confettiElement.position.x >= -margin &&
+      confettiElement.position.x <= confettiContainer.width + margin &&
+      confettiElement.position.y <= confettiContainer.height + margin
+    );
   }
 </script>
 

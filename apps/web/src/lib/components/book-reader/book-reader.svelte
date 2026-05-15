@@ -148,6 +148,12 @@
 
   let wakeLock: WakeLockSentinel | undefined;
 
+  let wakeLockRequestTimer: ReturnType<typeof setTimeout> | undefined;
+
+  let wakeLockRequestInFlight = false;
+
+  let destroyed = false;
+
   let visibilityState: DocumentVisibilityState;
 
   let contentEl: HTMLElement | undefined;
@@ -173,11 +179,11 @@
       ? firstDimensionMargin * 2
       : 0;
 
-  $: if ($enableReaderWakeLock$ && visibilityState === 'visible') {
-    setTimeout(requestWakeLock, 500);
-  }
+  $: syncWakeLock($enableReaderWakeLock$, visibilityState);
 
   onDestroy(() => {
+    destroyed = true;
+    clearWakeLockRequestTimer();
     mutationObserver.disconnect();
 
     releaseWakeLock();
@@ -307,29 +313,83 @@
   }
 
   async function requestWakeLock() {
-    if (wakeLock && !wakeLock.released) {
+    if (
+      destroyed ||
+      wakeLockRequestInFlight ||
+      (wakeLock && !wakeLock.released) ||
+      typeof navigator === 'undefined' ||
+      !('wakeLock' in navigator)
+    ) {
       return;
     }
 
-    wakeLock = await navigator.wakeLock.request().catch(({ message }) => {
+    wakeLockRequestInFlight = true;
+
+    const nextWakeLock = await navigator.wakeLock.request().catch(({ message }) => {
       logger.error(`failed to request wakelock: ${message}`);
 
       return undefined;
     });
 
-    if (wakeLock) {
-      wakeLock.addEventListener('release', releaseWakeLock, false);
+    wakeLockRequestInFlight = false;
+
+    if (!nextWakeLock) {
+      return;
     }
+
+    if (destroyed || !$enableReaderWakeLock$ || visibilityState !== 'visible') {
+      await nextWakeLock.release().catch(() => {
+        // no-op
+      });
+      return;
+    }
+
+    wakeLock = nextWakeLock;
+    wakeLock.addEventListener('release', releaseWakeLock, false);
   }
 
   async function releaseWakeLock() {
-    if (wakeLock && !wakeLock.released) {
-      await wakeLock.release().catch(() => {
+    const activeWakeLock = wakeLock;
+
+    wakeLock = undefined;
+
+    if (!activeWakeLock) {
+      return;
+    }
+
+    activeWakeLock.removeEventListener('release', releaseWakeLock, false);
+
+    if (!activeWakeLock.released) {
+      await activeWakeLock.release().catch(() => {
         // no-op
       });
     }
+  }
 
-    wakeLock = undefined;
+  function syncWakeLock(enabled: boolean, state: DocumentVisibilityState) {
+    if (!enabled || state !== 'visible') {
+      clearWakeLockRequestTimer();
+      releaseWakeLock();
+      return;
+    }
+
+    if (wakeLock || wakeLockRequestTimer || wakeLockRequestInFlight) {
+      return;
+    }
+
+    wakeLockRequestTimer = setTimeout(() => {
+      wakeLockRequestTimer = undefined;
+      requestWakeLock();
+    }, 500);
+  }
+
+  function clearWakeLockRequestTimer() {
+    if (!wakeLockRequestTimer) {
+      return;
+    }
+
+    clearTimeout(wakeLockRequestTimer);
+    wakeLockRequestTimer = undefined;
   }
 </script>
 

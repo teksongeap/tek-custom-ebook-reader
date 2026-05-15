@@ -19,6 +19,8 @@ export class SectionCharacterStatsCalculator {
 
   private calculator: CharacterStatsCalculator | undefined;
 
+  private updateParagraphPosTimer: ReturnType<typeof setTimeout> | undefined;
+
   constructor(
     public readonly containerEl: HTMLElement,
     sectionCharacterCounts: ReadonlyArray<number>,
@@ -39,6 +41,9 @@ export class SectionCharacterStatsCalculator {
   }
 
   updateCurrentSection(sectionIndex: number) {
+    this.calculator?.destroy();
+    this.clearUpdateParagraphPosTimer();
+
     this.calculator = new CharacterStatsCalculator(
       this.containerEl,
       this.verticalMode ? 'horizontal' : 'vertical',
@@ -48,7 +53,8 @@ export class SectionCharacterStatsCalculator {
     );
     this.sectionIndex = sectionIndex;
 
-    setTimeout(() => {
+    this.updateParagraphPosTimer = setTimeout(() => {
+      this.updateParagraphPosTimer = undefined;
       this.calculator?.updateParagraphPosIfNeeded(this.virtualScrollPos$.getValue());
     });
   }
@@ -165,6 +171,12 @@ export class SectionCharacterStatsCalculator {
     return totalProgress / 100;
   }
 
+  destroy() {
+    this.clearUpdateParagraphPosTimer();
+    this.calculator?.destroy();
+    this.calculator = undefined;
+  }
+
   private getSectionStartCount() {
     return this.sectionAccCharCounts[this.sectionIndex - 1] || 0;
   }
@@ -175,5 +187,14 @@ export class SectionCharacterStatsCalculator {
 
   private get screenSizeMirrored() {
     return (this.verticalMode ? this.getWidth() : this.getHeight()) + this.getPageGap();
+  }
+
+  private clearUpdateParagraphPosTimer() {
+    if (!this.updateParagraphPosTimer) {
+      return;
+    }
+
+    clearTimeout(this.updateParagraphPosTimer);
+    this.updateParagraphPosTimer = undefined;
   }
 }

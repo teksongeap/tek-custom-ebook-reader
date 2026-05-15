@@ -532,109 +532,115 @@ export abstract class BaseStorageHandler {
 
   protected async extractBookData(book: Blob, filename: string, progressBase = 1) {
     const bookreader = new ZipReader(new BlobReader(book));
-    const bookDataEntries = await bookreader.getEntries();
+    try {
+      const bookDataEntries = await bookreader.getEntries();
 
-    if (!bookDataEntries.length) {
-      BaseStorageHandler.reportProgress(progressBase);
+      if (!bookDataEntries.length) {
+        BaseStorageHandler.reportProgress(progressBase);
 
-      return undefined;
-    }
+        return undefined;
+      }
 
-    const bookObject: Omit<BooksDbBookData, 'id'> = {
-      title: '',
-      styleSheet: '',
-      elementHtml: '',
-      blobs: {} as Record<string, Blob>,
-      coverImage: '',
-      hasThumb: true,
-      characters: 0,
-      sections: [],
-      lastBookModified: 0,
-      lastBookOpen: 0
-    };
+      const bookObject: Omit<BooksDbBookData, 'id'> = {
+        title: '',
+        styleSheet: '',
+        elementHtml: '',
+        blobs: {} as Record<string, Blob>,
+        coverImage: '',
+        hasThumb: true,
+        characters: 0,
+        sections: [],
+        lastBookModified: 0,
+        lastBookOpen: 0
+      };
 
-    const bookObjectTransforms = [];
-    const limiter = pLimit(1);
-    const progressPerStep = progressBase / bookDataEntries.length;
+      const bookObjectTransforms = [];
+      const limiter = pLimit(1);
+      const progressPerStep = progressBase / bookDataEntries.length;
 
-    for (let index = 0, { length } = bookDataEntries; index < length; index += 1) {
-      bookObjectTransforms.push(
-        limiter(async () => {
-          try {
-            throwIfAborted(this.cancelSignal);
+      for (let index = 0, { length } = bookDataEntries; index < length; index += 1) {
+        bookObjectTransforms.push(
+          limiter(async () => {
+            try {
+              throwIfAborted(this.cancelSignal);
 
-            const entry = bookDataEntries[index];
+              const entry = bookDataEntries[index];
 
-            if (entry.filename === 'staticdata.json') {
-              const staticData = JSON.parse(
-                await this.readFromZip(
-                  new TextWriter(),
-                  'Unable to read Static Data',
+              if (entry.filename === 'staticdata.json') {
+                const staticData = JSON.parse(
+                  await this.readFromZip(
+                    new TextWriter(),
+                    'Unable to read Static Data',
+                    entry,
+                    progressPerStep
+                  )
+                ) as Omit<
+                  BooksDbBookData,
+                  | 'id'
+                  | 'blobs'
+                  | 'hasThumb'
+                  | 'coverImage'
+                  | 'lastBookModified'
+                  | 'lastBookOpen'
+                  | 'storageSource'
+                >;
+
+                if (!staticData.elementHtml) {
+                  throw new Error(`Invalid bookdata - empty element html`);
+                }
+
+                const { characters, lastBookModified, lastBookOpen } =
+                  BaseStorageHandler.getBookMetadata(filename);
+
+                bookObject.title = staticData.title;
+                bookObject.elementHtml = staticData.elementHtml;
+                bookObject.styleSheet = staticData.styleSheet || '';
+                bookObject.sections = staticData.sections || [];
+                bookObject.characters = BaseStorageHandler.getBookCharacters(
+                  characters || 0,
+                  bookObject.sections
+                );
+                bookObject.lastBookModified = lastBookModified;
+                bookObject.lastBookOpen = lastBookOpen;
+
+                if (staticData.htmlBackup) {
+                  bookObject.htmlBackup = staticData.htmlBackup;
+                }
+              } else if (entry.filename.startsWith('blobs/')) {
+                const imagePath = entry.filename.replace('blobs/', '');
+                const existingBlobEntries = bookObject.blobs || {};
+
+                existingBlobEntries[imagePath] = await this.readFromZip(
+                  new BlobWriter(BaseStorageHandler.getImageMimeTypeFromExtension(imagePath)),
+                  'Unable to read blob data',
                   entry,
                   progressPerStep
-                )
-              ) as Omit<
-                BooksDbBookData,
-                | 'id'
-                | 'blobs'
-                | 'hasThumb'
-                | 'coverImage'
-                | 'lastBookModified'
-                | 'lastBookOpen'
-                | 'storageSource'
-              >;
-
-              if (!staticData.elementHtml) {
-                throw new Error(`Invalid bookdata - empty element html`);
+                );
+                bookObject.blobs = existingBlobEntries;
+              } else if (entry.filename.startsWith('cover.')) {
+                bookObject.coverImage = await this.readFromZip(
+                  new BlobWriter(BaseStorageHandler.getImageMimeTypeFromExtension(entry.filename)),
+                  'Unable to read cover data',
+                  entry,
+                  progressPerStep
+                );
               }
-
-              const { characters, lastBookModified, lastBookOpen } =
-                BaseStorageHandler.getBookMetadata(filename);
-
-              bookObject.title = staticData.title;
-              bookObject.elementHtml = staticData.elementHtml;
-              bookObject.styleSheet = staticData.styleSheet || '';
-              bookObject.sections = staticData.sections || [];
-              bookObject.characters = BaseStorageHandler.getBookCharacters(
-                characters || 0,
-                bookObject.sections
-              );
-              bookObject.lastBookModified = lastBookModified;
-              bookObject.lastBookOpen = lastBookOpen;
-
-              if (staticData.htmlBackup) {
-                bookObject.htmlBackup = staticData.htmlBackup;
-              }
-            } else if (entry.filename.startsWith('blobs/')) {
-              const imagePath = entry.filename.replace('blobs/', '');
-              const existingBlobEntries = bookObject.blobs || {};
-
-              existingBlobEntries[imagePath] = await this.readFromZip(
-                new BlobWriter(BaseStorageHandler.getImageMimeTypeFromExtension(imagePath)),
-                'Unable to read blob data',
-                entry,
-                progressPerStep
-              );
-              bookObject.blobs = existingBlobEntries;
-            } else if (entry.filename.startsWith('cover.')) {
-              bookObject.coverImage = await this.readFromZip(
-                new BlobWriter(BaseStorageHandler.getImageMimeTypeFromExtension(entry.filename)),
-                'Unable to read cover data',
-                entry,
-                progressPerStep
-              );
+            } catch (error) {
+              limiter.clearQueue();
+              throw error;
             }
-          } catch (error) {
-            limiter.clearQueue();
-            throw error;
-          }
-        })
-      );
+          })
+        );
+      }
+
+      await Promise.all(bookObjectTransforms);
+
+      return bookObject;
+    } finally {
+      await bookreader.close().catch(() => {
+        // no-op
+      });
     }
-
-    await Promise.all(bookObjectTransforms);
-
-    return bookObject;
   }
 
   protected async extractAsJSON(entry: Entry, errorMessage: string, progressBase = 0.9) {

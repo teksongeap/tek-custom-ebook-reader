@@ -38,7 +38,7 @@
     const isEqual = (newValue: string | Blob) => {
       if (!prevValue) return false;
       if (prevValue instanceof Blob && newValue instanceof Blob) {
-        return prevValue.type === newValue.type && prevValue.size === newValue.size;
+        return prevValue === newValue;
       }
       if (typeof prevValue !== 'object' || typeof newValue !== 'object') {
         return prevValue === newValue;
