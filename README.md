@@ -4,7 +4,7 @@
 
 とく Ebook Reader is a customized browser ebook reader for Japanese reading, progress tracking, and dictionary lookup workflows. It is based on [TTU Reader](https://github.com/ttu-ttu/ebook-reader) and keeps compatibility with TTU-style book data and the default `ttu-reader-data` storage root.
 
-The app runs fully in the browser, can be installed as a PWA, and is designed to work well with dictionary extensions such as Yomitan.
+The app runs fully in the browser, can be installed as a PWA, and is designed to work well with extensions such as Yomitan, DeepL, and Read Aloud.
 
 ## Features
 
