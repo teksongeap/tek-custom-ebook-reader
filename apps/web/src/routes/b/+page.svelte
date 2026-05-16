@@ -2187,10 +2187,7 @@
     fontColor={$themeOption$?.fontColor ?? ''}
     backgroundColor={$backgroundColor$ ?? ''}
     on:save={createAnnotation}
-    on:cancel={() => {
-      hideAnnotationComposer();
-      clearRange(window, 0);
-    }}
+    on:dismiss={hideAnnotationComposer}
   />
   {$initBookmarkData$ ?? ''}
   {$initAnnotations$ ?? ''}

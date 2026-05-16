@@ -10,7 +10,7 @@
 
   const dispatch = createEventDispatcher<{
     save: { color: AnnotationColor; comment: string };
-    cancel: void;
+    dismiss: void;
   }>();
 
   let toolbarEl: HTMLElement | undefined;
@@ -94,12 +94,13 @@
     if (
       !selectionRect ||
       !toolbarEl ||
+      (event.pointerType === 'mouse' && event.button !== 0) ||
       (event.target instanceof Node && toolbarEl.contains(event.target))
     ) {
       return;
     }
 
-    dispatch('cancel');
+    dispatch('dismiss');
   }
 
   function limitToRange(min: number, max: number, value: number) {
