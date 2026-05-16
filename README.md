@@ -83,7 +83,7 @@ Browser storage can still be evicted by the browser or operating system. Enable 
 ## Local Development
 
 Requirements: Node.js and pnpm.
-
+cd into the main folder and run:
 ```sh
 pnpm install
 pnpm dev
