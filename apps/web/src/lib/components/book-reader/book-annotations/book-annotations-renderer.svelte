@@ -461,6 +461,15 @@
     filter: saturate(1.1);
   }
 
+  :global(.book-content--writing-vertical-rl .book-annotation-highlight) {
+    background: color-mix(in srgb, var(--book-annotation-base) 44%, transparent);
+  }
+
+  :global(.book-content--writing-vertical-rl .book-annotation-highlight:hover),
+  :global(.book-content--writing-vertical-rl .book-annotation-highlight:focus-visible) {
+    background: color-mix(in srgb, var(--book-annotation-base) 64%, transparent);
+  }
+
   :global(.book-annotation-highlight--active) {
     box-shadow:
       0 0 0 2px color-mix(in srgb, var(--book-annotation-base) 72%, transparent),
