@@ -1,82 +1,35 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
-  "dependencyDashboard": true,
-  "timezone": "America/Chicago",
-  "prConcurrentLimit": 5,
-  "prHourlyLimit": 2,
-  "labels": ["dependencies"],
+  "extends": ["config:js-app", ":automergeAll", ":automergeBranch"],
   "packageRules": [
     {
-      "description": "Keep runtime/image Node versions intentional.",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["node"],
-      "dependencyDashboardApproval": true
+      "enabled": false
     },
     {
-      "description": "Keep the risky SvelteKit/Vite stack on demand because this repo mixes root Svelte tooling with the app-level Svelte 4 stack.",
-      "matchDatasources": ["npm"],
-      "matchPackageNames": [
-        "svelte",
-        "svelte-check",
-        "svelte-eslint-parser",
-        "svelte-fa",
-        "svelte-gestures",
-        "svelte-meta-tags",
-        "svelte-preprocess",
-        "@sveltejs/**",
-        "vite",
-        "eslint-plugin-svelte",
-        "prettier-plugin-svelte"
-      ],
-      "groupName": "Svelte and Vite stack",
-      "dependencyDashboardApproval": true
-    },
-    {
-      "description": "Keep Tailwind/PostCSS changes together so style-pipeline changes are reviewed as one surface.",
-      "matchDatasources": ["npm"],
-      "matchPackageNames": [
-        "tailwindcss",
-        "@tailwindcss/**",
-        "postcss",
-        "autoprefixer",
-        "sass",
-        "prettier-plugin-tailwindcss"
-      ],
-      "groupName": "Tailwind and PostCSS stack"
-    },
-    {
-      "description": "Keep TypeScript and lint tooling together because their peer ranges tend to move in tandem.",
-      "matchDatasources": ["npm"],
-      "matchPackageNames": [
-        "typescript",
-        "typescript-eslint",
-        "@typescript-eslint/**",
-        "eslint",
-        "@eslint/**",
-        "eslint-config-prettier",
-        "eslint-import-resolver-typescript",
-        "eslint-plugin-*",
-        "prettier"
-      ],
-      "groupName": "TypeScript and lint tooling"
-    },
-    {
-      "description": "Preserve the upstream guard until this dependency is reviewed manually.",
       "matchDatasources": ["npm"],
       "matchPackageNames": ["@zip.js/zip.js"],
-      "dependencyDashboardApproval": true
+      "enabled": false
     },
     {
-      "description": "Group GitHub Actions updates separately from app dependencies.",
-      "matchManagers": ["github-actions"],
-      "groupName": "GitHub Actions"
+      "matchDatasources": ["npm"],
+      "matchPackageNames": ["svelte"],
+      "allowedVersions": "<5.0.0"
     },
     {
-      "description": "Require dashboard approval for major npm updates outside the specially grouped stacks.",
-      "matchManagers": ["npm"],
-      "matchUpdateTypes": ["major"],
-      "dependencyDashboardApproval": true
+      "matchDatasources": ["npm"],
+      "matchPackageNames": ["@sveltejs/vite-plugin-svelte"],
+      "allowedVersions": "<4.0.0"
+    },
+    {
+      "matchDatasources": ["npm"],
+      "matchPackageNames": ["svelte-meta-tags"],
+      "allowedVersions": "<4.0.0"
+    },
+    {
+      "matchDatasources": ["npm"],
+      "matchPackageNames": ["svelte-gestures"],
+      "allowedVersions": "<5.1.0"
     }
   ]
 }
