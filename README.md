@@ -134,6 +134,11 @@ pnpm build
 ```
 
 Serve `apps/web/build` with any static HTTP server.
+Alternatively, you can go into build folder and run:
+```sh
+npx serve build -l 4173
+```
+...or any port that you prefer.
 
 ## Environment
 
