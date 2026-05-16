@@ -133,12 +133,10 @@ pnpm install
 pnpm build
 ```
 
-Serve `apps/web/build` with any static HTTP server.
-Alternatively, you can go into build folder and run:
+Serve `apps/web/build` with any static HTTP server. Then cd into apps/web and run:
 ```sh
-npx serve build -l 4173
+pnpm preview
 ```
-...or any port that you prefer.
 
 ## Environment
 
