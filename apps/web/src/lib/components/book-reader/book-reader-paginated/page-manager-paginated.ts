@@ -192,12 +192,7 @@ export class PageManagerPaginated implements PageManager {
     }
     if (newValueCeil >= maxValue) {
       if (multiplier < 0) {
-        this.moveToPos(
-          this.getLastScrollPos(maxValue, offset),
-          maxValue,
-          viewportSize,
-          isUser
-        );
+        this.moveToPos(this.getLastScrollPos(maxValue, offset), maxValue, viewportSize, isUser);
         return;
       }
 
