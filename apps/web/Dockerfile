@@ -1,6 +1,6 @@
 # Run from pnpm workspace root (e.g. docker build -t toku-ebook-reader -f apps/web/Dockerfile .)
 
-FROM node:20.11-alpine as builder
+FROM node:20.20-alpine as builder
 
 RUN npm install -g pnpm
 
