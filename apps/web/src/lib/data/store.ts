@@ -15,6 +15,7 @@ import {
   TrackerSkipThresholdAction
 } from '$lib/components/book-reader/book-reading-tracker/book-reading-tracker';
 import { HeatmapDataAggregration } from '$lib/components/statistics/statistics-heatmap/statistics-heatmap';
+import { AnnotationSortMode } from '$lib/data/annotation-sort';
 import {
   StatisticsRangeTemplate,
   StatisticsTab,
@@ -433,6 +434,11 @@ export const lastStatisticsSummarySortDirection$ =
     'lastStatisticsSummarySortDirection',
     SortDirection.DESC
   );
+
+export const lastAnnotationSortMode$ = writableStringLocalStorageSubject<AnnotationSortMode>()(
+  'lastAnnotationSortMode',
+  AnnotationSortMode.LOCATION
+);
 
 export const fileCountData$ = writableSubject<Record<string, number> | undefined>(undefined);
 

@@ -20,6 +20,14 @@ const annotationColorValue = new Map(
   annotationColorOptions.map((colorOption) => [colorOption.id, colorOption.value])
 );
 
+const annotationColorLabel = new Map(
+  annotationColorOptions.map((colorOption) => [colorOption.id, colorOption.label])
+);
+
 export function getAnnotationColorValue(color: AnnotationColor) {
   return annotationColorValue.get(color) || annotationColorOptions[0].value;
+}
+
+export function getAnnotationColorLabel(color: AnnotationColor) {
+  return annotationColorLabel.get(color) || annotationColorOptions[0].label;
 }

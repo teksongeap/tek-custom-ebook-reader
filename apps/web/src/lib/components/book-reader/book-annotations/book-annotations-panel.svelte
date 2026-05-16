@@ -4,14 +4,30 @@
   import {
     faCheck,
     faChevronRight,
+    faFilter,
     faHighlighter,
+    faMagnifyingGlass,
     faPen,
+    faSort,
     faTrash,
     faXmark
   } from '@fortawesome/free-solid-svg-icons';
   import type { BooksDbAnnotation } from '$lib/data/database/books-db/versions/books-db';
   import type { SectionWithProgress } from '$lib/components/book-reader/book-toc/book-toc';
-  import { getAnnotationColorValue } from './annotation-colors';
+  import {
+    AnnotationSortMode,
+    annotationSortOptions,
+    getAnnotationSortMode
+  } from '$lib/data/annotation-sort';
+  import { lastAnnotationSortMode$ } from '$lib/data/store';
+  import {
+    annotationColorOptions,
+    getAnnotationColorLabel,
+    getAnnotationColorValue,
+    type AnnotationColor
+  } from './annotation-colors';
+
+  type AnnotationColorFilter = AnnotationColor | 'all';
 
   export let annotations: BooksDbAnnotation[] = [];
   export let sectionData: SectionWithProgress[] = [];
@@ -27,24 +43,86 @@
 
   let editingAnnotationId = '';
   let draftComment = '';
+  let searchQuery = '';
+  let selectedAnnotationColor: AnnotationColorFilter = 'all';
 
   $: panelStyle = `--reader-page-text: ${
     fontColor || 'var(--font-color)'
   }; --reader-page-bg: ${backgroundColor || 'var(--background-color)'};`;
+  $: activeSortMode = getAnnotationSortMode($lastAnnotationSortMode$);
+  $: mainChapters = sectionData.filter((section) => !section.parentChapter);
   $: sectionOrder = new Map(sectionData.map((section, index) => [section.reference, index]));
-  $: sortedAnnotations = annotations
+  $: searchTerms = normalizeForSearch(searchQuery).split(/\s+/).filter(Boolean);
+  $: colorFilteredAnnotations =
+    selectedAnnotationColor === 'all'
+      ? annotations
+      : annotations.filter((annotation) => annotation.color === selectedAnnotationColor);
+  $: filteredAnnotations = searchTerms.length
+    ? colorFilteredAnnotations.filter((annotation) =>
+        matchesAnnotationSearch(annotation, searchTerms)
+      )
+    : colorFilteredAnnotations;
+  $: sortedAnnotations = filteredAnnotations
     .slice()
-    .sort(
-      (a, b) =>
-        getAnnotationSectionOrder(a) - getAnnotationSectionOrder(b) ||
-        a.anchor.startOffset - b.anchor.startOffset ||
-        a.createdAt - b.createdAt
-    );
+    .sort((a, b) => compareAnnotationsForPanel(a, b, activeSortMode));
+  $: isFilteringAnnotations = searchTerms.length > 0 || selectedAnnotationColor !== 'all';
+  $: panelSubtitle = isFilteringAnnotations
+    ? `${sortedAnnotations.length} of ${annotations.length} shown`
+    : `${annotations.length} saved`;
   $: if (
     editingAnnotationId &&
     !annotations.some((annotation) => annotation.id === editingAnnotationId)
   ) {
     cancelEditing();
+  }
+
+  function compareAnnotationsForPanel(
+    annotationA: BooksDbAnnotation,
+    annotationB: BooksDbAnnotation,
+    sortMode: AnnotationSortMode
+  ) {
+    switch (sortMode) {
+      case AnnotationSortMode.UPDATED:
+        return (
+          getAnnotationUpdatedAt(annotationB) - getAnnotationUpdatedAt(annotationA) ||
+          compareAnnotationsByLocation(annotationA, annotationB)
+        );
+      case AnnotationSortMode.CREATED:
+        return (
+          annotationB.createdAt - annotationA.createdAt ||
+          compareAnnotationsByLocation(annotationA, annotationB)
+        );
+      case AnnotationSortMode.NOTES:
+        return (
+          Number(hasAnnotationComment(annotationB)) - Number(hasAnnotationComment(annotationA)) ||
+          compareAnnotationsByLocation(annotationA, annotationB)
+        );
+      case AnnotationSortMode.LOCATION:
+      default:
+        return compareAnnotationsByLocation(annotationA, annotationB);
+    }
+  }
+
+  function compareAnnotationsByLocation(
+    annotationA: BooksDbAnnotation,
+    annotationB: BooksDbAnnotation
+  ) {
+    return (
+      getAnnotationSectionOrder(annotationA) - getAnnotationSectionOrder(annotationB) ||
+      annotationA.anchor.startOffset - annotationB.anchor.startOffset ||
+      annotationA.anchor.endOffset - annotationB.anchor.endOffset ||
+      annotationA.exploredCharCount - annotationB.exploredCharCount ||
+      annotationA.createdAt - annotationB.createdAt ||
+      annotationA.id.localeCompare(annotationB.id)
+    );
+  }
+
+  function getAnnotationUpdatedAt(annotation: BooksDbAnnotation) {
+    return annotation.updatedAt || annotation.createdAt || 0;
+  }
+
+  function hasAnnotationComment(annotation: BooksDbAnnotation) {
+    return !!annotation.comment.trim();
   }
 
   function getAnnotationSectionOrder(annotation: BooksDbAnnotation) {
@@ -55,7 +133,6 @@
   }
 
   function getChapterLabel(annotation: BooksDbAnnotation) {
-    const mainChapters = sectionData.filter((section) => !section.parentChapter);
     const annotationSection = sectionData.find(
       (section) => section.reference === annotation.anchor.sectionId
     );
@@ -70,6 +147,46 @@
       .find((section) => (section.startCharacter || 0) <= annotation.exploredCharCount);
 
     return anchorChapter?.label || fallbackChapter?.label || 'Current Book';
+  }
+
+  function matchesAnnotationSearch(annotation: BooksDbAnnotation, terms: string[]) {
+    const searchableText = normalizeForSearch(
+      [
+        annotation.comment,
+        annotation.selectedText,
+        annotation.anchor.text,
+        getChapterLabel(annotation),
+        getAnnotationColorLabel(annotation.color),
+        annotation.color
+      ].join(' ')
+    );
+
+    return terms.every((term) => searchableText.includes(term));
+  }
+
+  function normalizeForSearch(value: string) {
+    return value.trim().toLocaleLowerCase();
+  }
+
+  function setAnnotationSortMode(event: Event) {
+    if (!(event.currentTarget instanceof HTMLSelectElement)) {
+      return;
+    }
+
+    $lastAnnotationSortMode$ = getAnnotationSortMode(event.currentTarget.value);
+  }
+
+  function setAnnotationColorFilter(event: Event) {
+    if (!(event.currentTarget instanceof HTMLSelectElement)) {
+      return;
+    }
+
+    const nextColor = event.currentTarget.value;
+    selectedAnnotationColor = isAnnotationColor(nextColor) ? nextColor : 'all';
+  }
+
+  function isAnnotationColor(value: string): value is AnnotationColor {
+    return annotationColorOptions.some((colorOption) => colorOption.id === value);
   }
 
   function handleAnnotationClick(annotation: BooksDbAnnotation) {
@@ -116,7 +233,7 @@
       <span class="annotations-panel-title-icon"><Fa icon={faHighlighter} /></span>
       <div>
         <div class="annotations-panel-title-main">Annotations</div>
-        <div class="annotations-panel-title-sub">{annotations.length} saved</div>
+        <div class="annotations-panel-title-sub">{panelSubtitle}</div>
       </div>
     </div>
     <button
@@ -128,6 +245,64 @@
     >
       <Fa icon={faXmark} />
     </button>
+  </div>
+
+  <div class="annotations-panel-controls">
+    <div class="annotations-panel-search">
+      <span class="annotations-panel-control-icon" aria-hidden="true">
+        <Fa icon={faMagnifyingGlass} />
+      </span>
+      <input
+        type="search"
+        bind:value={searchQuery}
+        placeholder="Search annotations"
+        aria-label="Search annotations"
+        on:keydown|stopPropagation={() => {}}
+      />
+      {#if searchQuery}
+        <button
+          type="button"
+          class="annotations-panel-search-clear"
+          title="Clear search"
+          aria-label="Clear search"
+          on:click={() => (searchQuery = '')}
+          on:keydown|stopPropagation={() => {}}
+        >
+          <Fa icon={faXmark} />
+        </button>
+      {/if}
+    </div>
+    <label class="annotations-panel-filter">
+      <span class="annotations-panel-control-icon" aria-hidden="true">
+        <Fa icon={faFilter} />
+      </span>
+      <select
+        value={selectedAnnotationColor}
+        aria-label="Filter annotations by color"
+        on:change={setAnnotationColorFilter}
+        on:keydown|stopPropagation={() => {}}
+      >
+        <option value="all">All colors</option>
+        {#each annotationColorOptions as colorOption (colorOption.id)}
+          <option value={colorOption.id}>{colorOption.label}</option>
+        {/each}
+      </select>
+    </label>
+    <label class="annotations-panel-sort">
+      <span class="annotations-panel-control-icon" aria-hidden="true">
+        <Fa icon={faSort} />
+      </span>
+      <select
+        value={activeSortMode}
+        aria-label="Sort annotations"
+        on:change={setAnnotationSortMode}
+        on:keydown|stopPropagation={() => {}}
+      >
+        {#each annotationSortOptions as sortOption (sortOption.id)}
+          <option value={sortOption.id}>{sortOption.label}</option>
+        {/each}
+      </select>
+    </label>
   </div>
 
   <div class="annotations-panel-list">
@@ -145,7 +320,7 @@
           <span class="annotation-item-swatch" aria-hidden="true"></span>
           <span class="annotation-item-content">
             <span class="annotation-item-meta">
-              <span>{getChapterLabel(annotation)}</span>
+              <span class="annotation-item-location">{getChapterLabel(annotation)}</span>
             </span>
             {#if annotation.comment && editingAnnotationId !== annotation.id}
               <span class="annotation-item-comment">{annotation.comment}</span>
@@ -182,7 +357,9 @@
             <span class="annotation-item-quote">{annotation.selectedText}</span>
           </span>
           <span class="annotation-item-actions">
-            <span class="annotation-item-go" aria-hidden="true"><Fa icon={faChevronRight} /></span>
+            <span class="annotation-item-go" aria-hidden="true">
+              <Fa icon={faChevronRight} />
+            </span>
             <button
               type="button"
               class="annotation-item-edit"
@@ -216,6 +393,12 @@
           </span>
         </div>
       {/each}
+    {:else if annotations.length}
+      <div class="annotations-panel-empty">
+        <div class="annotations-panel-empty-icon"><Fa icon={faMagnifyingGlass} /></div>
+        <div class="annotations-panel-empty-title">No matches</div>
+        <div class="annotations-panel-empty-copy">Try another word, chapter, note, or color.</div>
+      </div>
     {:else}
       <div class="annotations-panel-empty">
         <div class="annotations-panel-empty-icon"><Fa icon={faHighlighter} /></div>
@@ -309,6 +492,93 @@
     color: var(--reader-page-text);
   }
 
+  .annotations-panel-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(8.5rem, auto) minmax(9.25rem, auto);
+    gap: 0.625rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--reader-page-text) 9%, transparent);
+    padding: 0.75rem 1rem;
+  }
+
+  .annotations-panel-search,
+  .annotations-panel-filter,
+  .annotations-panel-sort {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid color-mix(in srgb, var(--reader-page-text) 12%, transparent);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--reader-page-bg) 86%, transparent);
+    color: color-mix(in srgb, var(--reader-page-text) 74%, transparent);
+    min-height: 2.25rem;
+    padding: 0 0.65rem;
+  }
+
+  .annotations-panel-search:focus-within,
+  .annotations-panel-filter:focus-within,
+  .annotations-panel-sort:focus-within {
+    border-color: color-mix(in srgb, var(--app-accent) 62%, transparent);
+    box-shadow: var(--app-focus-ring);
+  }
+
+  .annotations-panel-control-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: 0.82rem;
+  }
+
+  .annotations-panel-search input,
+  .annotations-panel-filter select,
+  .annotations-panel-sort select {
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    background: transparent;
+    color: var(--reader-page-text);
+    font: inherit;
+    font-size: 0.84rem;
+    font-weight: 720;
+    outline: none;
+  }
+
+  .annotations-panel-search input::placeholder {
+    color: color-mix(in srgb, var(--reader-page-text) 44%, transparent);
+  }
+
+  .annotations-panel-filter select,
+  .annotations-panel-sort select {
+    cursor: pointer;
+  }
+
+  .annotations-panel-filter option,
+  .annotations-panel-sort option {
+    background-color: var(--reader-page-bg);
+    color: var(--reader-page-text);
+  }
+
+  .annotations-panel-search-clear {
+    display: inline-flex;
+    height: 1.5rem;
+    width: 1.5rem;
+    flex: 0 0 auto;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: color-mix(in srgb, var(--reader-page-text) 58%, transparent);
+    font: inherit;
+    outline: none;
+  }
+
+  .annotations-panel-search-clear:hover,
+  .annotations-panel-search-clear:focus-visible {
+    background: color-mix(in srgb, var(--reader-page-text) 9%, transparent);
+    color: var(--reader-page-text);
+  }
+
   .annotations-panel-list {
     min-height: 0;
     flex: 1;
@@ -373,6 +643,7 @@
   .annotation-item-meta {
     display: flex;
     min-width: 0;
+    align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
     color: color-mix(in srgb, var(--reader-page-text) 54%, transparent);
@@ -381,7 +652,7 @@
     line-height: 1;
   }
 
-  .annotation-item-meta span:first-child {
+  .annotation-item-location {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -542,5 +813,20 @@
     color: color-mix(in srgb, var(--reader-page-text) 58%, transparent);
     font-size: 0.86rem;
     line-height: 1.35;
+  }
+
+  @media (max-width: 28rem) {
+    .annotations-panel-controls {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .annotation-item {
+      grid-template-columns: 0.4rem minmax(0, 1fr);
+    }
+
+    .annotation-item-actions {
+      grid-column: 2;
+      justify-content: flex-end;
+    }
   }
 </style>

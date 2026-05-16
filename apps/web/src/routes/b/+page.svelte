@@ -1223,7 +1223,8 @@
       ev.ctrlKey ||
       ev.shiftKey ||
       ev.metaKey ||
-      ev.repeat
+      ev.repeat ||
+      isEditableEventTarget(ev.target)
     ) {
       return;
     }
@@ -1249,6 +1250,15 @@
       document.activeElement.blur();
     }
     ev.preventDefault();
+  }
+
+  function isEditableEventTarget(target: EventTarget | null) {
+    return (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLElement && target.isContentEditable)
+    );
   }
 
   function getBookIdSync() {

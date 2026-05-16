@@ -939,7 +939,8 @@
       ev.ctrlKey ||
       ev.shiftKey ||
       ev.metaKey ||
-      ev.repeat
+      ev.repeat ||
+      isEditableEventTarget(ev.target)
     )
       return;
     switch (ev.code) {
@@ -963,6 +964,15 @@
 
     ev.preventDefault();
     ev.stopImmediatePropagation();
+  }
+
+  function isEditableEventTarget(target: EventTarget | null) {
+    return (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLElement && target.isContentEditable)
+    );
   }
 
   nextChapter$.pipe(takeUntil(destroy$)).subscribe((chapterId) => {
