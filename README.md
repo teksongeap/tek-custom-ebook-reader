@@ -137,6 +137,10 @@ Serve `apps/web/build` with any static HTTP server. Then cd into apps/web and ru
 ```sh
 pnpm preview
 ```
+Alternatively you can also use:
+```sh
+npx serve apps/web/build
+```
 
 ## Environment
 
