@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, tick } from 'svelte';
   import Fa from 'svelte-fa';
   import {
     faCheck,
+    faChevronDown,
     faChevronRight,
+    faChevronUp,
     faFilter,
     faHighlighter,
     faMagnifyingGlass,
@@ -26,6 +28,7 @@
     getAnnotationColorValue,
     type AnnotationColor
   } from './annotation-colors';
+  import { formatAnnotationTimestamp, getAnnotationEditedAt } from './annotation-time';
 
   type AnnotationColorFilter = AnnotationColor | 'all';
 
@@ -43,8 +46,10 @@
 
   let editingAnnotationId = '';
   let draftComment = '';
+  let draftTextAreaEl: HTMLTextAreaElement | undefined;
   let searchQuery = '';
   let selectedAnnotationColor: AnnotationColorFilter = 'all';
+  let expandedCommentIds = new Set<string>();
 
   $: panelStyle = `--reader-page-text: ${
     fontColor || 'var(--font-color)'
@@ -75,6 +80,7 @@
   ) {
     cancelEditing();
   }
+  $: void resizeDraftTextArea(draftTextAreaEl, editingAnnotationId, draftComment);
 
   function compareAnnotationsForPanel(
     annotationA: BooksDbAnnotation,
@@ -156,6 +162,10 @@
         annotation.selectedText,
         annotation.anchor.text,
         getChapterLabel(annotation),
+        formatAnnotationTimestamp(annotation.createdAt),
+        getAnnotationEditedAt(annotation)
+          ? formatAnnotationTimestamp(getAnnotationEditedAt(annotation))
+          : '',
         getAnnotationColorLabel(annotation.color),
         annotation.color
       ].join(' ')
@@ -189,8 +199,12 @@
     return annotationColorOptions.some((colorOption) => colorOption.id === value);
   }
 
-  function handleAnnotationClick(annotation: BooksDbAnnotation) {
+  function handleAnnotationClick(event: MouseEvent, annotation: BooksDbAnnotation) {
     if (editingAnnotationId === annotation.id) {
+      return;
+    }
+
+    if (isAnnotationPanelControl(event.target)) {
       return;
     }
 
@@ -219,15 +233,71 @@
   }
 
   function saveAnnotation(annotation: BooksDbAnnotation) {
+    const comment = draftComment.trim();
+
+    if (comment === annotation.comment) {
+      cancelEditing();
+      return;
+    }
+
     dispatch('update', {
       annotation,
-      comment: draftComment.trim()
+      comment
     });
     cancelEditing();
   }
+
+  function canExpandComment(comment: string) {
+    const trimmedComment = comment.trim();
+
+    return trimmedComment.split(/\r?\n/).length > 2 || trimmedComment.length > 150;
+  }
+
+  function toggleCommentExpanded(annotationId: string) {
+    const nextExpandedCommentIds = new Set(expandedCommentIds);
+
+    if (nextExpandedCommentIds.has(annotationId)) {
+      nextExpandedCommentIds.delete(annotationId);
+    } else {
+      nextExpandedCommentIds.add(annotationId);
+    }
+
+    expandedCommentIds = nextExpandedCommentIds;
+  }
+
+  function isAnnotationPanelControl(target: EventTarget | null) {
+    return (
+      target instanceof Element &&
+      !!target.closest('button, input, select, textarea, [data-annotation-panel-control]')
+    );
+  }
+
+  async function resizeDraftTextArea(
+    textArea: HTMLTextAreaElement | undefined,
+    annotationId: string,
+    comment: string
+  ) {
+    if (!textArea || !annotationId) {
+      return;
+    }
+
+    await tick();
+
+    if (!textArea || editingAnnotationId !== annotationId || draftComment !== comment) {
+      return;
+    }
+
+    textArea.style.height = 'auto';
+    textArea.style.height = `${textArea.scrollHeight}px`;
+  }
 </script>
 
-<div class="annotations-panel" style={panelStyle}>
+<div
+  class="annotations-panel"
+  style={panelStyle}
+  on:touchmove|stopPropagation={() => {}}
+  on:wheel|stopPropagation={() => {}}
+>
   <div class="annotations-panel-header">
     <div class="annotations-panel-title">
       <span class="annotations-panel-title-icon"><Fa icon={faHighlighter} /></span>
@@ -314,23 +384,64 @@
           class="annotation-item"
           class:annotation-item--editing={editingAnnotationId === annotation.id}
           style:--book-annotation-base={getAnnotationColorValue(annotation.color)}
-          on:click={() => handleAnnotationClick(annotation)}
+          on:click={(event) => handleAnnotationClick(event, annotation)}
           on:keydown={(event) => handleAnnotationKeydown(event, annotation)}
         >
           <span class="annotation-item-swatch" aria-hidden="true"></span>
           <span class="annotation-item-content">
             <span class="annotation-item-meta">
               <span class="annotation-item-location">{getChapterLabel(annotation)}</span>
+              <span class="annotation-item-created-time">
+                Added {formatAnnotationTimestamp(annotation.createdAt)}
+              </span>
             </span>
+            {#if getAnnotationEditedAt(annotation)}
+              <span class="annotation-item-edited-time">
+                Edited {formatAnnotationTimestamp(getAnnotationEditedAt(annotation))}
+              </span>
+            {/if}
+            <span class="annotation-item-quote">{annotation.selectedText}</span>
             {#if annotation.comment && editingAnnotationId !== annotation.id}
-              <span class="annotation-item-comment">{annotation.comment}</span>
+              <span class="annotation-item-comment-shell">
+                <span
+                  class="annotation-item-comment"
+                  class:annotation-item-comment--clamped={!expandedCommentIds.has(annotation.id)}
+                  class:annotation-item-comment--expanded={expandedCommentIds.has(annotation.id)}
+                >
+                  {annotation.comment}
+                </span>
+                {#if canExpandComment(annotation.comment)}
+                  <button
+                    type="button"
+                    class="annotation-item-comment-expand"
+                    data-annotation-panel-control
+                    aria-expanded={expandedCommentIds.has(annotation.id)}
+                    on:pointerdown|stopPropagation={() => {}}
+                    on:click|stopPropagation={() => toggleCommentExpanded(annotation.id)}
+                    on:keydown|stopPropagation={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        toggleCommentExpanded(annotation.id);
+                      }
+                    }}
+                  >
+                    <span>{expandedCommentIds.has(annotation.id) ? 'Show less' : 'Show more'}</span>
+                    <span class="annotation-item-comment-expand-icon" aria-hidden="true">
+                      <Fa
+                        icon={expandedCommentIds.has(annotation.id) ? faChevronUp : faChevronDown}
+                      />
+                    </span>
+                  </button>
+                {/if}
+              </span>
             {/if}
             {#if editingAnnotationId === annotation.id}
               <span class="annotation-item-editor">
                 <textarea
+                  bind:this={draftTextAreaEl}
                   class="annotation-item-textarea"
                   bind:value={draftComment}
-                  rows="3"
+                  rows={canExpandComment(annotation.comment) ? 6 : 3}
                   placeholder="Add an optional comment"
                   on:click|stopPropagation={() => {}}
                   on:keydown|stopPropagation={() => {}}
@@ -354,7 +465,6 @@
                 </span>
               </span>
             {/if}
-            <span class="annotation-item-quote">{annotation.selectedText}</span>
           </span>
           <span class="annotation-item-actions">
             <span class="annotation-item-go" aria-hidden="true">
@@ -417,6 +527,7 @@
     height: 100%;
     width: 100%;
     flex-direction: column;
+    overscroll-behavior: contain;
     background:
       linear-gradient(
         145deg,
@@ -583,6 +694,7 @@
     min-height: 0;
     flex: 1;
     overflow: auto;
+    overscroll-behavior: contain;
     padding: 0.75rem;
   }
 
@@ -637,7 +749,7 @@
     display: flex;
     min-width: 0;
     flex-direction: column;
-    gap: 0.45rem;
+    gap: 0.42rem; /* appears to make everything look less smooshed */
   }
 
   .annotation-item-meta {
@@ -659,26 +771,125 @@
     white-space: nowrap;
   }
 
-  .annotation-item-comment {
-    display: -webkit-box;
+  .annotation-item-created-time {
+    flex: 0 1 auto;
+    min-width: 0;
     overflow: hidden;
-    font-size: 0.9rem;
-    font-weight: 720;
-    line-height: 1.25;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .annotation-item-edited-time {
+    align-self: flex-end;
+    min-width: 0;
+    overflow: hidden;
+    color: color-mix(in srgb, var(--reader-page-text) 46%, transparent);
+    font-size: 0.68rem;
+    font-weight: 650;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .annotation-item-quote {
     display: -webkit-box;
     overflow: hidden;
-    color: color-mix(in srgb, var(--reader-page-text) 62%, transparent);
-    font-size: 0.78rem;
-    line-height: 1.35;
+    overflow-wrap: anywhere;
+    font-size: 1.1rem;
+    font-weight: 500;
+    line-height: 1.3;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
     line-clamp: 3;
+  }
+
+  .annotation-item-comment-shell {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.45rem;
+    border: 1px solid color-mix(in srgb, var(--book-annotation-base) 16%, transparent);
+    border-radius: 0.55rem;
+    background: color-mix(in srgb, var(--reader-page-bg) 72%, transparent);
+    padding: 0.55rem;
+  }
+
+  .annotation-item-comment {
+    color: color-mix(in srgb, var(--reader-page-text) 68%, transparent);
+    overflow-wrap: anywhere;
+    font-size: 1.0rem;
+    font-weight: 250;
+    line-height: 1.35;
+    white-space: pre-wrap;
+  }
+
+  .annotation-item-comment--clamped {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+  }
+
+  .annotation-item-comment--expanded {
+    display: block;
+  }
+
+  .annotation-item-comment-expand {
+    display: inline-flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    border: 1px solid color-mix(in srgb, var(--book-annotation-base) 26%, transparent);
+    border-radius: 0.5rem;
+    background:
+      linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--book-annotation-base) 13%, transparent),
+        color-mix(in srgb, var(--reader-page-text) 5%, transparent)
+      ),
+      color-mix(in srgb, var(--reader-page-bg) 78%, transparent);
+    color: color-mix(in srgb, var(--reader-page-text) 76%, var(--book-annotation-base));
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 820;
+    outline: none;
+    padding: 0.36rem 0.55rem;
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      box-shadow 140ms ease,
+      color 140ms ease,
+      transform 140ms ease;
+  }
+
+  .annotation-item-comment-expand:hover,
+  .annotation-item-comment-expand:focus-visible {
+    border-color: color-mix(in srgb, var(--book-annotation-base) 54%, transparent);
+    background:
+      linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--book-annotation-base) 20%, transparent),
+        color-mix(in srgb, var(--reader-page-text) 8%, transparent)
+      ),
+      color-mix(in srgb, var(--reader-page-bg) 72%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--book-annotation-base) 16%, transparent);
+    color: var(--reader-page-text);
+  }
+
+  .annotation-item-comment-expand:active {
+    transform: translateY(1px);
+  }
+
+  .annotation-item-comment-expand-icon {
+    display: inline-flex;
+    align-items: center;
+    color: var(--book-annotation-base);
+    font-size: 0.68rem;
   }
 
   .annotation-item-actions {
@@ -724,8 +935,11 @@
   }
 
   .annotation-item-textarea {
+    box-sizing: border-box;
     width: 100%;
     resize: vertical;
+    overflow: hidden;
+    overscroll-behavior: contain;
     border: 1px solid color-mix(in srgb, var(--reader-page-text) 14%, transparent);
     border-radius: 0.5rem;
     background: color-mix(in srgb, var(--reader-page-bg) 86%, transparent);
@@ -818,6 +1032,21 @@
   @media (max-width: 28rem) {
     .annotations-panel-controls {
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    .annotation-item-meta {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .annotation-item-created-time {
+      text-align: left;
+    }
+
+    .annotation-item-edited-time {
+      align-self: flex-start;
+      text-align: left;
     }
 
     .annotation-item {

@@ -1425,6 +1425,14 @@
   async function updateAnnotationComment({
     detail
   }: CustomEvent<{ annotation: BooksDbAnnotation; comment: string }>) {
+    if (detail.comment === detail.annotation.comment) {
+      activeAnnotationId = detail.annotation.id;
+      if (activeAnnotationEditId === detail.annotation.id) {
+        activeAnnotationEditId = '';
+      }
+      return;
+    }
+
     const updatedAnnotation: BooksDbAnnotation = {
       ...detail.annotation,
       comment: detail.comment,
@@ -1436,7 +1444,6 @@
     annotations = annotations.map((annotation) =>
       annotation.id === updatedAnnotation.id ? updatedAnnotation : annotation
     );
-    activeAnnotationId = updatedAnnotation.id;
     if (activeAnnotationEditId === updatedAnnotation.id) {
       activeAnnotationEditId = '';
     }
