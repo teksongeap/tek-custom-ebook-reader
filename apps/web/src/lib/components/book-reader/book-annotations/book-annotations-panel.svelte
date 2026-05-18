@@ -749,7 +749,8 @@
     display: flex;
     min-width: 0;
     flex-direction: column;
-    gap: 0.42rem; /* appears to make everything look less smooshed */
+    gap: 0.45rem; /* appears to make everything look less smooshed */
+    line-height: 1.25;
   }
 
   .annotation-item-meta {
@@ -761,11 +762,12 @@
     color: color-mix(in srgb, var(--reader-page-text) 54%, transparent);
     font-size: 0.72rem;
     font-weight: 760;
-    line-height: 1;
+    line-height: 1.25;
   }
 
   .annotation-item-location {
     min-width: 0;
+    line-height: 1.25;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
