@@ -41,6 +41,7 @@ interface BooksDbV6BookData {
   hasThumb: boolean;
   characters: number;
   sections?: Section[];
+  toc?: BookTocEntry[];
   lastBookModified: number;
   lastBookOpen: number;
   storageSource?: string;
@@ -119,6 +120,15 @@ export interface Section {
   sourceHref?: string;
   targetFragment?: string;
   tocDepth?: number;
+}
+
+export interface BookTocEntry {
+  id: string;
+  label: string;
+  reference: string;
+  sourceHref: string;
+  targetFragment?: string;
+  children?: BookTocEntry[];
 }
 
 export default interface BooksDbV6 extends DBSchema {

@@ -5,6 +5,7 @@
  */
 
 import { isOPFType, type EpubContent, type EpubOPFContent } from './types';
+import type { BookTocEntry } from '$lib/data/database/books-db/versions/v7/books-db-v7';
 import type { Section } from '../../../data/database/books-db/versions/v3/books-db-v3';
 import buildDummyBookImage from '../utils/build-dummy-book-image';
 import clearAllBadImageRef from '../utils/clear-all-bad-image-ref';
@@ -136,7 +137,10 @@ export default function generateEpubHtml(
     selfClosingContentTagsToFix.push('a');
   }
 
-  mainChapters = parseTocEntries(tocData, parser);
+  const parsedTocEntries = parseTocEntries(tocData, parser);
+  const toc = buildBookTocEntries(parsedTocEntries);
+
+  mainChapters = [...parsedTocEntries];
 
   if (mainChapters.length) {
     firstChapterMatchIndex = itemRefs.findIndex((ref) => {
@@ -322,7 +326,8 @@ export default function generateEpubHtml(
   return {
     element: result,
     characters: currentCharCount,
-    sections: sectionData.filter((item: Section) => item.reference.startsWith(prependValue))
+    sections: sectionData.filter((item: Section) => item.reference.startsWith(prependValue)),
+    toc
   };
 }
 
@@ -473,9 +478,10 @@ function createTocEntry(
   const { hrefPath, fragment } = splitTocHref(rawReference);
   const sourceHref = resolveTocHref(tocSourceHref, hrefPath);
   const reference = fragment ? `${sourceHref}#${fragment}` : sourceHref;
+  const rawId = options.rawId?.trim();
 
   return {
-    id: options.rawId || `toc-${options.order}`,
+    id: rawId ? `${rawId}-${options.order}` : `toc-${options.order}`,
     reference,
     charactersWeight: 1,
     label,
@@ -557,6 +563,34 @@ function findTocParentSectionReference(
   }
 
   return undefined;
+}
+
+function buildBookTocEntries(entries: ParsedTocEntry[]) {
+  const tocEntries = entries.map(
+    (entry): BookTocEntry => ({
+      id: entry.id,
+      label: entry.label,
+      reference: entry.reference,
+      sourceHref: entry.sourceHref,
+      targetFragment: entry.targetFragment,
+      children: []
+    })
+  );
+  const entryById = new Map(tocEntries.map((entry) => [entry.id, entry]));
+  const roots: BookTocEntry[] = [];
+
+  entries.forEach((entry, index) => {
+    const tocEntry = tocEntries[index];
+    const parent = entry.parentId ? entryById.get(entry.parentId) : undefined;
+
+    if (parent && parent.id !== tocEntry.id) {
+      parent.children?.push(tocEntry);
+    } else {
+      roots.push(tocEntry);
+    }
+  });
+
+  return roots;
 }
 
 function getDirectChildrenByLocalName(element: ParentNode | null | undefined, localName: string) {

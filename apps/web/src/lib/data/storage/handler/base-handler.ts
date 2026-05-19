@@ -8,6 +8,7 @@ import type { BookCardProps } from '$lib/components/book-card/book-card-props';
 import {
   currentDbVersion,
   type BooksDbBookData,
+  type BooksDbTocEntry,
   type BooksDbBookmarkData,
   type BooksDbAnnotation,
   type BooksDbStatistic,
@@ -400,8 +401,8 @@ export abstract class BaseStorageHandler {
         | 'lastBookOpen'
         | 'storageSource'
       >
-    > = ['title', 'styleSheet', 'elementHtml', 'htmlBackup', 'sections'];
-    const staticData: Record<string, string | Section[] | undefined> = {};
+    > = ['title', 'styleSheet', 'elementHtml', 'htmlBackup', 'sections', 'toc'];
+    const staticData: Record<string, string | Section[] | BooksDbTocEntry[] | undefined> = {};
     const limiter = pLimit(1);
     const cover = bookdata.coverImage;
     const isBlobCover = cover instanceof Blob;
@@ -596,6 +597,7 @@ export abstract class BaseStorageHandler {
                 bookObject.elementHtml = staticData.elementHtml;
                 bookObject.styleSheet = staticData.styleSheet || '';
                 bookObject.sections = staticData.sections || [];
+                bookObject.toc = staticData.toc || [];
                 bookObject.characters = BaseStorageHandler.getBookCharacters(
                   characters || 0,
                   bookObject.sections

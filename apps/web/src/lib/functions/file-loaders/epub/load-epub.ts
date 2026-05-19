@@ -85,6 +85,7 @@ export default async function loadEpub(
     coverImage,
     characters: result.characters,
     sections: result.sections,
+    toc: result.toc,
     lastBookModified,
     lastBookOpen: 0
   };

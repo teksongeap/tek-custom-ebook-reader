@@ -15,6 +15,7 @@ interface BooksDbV3BookData {
   coverImage?: string | Blob;
   hasThumb: boolean;
   sections?: Section[];
+  toc?: BookTocEntry[];
   lastBookModified: number;
   lastBookOpen: number;
 }
@@ -38,6 +39,15 @@ export interface Section {
   sourceHref?: string;
   targetFragment?: string;
   tocDepth?: number;
+}
+
+export interface BookTocEntry {
+  id: string;
+  label: string;
+  reference: string;
+  sourceHref: string;
+  targetFragment?: string;
+  children?: BookTocEntry[];
 }
 
 export default interface BooksDbV3 extends DBSchema {

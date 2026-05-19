@@ -4,6 +4,9 @@
     nextChapter$,
     sectionList$,
     sectionProgress$,
+    setActiveTocItem,
+    tocTargets$,
+    type TocTarget,
     type SectionWithProgress
   } from '$lib/components/book-reader/book-toc/book-toc';
   import HtmlRenderer from '$lib/components/html-renderer.svelte';
@@ -190,6 +193,8 @@
   const sectionToElement = new Map<string, HTMLElement>();
 
   const sectionData = new Map<string, SectionWithProgress>();
+
+  let tocTargets: TocTarget[] = [];
 
   let scrollAdjustment = 0;
 
@@ -391,6 +396,11 @@
   if (browser) {
     autoScrollerConcrete = new AutoScrollerContinuous(multiplier, verticalMode, destroy$, document);
     autoScroller = autoScrollerConcrete;
+
+    tocTargets$.pipe(takeUntil(destroy$)).subscribe((targets) => {
+      tocTargets = targets;
+      requestAnimationFrame(() => updateActiveTocItemFromScroll());
+    });
   }
 
   combineLatest([width$, height$])
@@ -569,6 +579,115 @@
 
     willNavigate = false;
     sectionProgress$.next(sectionData);
+    updateActiveTocItemFromScroll(getCurrentSectionSourceHref());
+  }
+
+  function getCurrentSectionSourceHref() {
+    const sections = [...sectionData.values()];
+    const currentSection = sections.find((section) => section.progress < 100);
+
+    return (currentSection || sections[sections.length - 1])?.sourceHref;
+  }
+
+  function updateActiveTocItemFromScroll(sourceHref = getCurrentSectionSourceHref()) {
+    if (!contentEl || !sourceHref || !tocTargets.length) {
+      return;
+    }
+
+    const activeTarget = getActiveContinuousTocTarget(
+      tocTargets.filter((target) => target.sourceHref === sourceHref)
+    );
+
+    if (!activeTarget) {
+      return;
+    }
+
+    setActiveTocItem({
+      id: activeTarget.id,
+      sourceHref: activeTarget.sourceHref,
+      targetFragment: activeTarget.targetFragment
+    });
+  }
+
+  function getActiveContinuousTocTarget(sourceTargets: TocTarget[]) {
+    if (!contentEl || !sourceTargets.length) {
+      return undefined;
+    }
+
+    const readingPoint = verticalMode
+      ? window.innerWidth - (firstDimensionMargin || 0) - customReadingPointScrollOffset
+      : (firstDimensionMargin || 0) + customReadingPointScrollOffset;
+    let closestReachedTarget: TocTargetCandidate | undefined;
+    let closestUpcomingTarget: TocTargetCandidate | undefined;
+
+    sourceTargets.forEach((target) => {
+      const targetElement = findReaderTargetElement(contentEl as HTMLElement, {
+        sourceHref: target.sourceHref,
+        fragment: target.targetFragment
+      });
+
+      if (!targetElement) {
+        return;
+      }
+
+      const rect = targetElement.getBoundingClientRect();
+
+      if (!isUsableTocTargetRect(rect)) {
+        return;
+      }
+
+      const axisPosition = verticalMode ? rect.right : rect.top;
+      const reached = verticalMode
+        ? axisPosition >= readingPoint - 1
+        : axisPosition <= readingPoint + 1;
+      const candidate = {
+        target,
+        distance: Math.abs(axisPosition - readingPoint),
+        depth: target.depth,
+        order: target.order
+      };
+
+      if (reached) {
+        if (isBetterTocTargetCandidate(candidate, closestReachedTarget, true)) {
+          closestReachedTarget = candidate;
+        }
+      } else if (isBetterTocTargetCandidate(candidate, closestUpcomingTarget, false)) {
+        closestUpcomingTarget = candidate;
+      }
+    });
+
+    return (closestReachedTarget || closestUpcomingTarget)?.target;
+  }
+
+  type TocTargetCandidate = {
+    target: TocTarget;
+    distance: number;
+    depth: number;
+    order: number;
+  };
+
+  function isBetterTocTargetCandidate(
+    candidate: TocTargetCandidate,
+    current: TocTargetCandidate | undefined,
+    preferLater: boolean
+  ) {
+    if (!current) {
+      return true;
+    }
+
+    if (Math.abs(candidate.distance - current.distance) > 1) {
+      return candidate.distance < current.distance;
+    }
+
+    if (candidate.depth !== current.depth) {
+      return candidate.depth > current.depth;
+    }
+
+    return preferLater ? candidate.order > current.order : candidate.order < current.order;
+  }
+
+  function isUsableTocTargetRect(rect: DOMRect) {
+    return rect.width > 0 || rect.height > 0;
   }
 
   function onWheel(ev: WheelEvent) {

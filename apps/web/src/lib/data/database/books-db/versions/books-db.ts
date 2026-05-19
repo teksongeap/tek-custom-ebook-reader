@@ -9,6 +9,7 @@ import type BooksDbV7 from '$lib/data/database/books-db/versions/v7/books-db-v7'
 type BooksDb = BooksDbV7;
 
 export type BooksDbBookData = BooksDb['data']['value'];
+export type BooksDbTocEntry = NonNullable<BooksDbBookData['toc']>[number];
 export type BooksDbBookmarkData = BooksDb['bookmark']['value'];
 export type BooksDbAnnotation = BooksDb['annotation']['value'];
 export type BooksDbStorageSource = BooksDb['storageSource']['value'];
@@ -20,4 +21,4 @@ export type BooksDbSubtitleData = BooksDb['subtitle']['value'];
 export type BooksDbHandle = BooksDb['handle']['value'];
 export const currentDbVersion = 7;
 
-export default BooksDb;
+export type { BooksDb as default };

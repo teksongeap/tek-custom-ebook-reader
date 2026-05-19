@@ -1,6 +1,11 @@
 <script lang="ts">
   import { browser } from '$app/environment';
-  import { nextChapter$ } from '$lib/components/book-reader/book-toc/book-toc';
+  import {
+    nextChapter$,
+    setActiveTocItem,
+    tocTargets$,
+    type TocTarget
+  } from '$lib/components/book-reader/book-toc/book-toc';
   import HtmlRenderer from '$lib/components/html-renderer.svelte';
   import type { BooksDbBookmarkData } from '$lib/data/database/books-db/versions/books-db';
   import { SECTION_CHANGE } from '$lib/data/events';
@@ -204,6 +209,8 @@
   let wheelNavigationLocked = false;
 
   let wheelNavigationUnlockTimer: ReturnType<typeof setTimeout> | undefined;
+
+  let tocTargets: TocTarget[] = [];
 
   const width$ = new Subject<number>();
 
@@ -559,6 +566,12 @@
       useExploredCharCount = isUser || !!customReadingPointRange;
       updateBookmarkScreen(data);
     });
+    scheduleActiveTocItemUpdate();
+  });
+
+  tocTargets$.pipe(takeUntil(destroy$)).subscribe((targets) => {
+    tocTargets = targets;
+    scheduleActiveTocItemUpdate();
   });
 
   if (autoBookmark) {
@@ -919,6 +932,7 @@
       calculator: _calculator
     });
     sectionRenderComplete$.next(sectionIndex);
+    scheduleActiveTocItemUpdate();
 
     if (scrollWhenReady) {
       scrollWhenReady = false;
@@ -975,6 +989,153 @@
 
     useExploredCharCount = true;
     isBookmarkScreen = result.isBookmarkScreen;
+  }
+
+  function scheduleActiveTocItemUpdate() {
+    if (!browser) {
+      return;
+    }
+
+    requestAnimationFrame(() => updateActiveTocItemFromPage());
+  }
+
+  function updateActiveTocItemFromPage() {
+    if (!contentEl || !scrollEl || !calculator || !tocTargets.length) {
+      return;
+    }
+
+    const sourceHref = sections[displayedSectionIndex]?.sourceHref;
+
+    if (!sourceHref) {
+      return;
+    }
+
+    const activeTarget = getActivePaginatedTocTarget(
+      tocTargets.filter((target) => target.sourceHref === sourceHref)
+    );
+
+    if (!activeTarget) {
+      return;
+    }
+
+    setActiveTocItem({
+      id: activeTarget.id,
+      sourceHref: activeTarget.sourceHref,
+      targetFragment: activeTarget.targetFragment
+    });
+  }
+
+  function getActivePaginatedTocTarget(sourceTargets: TocTarget[]) {
+    if (!contentEl || !scrollEl || !calculator || !sourceTargets.length) {
+      return undefined;
+    }
+
+    const currentScrollPos = virtualScrollPos$.getValue();
+    const viewportRect = scrollEl.getBoundingClientRect();
+    let closestReachedTarget: PaginatedTocTargetCandidate | undefined;
+    let closestUpcomingTarget: PaginatedTocTargetCandidate | undefined;
+
+    sourceTargets.forEach((target) => {
+      const targetElement = findReaderTargetElement(contentEl as HTMLElement, {
+        sourceHref: target.sourceHref,
+        fragment: target.targetFragment
+      });
+
+      if (!targetElement) {
+        return;
+      }
+
+      const targetScrollPos = getTargetElementScrollPos(
+        calculator as SectionCharacterStatsCalculator,
+        targetElement
+      );
+
+      if (targetScrollPos < 0) {
+        return;
+      }
+
+      const rect = targetElement.getBoundingClientRect();
+      const candidate = {
+        target,
+        pageDistance: Math.abs(targetScrollPos - currentScrollPos),
+        visualDistance: getPaginatedTocVisualDistance(rect, viewportRect),
+        visible: rectIntersects(rect, viewportRect),
+        specificity: target.targetFragment ? 1 : 0,
+        depth: target.depth,
+        order: target.order
+      };
+
+      if (targetScrollPos <= currentScrollPos + 1) {
+        if (isBetterPaginatedTocTargetCandidate(candidate, closestReachedTarget, true)) {
+          closestReachedTarget = candidate;
+        }
+      } else if (isBetterPaginatedTocTargetCandidate(candidate, closestUpcomingTarget, false)) {
+        closestUpcomingTarget = candidate;
+      }
+    });
+
+    return (closestReachedTarget || closestUpcomingTarget)?.target;
+  }
+
+  type PaginatedTocTargetCandidate = {
+    target: TocTarget;
+    pageDistance: number;
+    visualDistance: number;
+    visible: boolean;
+    specificity: number;
+    depth: number;
+    order: number;
+  };
+
+  function isBetterPaginatedTocTargetCandidate(
+    candidate: PaginatedTocTargetCandidate,
+    current: PaginatedTocTargetCandidate | undefined,
+    preferLater: boolean
+  ) {
+    if (!current) {
+      return true;
+    }
+
+    if (Math.abs(candidate.pageDistance - current.pageDistance) > 1) {
+      return candidate.pageDistance < current.pageDistance;
+    }
+
+    if (candidate.visible !== current.visible) {
+      return candidate.visible;
+    }
+
+    if (candidate.specificity !== current.specificity) {
+      return candidate.specificity > current.specificity;
+    }
+
+    if (Math.abs(candidate.visualDistance - current.visualDistance) > 1) {
+      return candidate.visualDistance < current.visualDistance;
+    }
+
+    if (candidate.depth !== current.depth) {
+      return candidate.depth > current.depth;
+    }
+
+    return preferLater ? candidate.order > current.order : candidate.order < current.order;
+  }
+
+  function getPaginatedTocVisualDistance(rect: DOMRect, viewportRect: DOMRect) {
+    const readingPoint = verticalMode
+      ? viewportRect.right - (firstDimensionMargin || 0)
+      : viewportRect.top + (firstDimensionMargin || 0);
+    const axisPosition = verticalMode ? rect.right : rect.top;
+
+    return Math.abs(axisPosition - readingPoint);
+  }
+
+  function rectIntersects(rect: DOMRect, viewportRect: DOMRect) {
+    return (
+      rect.right >= viewportRect.left &&
+      rect.left <= viewportRect.right &&
+      rect.bottom >= viewportRect.top &&
+      rect.top <= viewportRect.bottom &&
+      (rect.width > 0 || rect.height > 0)
+    );
   }
 
   function setDefaultBookmarkPositions(dimensionAdjustment: number) {

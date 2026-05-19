@@ -7,23 +7,53 @@
     faXmark
   } from '@fortawesome/free-solid-svg-icons';
   import {
+    activeTocItem$,
     getChapterData,
     getChapterSections,
     nextChapter$,
+    setActiveTocItem,
     tocIsOpen$,
+    type ActiveTocItem,
     type SectionWithProgress
   } from '$lib/components/book-reader/book-toc/book-toc';
   import { isTrackerPaused$ } from '$lib/components/book-reader/book-reading-tracker/book-reading-tracker';
   import { dialogManager } from '$lib/data/dialog-manager';
   import { PAGE_CHANGE } from '$lib/data/events';
   import { skipKeyDownListener$, statisticsEnabled$ } from '$lib/data/store';
+  import type { BooksDbTocEntry } from '$lib/data/database/books-db/versions/books-db';
   import { readerTargetNavigation$ } from '$lib/functions/reader-reference-layer/navigation';
   import { getWeightedAverage } from '$lib/functions/utils';
   import { debounceTime, fromEvent, Subject, take, takeUntil } from 'rxjs';
   import { onMount } from 'svelte';
   import Fa from 'svelte-fa';
 
-  type TocItem = SectionWithProgress & {
+  type TocItem = {
+    id: string;
+    reference: string;
+    label: string;
+    children: TocItem[];
+    sourceHref?: string;
+    targetFragment?: string;
+    startCharacter?: number;
+    characters?: number;
+    charactersWeight?: number;
+    progress?: number;
+    parentChapter?: string;
+    tocDepth?: number;
+  };
+
+  type TocNavigationTarget = {
+    id?: string;
+    reference: string;
+    label?: string;
+    sourceHref?: string;
+    targetFragment?: string;
+    startCharacter?: number;
+  };
+
+  type SectionTocItem = SectionWithProgress & {
+    id: string;
+    label: string;
     children: TocItem[];
   };
 
@@ -32,6 +62,7 @@
   };
 
   export let sectionData: SectionWithProgress[] = [];
+  export let tocEntries: BooksDbTocEntry[] = [];
   export let exploredCharCount = 0;
   export let verticalMode: boolean;
   export let wasTrackerPaused: boolean;
@@ -41,12 +72,17 @@
   let chapters: SectionWithProgress[] = [];
   let tocTree: TocItem[] = [];
   let visibleTocItems: VisibleTocItem[] = [];
+  let tocEntryCount = 0;
+  let currentTocItemId = '';
   let currentChapter: SectionWithProgress | undefined;
   let currentChapterIndex = -1;
   let currentChapterCharacterProgress = '0 / 0';
   let currentChapterProgress = '0.00';
+  let activeTocItem: ActiveTocItem | undefined;
   let expandedReferences = new Set<string>();
+  let collapsedReferences = new Set<string>();
   let currentAncestorReferences = new Set<string>();
+  let previousTocTreeKey = '';
 
   const destroy$ = new Subject<void>();
 
@@ -66,14 +102,17 @@
     chapters = nextChapters;
     currentChapterIndex = chapterIndex;
     currentChapter = nextChapters[currentChapterIndex];
-    tocTree = buildTocTree(sectionData);
-    currentAncestorReferences = getAncestorReferences(tocTree, currentChapter?.reference || '');
-    visibleTocItems = flattenTocTree(tocTree);
+    tocTree = buildTocTree(sectionData, tocEntries);
+    tocEntryCount = countTocEntries(tocTree);
+    currentTocItemId = getCurrentTocItemId(tocTree, currentChapter, activeTocItem);
+    currentAncestorReferences = getAncestorReferences(tocTree, currentTocItemId);
+    syncExpandedReferences(tocTree, currentAncestorReferences);
     updateCurrentChapterProgress(referenceId);
   }
+  $: visibleTocItems = flattenTocTree(tocTree, expandedReferences);
 
-  $: if (currentChapter) {
-    scrollToChapterItem(document.getElementById(getTocItemId(currentChapter.reference)));
+  $: if (currentTocItemId) {
+    scrollToChapterItem(document.getElementById(getTocItemId(currentTocItemId)));
   }
 
   onMount(() => {
@@ -83,8 +122,11 @@
         component: '<div/>'
       }
     ]);
-    if (currentChapter) {
-      scrollToChapterItem(document.getElementById(getTocItemId(currentChapter.reference)));
+    activeTocItem$.pipe(takeUntil(destroy$)).subscribe((tocItem) => {
+      activeTocItem = tocItem;
+    });
+    if (currentTocItemId) {
+      scrollToChapterItem(document.getElementById(getTocItemId(currentTocItemId)));
     }
 
     return () => {
@@ -95,13 +137,33 @@
     };
   });
 
-  function buildTocTree(sections: SectionWithProgress[]) {
+  function buildTocTree(sections: SectionWithProgress[], importedTocEntries: BooksDbTocEntry[]) {
+    if (importedTocEntries.length) {
+      return buildImportedTocTree(importedTocEntries);
+    }
+
+    return buildSectionTocTree(sections);
+  }
+
+  function buildImportedTocTree(importedTocEntries: BooksDbTocEntry[]): TocItem[] {
+    return importedTocEntries.map((entry) => ({
+      id: entry.id,
+      reference: entry.reference,
+      label: entry.label,
+      sourceHref: entry.sourceHref,
+      targetFragment: entry.targetFragment,
+      children: buildImportedTocTree(entry.children || [])
+    }));
+  }
+
+  function buildSectionTocTree(sections: SectionWithProgress[]) {
     const items = getChapterSections(sections).map((section) => ({
       ...section,
+      id: section.reference,
       children: [] as TocItem[]
-    }));
+    })) as SectionTocItem[];
     const itemByReference = new Map(items.map((item) => [item.reference, item]));
-    const roots: TocItem[] = [];
+    const roots: SectionTocItem[] = [];
 
     items.forEach((item) => {
       const parent = item.parentChapter ? itemByReference.get(item.parentChapter) : undefined;
@@ -116,34 +178,34 @@
     return roots;
   }
 
-  function flattenTocTree(items: TocItem[], depth = 0): VisibleTocItem[] {
+  function flattenTocTree(
+    items: TocItem[],
+    expandedItemReferences: Set<string>,
+    depth = 0
+  ): VisibleTocItem[] {
     return items.flatMap((item) => {
       const visibleItem = { ...item, depth };
-      const shouldShowChildren =
-        item.children.length &&
-        (depth === 0 ||
-          expandedReferences.has(item.reference) ||
-          currentAncestorReferences.has(item.reference));
+      const shouldShowChildren = item.children.length && expandedItemReferences.has(item.id);
 
       return shouldShowChildren
-        ? [visibleItem, ...flattenTocTree(item.children, depth + 1)]
+        ? [visibleItem, ...flattenTocTree(item.children, expandedItemReferences, depth + 1)]
         : [visibleItem];
     });
   }
 
   function getAncestorReferences(
     items: TocItem[],
-    reference: string,
+    itemId: string,
     ancestors: string[] = []
   ): Set<string> {
     for (const item of items) {
-      if (item.reference === reference) {
+      if (item.id === itemId) {
         return new Set(ancestors);
       }
 
-      const childAncestors: Set<string> = getAncestorReferences(item.children, reference, [
+      const childAncestors: Set<string> = getAncestorReferences(item.children, itemId, [
         ...ancestors,
-        item.reference
+        item.id
       ]);
 
       if (childAncestors.size) {
@@ -152,6 +214,99 @@
     }
 
     return new Set<string>();
+  }
+
+  function flattenAllTocItems(items: TocItem[], depth = 0): VisibleTocItem[] {
+    return items.flatMap((item) => [
+      { ...item, depth },
+      ...flattenAllTocItems(item.children, depth + 1)
+    ]);
+  }
+
+  function countTocEntries(items: TocItem[]): number {
+    return items.reduce((count, item) => count + 1 + countTocEntries(item.children), 0);
+  }
+
+  function getTocTreeKey(items: TocItem[]) {
+    return flattenAllTocItems(items)
+      .map((item) => item.id)
+      .join('|');
+  }
+
+  function getDefaultExpandedReferences(items: TocItem[], ancestorReferences: Set<string>) {
+    const defaultExpandedReferences = new Set<string>();
+
+    items.forEach((item) => {
+      if (item.children.length) {
+        defaultExpandedReferences.add(item.id);
+      }
+    });
+    ancestorReferences.forEach((reference) => defaultExpandedReferences.add(reference));
+
+    return defaultExpandedReferences;
+  }
+
+  function syncExpandedReferences(items: TocItem[], ancestorReferences: Set<string>) {
+    const tocTreeKey = getTocTreeKey(items);
+
+    if (tocTreeKey !== previousTocTreeKey) {
+      previousTocTreeKey = tocTreeKey;
+      collapsedReferences = new Set<string>();
+      expandedReferences = getDefaultExpandedReferences(items, ancestorReferences);
+      return;
+    }
+
+    const nextExpandedReferences = new Set(expandedReferences);
+    let changed = false;
+
+    ancestorReferences.forEach((reference) => {
+      if (!collapsedReferences.has(reference) && !nextExpandedReferences.has(reference)) {
+        nextExpandedReferences.add(reference);
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      expandedReferences = nextExpandedReferences;
+    }
+  }
+
+  function getCurrentTocItemId(
+    items: TocItem[],
+    chapter: SectionWithProgress | undefined,
+    selectedTocItem: ActiveTocItem | undefined
+  ) {
+    if (!chapter) {
+      return '';
+    }
+
+    if (!tocEntries.length) {
+      return chapter.reference;
+    }
+
+    const flattenedItems = flattenAllTocItems(items);
+    const selectedItem = selectedTocItem
+      ? flattenedItems.find((item) => item.id === selectedTocItem.id)
+      : undefined;
+
+    if (selectedItem && selectedItem.sourceHref && selectedItem.sourceHref === chapter.sourceHref) {
+      return selectedItem.id;
+    }
+
+    const exactMatch = flattenedItems.find(
+      (item) =>
+        item.sourceHref === chapter.sourceHref && item.targetFragment === chapter.targetFragment
+    );
+
+    if (exactMatch) {
+      return exactMatch.id;
+    }
+
+    const sourceHrefMatch = [...flattenedItems]
+      .reverse()
+      .find((item) => item.sourceHref === chapter.sourceHref);
+
+    return sourceHrefMatch?.id || '';
   }
 
   function updateCurrentChapterProgress(referenceId: string) {
@@ -223,12 +378,13 @@
     }
   }
 
-  function goToChapter(chapter: SectionWithProgress | undefined, closeToc = false) {
+  function goToChapter(chapter: TocNavigationTarget | undefined, closeToc = false) {
     if (!chapter) {
       return;
     }
 
-    const hasCharacterChange = exploredCharCount !== chapter.startCharacter;
+    const hasCharacterChange =
+      typeof chapter.startCharacter === 'number' && exploredCharCount !== chapter.startCharacter;
 
     if ($statisticsEnabled$ && closeToc && hasCharacterChange && !wasTrackerPaused) {
       fromEvent(document, PAGE_CHANGE)
@@ -249,24 +405,36 @@
 
   function toggleExpanded(reference: string) {
     const nextExpandedReferences = new Set(expandedReferences);
+    const nextCollapsedReferences = new Set(collapsedReferences);
 
     if (nextExpandedReferences.has(reference)) {
       nextExpandedReferences.delete(reference);
+      nextCollapsedReferences.add(reference);
     } else {
       nextExpandedReferences.add(reference);
+      nextCollapsedReferences.delete(reference);
     }
 
     expandedReferences = nextExpandedReferences;
+    collapsedReferences = nextCollapsedReferences;
   }
 
-  function navigateToChapter(chapter: SectionWithProgress) {
+  function navigateToChapter(chapter: TocNavigationTarget) {
     if (chapter.sourceHref) {
+      if (chapter.id) {
+        setActiveTocItem({
+          id: chapter.id,
+          sourceHref: chapter.sourceHref,
+          targetFragment: chapter.targetFragment
+        });
+      }
+
       readerTargetNavigation$.next({
         target: {
           sourceHref: chapter.sourceHref,
           fragment: chapter.targetFragment
         },
-        highlight: false
+        highlight: true
       });
       return;
     }
@@ -274,16 +442,11 @@
     nextChapter$.next(chapter.reference);
   }
 
-  function isExpanded(item: TocItem) {
-    return (
-      item.children.length > 0 &&
-      (item.tocDepth === 0 ||
-        expandedReferences.has(item.reference) ||
-        currentAncestorReferences.has(item.reference))
-    );
+  function isExpanded(item: VisibleTocItem) {
+    return item.children.length > 0 && expandedReferences.has(item.id);
   }
 
-  function formatTocMeta(item: SectionWithProgress) {
+  function formatTocMeta(item: TocItem) {
     if (typeof item.startCharacter === 'number') {
       return item.startCharacter.toLocaleString();
     }
@@ -292,7 +455,7 @@
   }
 
   function getTocItemId(reference: string) {
-    return `toc-${reference}`;
+    return `toc-${encodeURIComponent(reference)}`;
   }
 
   function closeTocMenu() {
@@ -316,7 +479,7 @@
       <span class="book-toc-panel-title-icon"><Fa icon={faBookOpen} /></span>
       <div>
         <div class="book-toc-panel-title-main">Contents</div>
-        <div class="book-toc-panel-title-sub">{chapters.length} entries</div>
+        <div class="book-toc-panel-title-sub">{tocEntryCount} entries</div>
       </div>
     </div>
     <button
@@ -339,11 +502,11 @@
 
   <div class="book-toc-panel-list">
     {#if visibleTocItems.length}
-      {#each visibleTocItems as item (item.reference)}
+      {#each visibleTocItems as item (item.id)}
         <div
-          id={getTocItemId(item.reference)}
+          id={getTocItemId(item.id)}
           class="book-toc-item-row"
-          class:book-toc-item-row--current={item.reference === currentChapter?.reference}
+          class:book-toc-item-row--current={item.id === currentTocItemId}
           style:--toc-depth={item.depth}
         >
           {#if item.children.length}
@@ -353,7 +516,7 @@
               class="book-toc-item-disclosure"
               aria-expanded={isExpanded(item)}
               aria-label={isExpanded(item) ? 'Collapse section' : 'Expand section'}
-              on:click|stopPropagation={() => toggleExpanded(item.reference)}
+              on:click|stopPropagation={() => toggleExpanded(item.id)}
             >
               <Fa icon={isExpanded(item) ? faChevronDown : faChevronRight} />
             </button>
