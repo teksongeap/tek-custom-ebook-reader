@@ -35,6 +35,9 @@ export interface Section {
   startCharacter?: number;
   characters?: number;
   parentChapter?: string;
+  sourceHref?: string;
+  targetFragment?: string;
+  tocDepth?: number;
 }
 
 export default interface BooksDbV3 extends DBSchema {

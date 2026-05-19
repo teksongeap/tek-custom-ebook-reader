@@ -45,6 +45,7 @@
   import BookAnnotationsRenderer from './book-annotations/book-annotations-renderer.svelte';
   import { faArrowUpRightFromSquare, faXmark } from '@fortawesome/free-solid-svg-icons';
   import Fa from 'svelte-fa';
+  import { clickOutside } from '$lib/functions/use-click-outside';
 
   export let htmlContent: string;
 
@@ -352,22 +353,65 @@
     tempContainer.innerHTML = htmlContent;
 
     const targetElement = findReaderTargetElement(tempContainer, target);
-    const previewHtml = targetElement ? clonePreviewHtml(targetElement) : '';
+    const previewElement = targetElement ? getFootnotePreviewElement(targetElement) : undefined;
+    const previewHtml = previewElement ? clonePreviewHtml(previewElement) : '';
 
     tempContainer.textContent = '';
 
     return previewHtml;
   }
 
+  function getFootnotePreviewElement(element: Element) {
+    const noteContainer = element.closest(
+      '[role="doc-footnote"],[epub\\:type~="footnote"],[epub\\:type~="endnote"],.fnote,.footnote,.endnote,p,li,aside,div'
+    );
+
+    if (!noteContainer || noteContainer === element || element.tagName.toLowerCase() !== 'a') {
+      return element;
+    }
+
+    return hasContainerTextBeyondMarker(noteContainer, element) ? noteContainer : element;
+  }
+
+  function hasContainerTextBeyondMarker(container: Element, marker: Element) {
+    const containerText = normalizePreviewText(container.textContent || '');
+    const markerText = normalizePreviewText(marker.textContent || '');
+
+    return containerText.length > markerText.length;
+  }
+
+  function normalizePreviewText(value: string) {
+    return value.replace(/\s+/g, ' ').trim();
+  }
+
   function clonePreviewHtml(element: Element) {
     const clone = element.cloneNode(true) as Element;
+    const clonedElements = [clone, ...Array.from(clone.querySelectorAll('*'))];
 
-    [clone, ...Array.from(clone.querySelectorAll('[id],[name]'))].forEach((item) => {
+    clonedElements.forEach((item) => {
       item.removeAttribute('id');
       item.removeAttribute('name');
     });
 
+    clonedElements
+      .filter((item) => item.tagName.toLowerCase() === 'a')
+      .forEach((item) => {
+        const linkKind = item.getAttribute('data-ttu-link-kind');
+
+        if (linkKind !== 'external') {
+          item.removeAttribute('href');
+          item.setAttribute('aria-disabled', 'true');
+        }
+      });
+
     return clone.outerHTML;
+  }
+
+  function handleFootnoteKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && footnotePreviewHtml) {
+      event.preventDefault();
+      closeFootnotePreview();
+    }
   }
 
   function isEditableEventTarget(target: EventTarget | null) {
@@ -576,27 +620,26 @@
 </div>
 {#if footnotePreviewHtml}
   <div
-    class="fixed inset-x-0 bottom-0 z-50 px-3 pb-3 sm:px-6 sm:pb-6"
+    class="book-footnote-preview-root writing-horizontal-tb"
+    class:book-footnote-preview-root--vertical={verticalMode}
+    use:clickOutside={closeFootnotePreview}
     on:touchmove|stopPropagation={() => {}}
     on:wheel|stopPropagation={() => {}}
   >
     <section
-      class="mx-auto max-h-[45vh] max-w-3xl overflow-hidden rounded-t-lg border shadow-2xl"
+      class="book-footnote-preview-card"
       role="dialog"
       aria-label="Footnote"
       style:color={fontColor}
       style:background-color={backgroundColor}
       style:border-color={fontColor}
     >
-      <div
-        class="flex items-center justify-between border-b px-4 py-2"
-        style:border-color={fontColor}
-      >
-        <div class="text-sm font-semibold">Footnote</div>
-        <div class="flex gap-2">
+      <div class="book-footnote-preview-header" style:border-color={fontColor}>
+        <div class="book-footnote-preview-title">Footnote</div>
+        <div class="book-footnote-preview-actions">
           <button
             type="button"
-            class="rounded px-3 py-2 opacity-80 hover:opacity-100"
+            class="book-footnote-preview-action"
             title="Jump to Footnote"
             aria-label="Jump to Footnote"
             on:click={jumpToFootnotePreviewTarget}
@@ -605,7 +648,7 @@
           </button>
           <button
             type="button"
-            class="rounded px-3 py-2 opacity-80 hover:opacity-100"
+            class="book-footnote-preview-action"
             title="Close Footnote"
             aria-label="Close Footnote"
             on:click={closeFootnotePreview}
@@ -615,7 +658,7 @@
         </div>
       </div>
       <div
-        class="max-h-[calc(45vh-3rem)] overflow-auto overscroll-contain px-4 py-3"
+        class="book-footnote-preview-content"
         style:font-family="var(--font-family-serif, 'Lora', 'Noto Serif JP', serif)"
         style:font-size="{fontSize}px"
         style:line-height={lineHeight}
@@ -644,4 +687,101 @@
 {$reactiveElements$ ?? ''}
 {$hoverFocusKeybind$ ?? ''}
 {$footnoteRequest$ ?? ''}
-<svelte:document bind:visibilityState />
+<svelte:document bind:visibilityState on:keydown={handleFootnoteKeydown} />
+
+<style lang="scss">
+  .book-footnote-preview-root {
+    pointer-events: none;
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 50;
+    padding: 0 0.75rem 0.75rem;
+  }
+
+  .book-footnote-preview-root--vertical {
+    right: auto;
+    bottom: 1rem;
+    left: 50%;
+    width: min(48rem, calc(100vw - 2rem));
+    transform: translateX(-50%);
+    padding: 0;
+  }
+
+  .book-footnote-preview-card {
+    pointer-events: auto;
+    box-sizing: border-box;
+    max-height: min(45vh, 26rem);
+    max-width: 48rem;
+    overflow: hidden;
+    margin: 0 auto;
+    border: 1px solid;
+    border-radius: 0.75rem 0.75rem 0 0;
+    box-shadow: 0 20px 52px rgba(5, 7, 10, 0.3);
+  }
+
+  .book-footnote-preview-root--vertical .book-footnote-preview-card {
+    width: 100%;
+    max-width: none;
+    border-radius: 0.75rem;
+  }
+
+  .book-footnote-preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: 1px solid;
+    padding: 0.5rem 0.85rem 0.5rem 1rem;
+  }
+
+  .book-footnote-preview-title {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.9rem;
+    font-weight: 760;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .book-footnote-preview-actions {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .book-footnote-preview-action {
+    display: inline-flex;
+    height: 2rem;
+    min-width: 2rem;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 0.45rem;
+    background: transparent;
+    color: inherit;
+    opacity: 0.78;
+    outline: none;
+    padding: 0 0.55rem;
+  }
+
+  .book-footnote-preview-action:hover,
+  .book-footnote-preview-action:focus-visible {
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    opacity: 1;
+  }
+
+  .book-footnote-preview-content {
+    max-height: calc(min(45vh, 26rem) - 3rem);
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 0.85rem 1rem 1rem;
+  }
+
+  .book-footnote-preview-content :global(a[aria-disabled='true']) {
+    cursor: default;
+    text-decoration: none;
+  }
+</style>

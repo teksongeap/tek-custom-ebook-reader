@@ -23,9 +23,15 @@ import { FuriganaStyle } from '../../data/furigana-style';
 import { nextChapter$ } from '$lib/components/book-reader/book-toc/book-toc';
 import { pulseElement } from '$lib/functions/range-util';
 import { readerFootnoteRequest$ } from '$lib/functions/reader-reference-layer/footnote';
-import { readReaderLinkReference } from '$lib/functions/reader-reference-layer/epub-reference';
+import {
+  createReaderLinkReference,
+  getElementSourceHref,
+  readReaderLinkReference
+} from '$lib/functions/reader-reference-layer/epub-reference';
 import { readerTargetNavigation$ } from '$lib/functions/reader-reference-layer/navigation';
 import { toggleImageGalleryPictureSpoiler$ } from '$lib/components/book-reader/book-reader-image-gallery/book-reader-image-gallery';
+
+const legacyHrefAttribute = 'data-ttu-legacy-href';
 
 export function reactiveElements(
   document: Document,
@@ -49,14 +55,30 @@ function anchorTagListener(document: Document) {
   return (contentEl: HTMLElement) => {
     const anchorTags = Array.from(contentEl.getElementsByTagName('a'));
     anchorTags.forEach((el) => {
+      if (!readReaderLinkReference(el) && !el.hasAttribute(legacyHrefAttribute)) {
+        const originalHref = el.getAttribute('href');
+
+        if (originalHref) {
+          el.setAttribute(legacyHrefAttribute, originalHref);
+        }
+      }
+
       el.href = document.location.pathname + el.hash;
     });
 
     return fromDelegatedClickEvent<HTMLAnchorElement>(contentEl, 'a').pipe(
       tap(({ element }) => {
-        const reference = readReaderLinkReference(element);
+        const reference =
+          readReaderLinkReference(element) || readLegacyReaderLinkReference(element);
 
-        if (reference && reference.kind !== 'external') {
+        if (reference?.kind === 'external') {
+          if (reference.targetHref) {
+            window.open(reference.targetHref, '_blank', 'noopener,noreferrer');
+          }
+          return;
+        }
+
+        if (reference) {
           if (reference.kind === 'footnote') {
             readerFootnoteRequest$.next({
               reference,
@@ -76,6 +98,15 @@ function anchorTagListener(document: Document) {
       })
     );
   };
+}
+
+function readLegacyReaderLinkReference(element: HTMLAnchorElement) {
+  const originalHref = element.getAttribute(legacyHrefAttribute);
+  const sourceHref = getElementSourceHref(element);
+
+  return sourceHref && originalHref
+    ? createReaderLinkReference(sourceHref, originalHref, element)
+    : undefined;
 }
 
 function rubyTagListener(contentEl: HTMLElement, furiganaStyle: FuriganaStyle) {

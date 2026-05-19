@@ -56,6 +56,18 @@ const selfClosingContentTags = [
   'title'
 ];
 
+interface ParsedTocEntry {
+  id: string;
+  reference: string;
+  charactersWeight: number;
+  label: string;
+  sourceHref: string;
+  targetFragment?: string;
+  parentId?: string;
+  depth: number;
+  order: number;
+}
+
 export default function generateEpubHtml(
   data: Record<string, string | Blob>,
   contents: EpubContent | EpubOPFContent,
@@ -69,7 +81,7 @@ export default function generateEpubHtml(
   const selfClosingContentTagsToFix =
     applyImportFixes && !restrictImportFixToAnchor ? selfClosingContentTags : [];
 
-  let tocData = { type: 3, content: '' };
+  let tocData = { type: 3, content: '', sourceHref: '' };
   let navKey = '';
 
   const itemIdToHtmlRef = (
@@ -97,7 +109,8 @@ export default function generateEpubHtml(
     if (isV2Toc || navKey === key) {
       tocData = {
         type: isV2Toc ? 2 : 3,
-        content: value as string
+        content: value as string,
+        sourceHref: key
       };
     }
 
@@ -116,50 +129,21 @@ export default function generateEpubHtml(
   const result = document.createElement('div');
   const spineHrefToIndex = createSpineHrefToIndex(itemRefs, itemIdToHtmlRef, fallbackData);
 
-  let mainChapters: Section[] = [];
+  let mainChapters: ParsedTocEntry[] = [];
   let firstChapterMatchIndex = -1;
 
   if (applyImportFixes && restrictImportFixToAnchor) {
     selfClosingContentTagsToFix.push('a');
   }
 
-  if (tocData.type && tocData.content) {
-    let parsedToc = parser.parseFromString(tocData.content, 'text/html');
-
-    if (tocData.type === 3) {
-      let navTocElement = parsedToc.querySelector('nav[epub\\:type="toc"],nav#toc');
-
-      if (!navTocElement) {
-        parsedToc = parser.parseFromString(tocData.content, 'text/xml');
-      }
-
-      navTocElement = parsedToc.querySelector('nav[epub\\:type="toc"],nav#toc');
-
-      if (navTocElement) {
-        mainChapters = [...navTocElement.querySelectorAll('a')].map((elm) => {
-          const anchor = elm as HTMLAnchorElement;
-
-          return { reference: anchor.href, charactersWeight: 1, label: anchor.innerText };
-        });
-      }
-    } else {
-      mainChapters = [...parsedToc.querySelectorAll('navPoint')].map((elm) => {
-        const navLabel = elm.querySelector('navLabel text') as HTMLElement;
-        const contentElm = elm.querySelector('content') as HTMLElement;
-
-        return {
-          reference: contentElm.getAttribute('src') as string,
-          charactersWeight: 1,
-          label: navLabel.innerText
-        };
-      });
-    }
-  }
+  mainChapters = parseTocEntries(tocData, parser);
 
   if (mainChapters.length) {
-    firstChapterMatchIndex = itemRefs.findIndex((ref) =>
-      mainChapters[0].reference.includes(itemIdToHtmlRef[ref['@_idref'].split('/').pop() || ''])
-    );
+    firstChapterMatchIndex = itemRefs.findIndex((ref) => {
+      const { htmlHref } = resolveSpineItemHtmlRef(ref, itemIdToHtmlRef, fallbackData);
+
+      return normalizeEpubPath(htmlHref || '') === mainChapters[0].sourceHref;
+    });
 
     if (firstChapterMatchIndex !== 0) {
       const firstRef = itemRefs[0]['@_idref'];
@@ -168,10 +152,13 @@ export default function generateEpubHtml(
       const reference = firstHTMLRef || (fallbackRef ? itemIdToHtmlRef[fallbackRef] : firstHTMLRef);
 
       mainChapters.unshift({
+        id: 'toc-preface',
         reference,
         charactersWeight: 1,
         label: 'Preface',
-        startCharacter: 0
+        sourceHref: normalizeEpubPath(reference || ''),
+        depth: 0,
+        order: -1
       });
     }
   }
@@ -181,9 +168,12 @@ export default function generateEpubHtml(
   let currentMainChapterIndex = 0;
   let previousCharacterCount = 0;
   let currentCharCount = 0;
+  const tocEntryById = new Map(mainChapters.map((chapter) => [chapter.id, chapter]));
+  const tocEntryToSectionReference = new Map<string, string>();
 
   itemRefs.forEach((item, spineIndex) => {
     const { itemIdRef, htmlHref } = resolveSpineItemHtmlRef(item, itemIdToHtmlRef, fallbackData);
+    const normalizedHtmlHref = normalizeEpubPath(htmlHref || '');
 
     let contentToParse = (data[htmlHref] as string) || '';
 
@@ -262,7 +252,7 @@ export default function generateEpubHtml(
     childWrapperDiv.id = `${prependValue}${itemIdRef}`;
     childWrapperDiv.setAttribute(ReaderReferenceAttribute.spineIndex, `${spineIndex}`);
     childWrapperDiv.setAttribute(ReaderReferenceAttribute.spineIdRef, itemIdRef);
-    childWrapperDiv.setAttribute(ReaderReferenceAttribute.sourceHref, normalizeEpubPath(htmlHref));
+    childWrapperDiv.setAttribute(ReaderReferenceAttribute.sourceHref, normalizedHtmlHref);
     childWrapperDiv.appendChild(childHtmlDiv);
     annotateReaderSearchBlocks(childWrapperDiv, `epub-${spineIndex}`);
     annotateAnchorReferences(childWrapperDiv, htmlHref, {
@@ -281,18 +271,22 @@ export default function generateEpubHtml(
       childBodyDiv.classList.add('ttu-no-text');
     }
 
-    const mainChapterIndex = mainChapters.findIndex((chapter) =>
-      chapter.reference.includes(htmlHref.split('/').pop() || '')
-    );
+    const mainChapterIndex = findBestTocEntryIndexForSourceHref(mainChapters, normalizedHtmlHref);
     const mainChapter = mainChapterIndex > -1 ? mainChapters[mainChapterIndex] : undefined;
     const characters = currentCharCount - previousCharacterCount;
 
     if (mainChapter) {
       const oldMainChapterIndex = currentMainChapterIndex;
+      const parentChapter = findTocParentSectionReference(
+        mainChapter,
+        tocEntryById,
+        tocEntryToSectionReference
+      );
 
       currentMainChapter = mainChapter;
       currentMainChapterIndex = sectionData.length;
       currentMainChapterId = `${prependValue}${itemIdRef}`;
+      tocEntryToSectionReference.set(mainChapter.id, currentMainChapterId);
 
       sectionData.push({
         reference: currentMainChapterId,
@@ -302,7 +296,11 @@ export default function generateEpubHtml(
           ? (sectionData[oldMainChapterIndex].startCharacter as number) +
             (sectionData[oldMainChapterIndex].characters as number)
           : 0,
-        characters
+        characters,
+        parentChapter,
+        sourceHref: currentMainChapter.sourceHref,
+        targetFragment: currentMainChapter.targetFragment,
+        tocDepth: currentMainChapter.depth
       });
     } else if (currentMainChapter) {
       (sectionData[currentMainChapterIndex].characters as number) += characters;
@@ -310,7 +308,8 @@ export default function generateEpubHtml(
       sectionData.push({
         reference: `${prependValue}${itemIdRef}`,
         charactersWeight: characters || 1,
-        parentChapter: currentMainChapterId
+        parentChapter: currentMainChapterId,
+        sourceHref: normalizedHtmlHref
       });
     }
 
@@ -337,6 +336,254 @@ function countForElement(containerEl: Node) {
   });
 
   return characterCount;
+}
+
+function parseTocEntries(
+  tocData: { type: number; content: string; sourceHref: string },
+  parser: DOMParser
+) {
+  if (!tocData.type || !tocData.content) {
+    return [] as ParsedTocEntry[];
+  }
+
+  if (tocData.type === 3) {
+    let parsedToc = parser.parseFromString(tocData.content, 'text/html');
+    let navTocElement = parsedToc.querySelector('nav[epub\\:type="toc"],nav#toc');
+
+    if (!navTocElement) {
+      parsedToc = parser.parseFromString(tocData.content, 'text/xml');
+      navTocElement = parsedToc.querySelector('nav[epub\\:type="toc"],nav#toc');
+    }
+
+    return navTocElement ? parseNavTocEntries(navTocElement, tocData.sourceHref) : [];
+  }
+
+  const parsedToc = parser.parseFromString(tocData.content, 'text/xml');
+  const navMap = findFirstDescendantByLocalName(parsedToc, 'navMap');
+
+  return navMap ? parseNcxTocEntries(navMap, tocData.sourceHref) : [];
+}
+
+function parseNavTocEntries(navTocElement: Element, tocSourceHref: string) {
+  const entries: ParsedTocEntry[] = [];
+
+  parseNavTocContainer(navTocElement, tocSourceHref, entries, 0);
+
+  return entries;
+}
+
+function parseNavTocContainer(
+  container: Element,
+  tocSourceHref: string,
+  entries: ParsedTocEntry[],
+  depth: number,
+  parentId?: string
+) {
+  const list =
+    getDirectChildrenByLocalName(container, 'ol')[0] ||
+    getDirectChildrenByLocalName(container, 'ul')[0];
+
+  if (!list) {
+    return;
+  }
+
+  getDirectChildrenByLocalName(list, 'li').forEach((item) => {
+    const anchor = findDirectChildByLocalName(item, 'a');
+    const entry = anchor
+      ? createTocEntry(anchor.getAttribute('href') || '', anchor.textContent || '', tocSourceHref, {
+          depth,
+          parentId,
+          rawId: anchor.id || item.id,
+          order: entries.length
+        })
+      : undefined;
+    const nextParentId = entry?.id || parentId;
+
+    if (entry) {
+      entries.push(entry);
+    }
+
+    parseNavTocContainer(item, tocSourceHref, entries, depth + 1, nextParentId);
+  });
+}
+
+function parseNcxTocEntries(navMapElement: Element, tocSourceHref: string) {
+  const entries: ParsedTocEntry[] = [];
+
+  parseNcxNavPoints(
+    getDirectChildrenByLocalName(navMapElement, 'navPoint'),
+    tocSourceHref,
+    entries,
+    0
+  );
+
+  return entries;
+}
+
+function parseNcxNavPoints(
+  navPoints: Element[],
+  tocSourceHref: string,
+  entries: ParsedTocEntry[],
+  depth: number,
+  parentId?: string
+) {
+  navPoints.forEach((navPoint) => {
+    const navLabel = findDirectChildByLocalName(navPoint, 'navLabel');
+    const label = findFirstDescendantByLocalName(navLabel, 'text')?.textContent || '';
+    const content = findDirectChildByLocalName(navPoint, 'content');
+    const entry = createTocEntry(content?.getAttribute('src') || '', label, tocSourceHref, {
+      depth,
+      parentId,
+      rawId: navPoint.id,
+      order: entries.length
+    });
+    const nextParentId = entry?.id || parentId;
+
+    if (entry) {
+      entries.push(entry);
+    }
+
+    parseNcxNavPoints(
+      getDirectChildrenByLocalName(navPoint, 'navPoint'),
+      tocSourceHref,
+      entries,
+      depth + 1,
+      nextParentId
+    );
+  });
+}
+
+function createTocEntry(
+  rawReference: string,
+  rawLabel: string,
+  tocSourceHref: string,
+  options: {
+    depth: number;
+    order: number;
+    parentId?: string;
+    rawId?: string;
+  }
+): ParsedTocEntry | undefined {
+  const label = rawLabel.replace(/\s+/g, ' ').trim();
+
+  if (!rawReference || !label) {
+    return undefined;
+  }
+
+  const { hrefPath, fragment } = splitTocHref(rawReference);
+  const sourceHref = resolveTocHref(tocSourceHref, hrefPath);
+  const reference = fragment ? `${sourceHref}#${fragment}` : sourceHref;
+
+  return {
+    id: options.rawId || `toc-${options.order}`,
+    reference,
+    charactersWeight: 1,
+    label,
+    sourceHref,
+    targetFragment: fragment,
+    parentId: options.parentId,
+    depth: options.depth,
+    order: options.order
+  };
+}
+
+function splitTocHref(href: string) {
+  const hashIndex = href.indexOf('#');
+  const hrefWithoutFragment = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const fragment = hashIndex >= 0 ? decodeTocFragment(href.slice(hashIndex + 1)) : undefined;
+  const queryIndex = hrefWithoutFragment.indexOf('?');
+  const hrefPath = queryIndex >= 0 ? hrefWithoutFragment.slice(0, queryIndex) : hrefWithoutFragment;
+
+  return { hrefPath, fragment };
+}
+
+function resolveTocHref(tocSourceHref: string, hrefPath: string) {
+  if (!hrefPath) {
+    return normalizeEpubPath(tocSourceHref);
+  }
+
+  if (hrefPath.startsWith('/')) {
+    return normalizeEpubPath(hrefPath);
+  }
+
+  const sourceDir = path.dirname(tocSourceHref);
+
+  return normalizeEpubPath(path.join(sourceDir === '.' ? '' : sourceDir, hrefPath));
+}
+
+function decodeTocFragment(fragment: string) {
+  try {
+    return decodeURIComponent(fragment);
+  } catch (_) {
+    return fragment;
+  }
+}
+
+function findBestTocEntryIndexForSourceHref(entries: ParsedTocEntry[], sourceHref: string) {
+  let bestIndex = -1;
+  let bestDepth = -1;
+
+  entries.forEach((entry, index) => {
+    if (entry.sourceHref !== sourceHref || entry.depth < bestDepth) {
+      return;
+    }
+
+    if (entry.depth === bestDepth && bestIndex > -1) {
+      return;
+    }
+
+    bestIndex = index;
+    bestDepth = entry.depth;
+  });
+
+  return bestIndex;
+}
+
+function findTocParentSectionReference(
+  entry: ParsedTocEntry,
+  entryById: Map<string, ParsedTocEntry>,
+  entryToSectionReference: Map<string, string>
+) {
+  let parentId = entry.parentId;
+
+  while (parentId) {
+    const parentSectionReference = entryToSectionReference.get(parentId);
+
+    if (parentSectionReference) {
+      return parentSectionReference;
+    }
+
+    parentId = entryById.get(parentId)?.parentId;
+  }
+
+  return undefined;
+}
+
+function getDirectChildrenByLocalName(element: ParentNode | null | undefined, localName: string) {
+  if (!element) {
+    return [] as Element[];
+  }
+
+  return Array.from(element.children).filter(
+    (child) => child.localName.toLowerCase() === localName.toLowerCase()
+  );
+}
+
+function findDirectChildByLocalName(element: ParentNode | null | undefined, localName: string) {
+  return getDirectChildrenByLocalName(element, localName)[0];
+}
+
+function findFirstDescendantByLocalName(
+  element: ParentNode | Document | null | undefined,
+  localName: string
+) {
+  if (!element) {
+    return undefined;
+  }
+
+  return Array.from(element.querySelectorAll('*')).find(
+    (child) => child.localName.toLowerCase() === localName.toLowerCase()
+  );
 }
 
 function annotateAnchorReferences(

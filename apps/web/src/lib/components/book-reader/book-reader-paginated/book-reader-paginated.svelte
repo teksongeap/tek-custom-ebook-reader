@@ -774,6 +774,10 @@
     );
 
     if (nextSectionIndex < 0) {
+      if (target.sourceHref) {
+        return false;
+      }
+
       return target.fragment ? jumpToSectionTarget(target.fragment, isUser) : false;
     }
 

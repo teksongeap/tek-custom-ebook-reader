@@ -17,10 +17,14 @@ export type SectionWithProgress = Section & {
   progress: number;
 };
 
+export function getChapterSections(sectionData: SectionWithProgress[]) {
+  return sectionData.filter((section) => !!section.label);
+}
+
 export function getChapterData(
   sectionData: SectionWithProgress[]
 ): [SectionWithProgress[], number, string] {
-  const mainChapters = sectionData.filter((section) => !section.parentChapter);
+  const mainChapters = getChapterSections(sectionData);
 
   let currentSection = sectionData.find((section) => section.progress < 100);
 
@@ -28,10 +32,18 @@ export function getChapterData(
     currentSection = sectionData[sectionData.length - 1];
   }
 
-  const referenceId = currentSection.parentChapter || currentSection.reference;
-  const currentChapterIndex = mainChapters.findIndex(
-    (section) => section.reference === referenceId
-  );
+  const referenceId = currentSection?.label
+    ? currentSection.reference
+    : currentSection?.parentChapter || currentSection?.reference || '';
+  let currentChapterIndex = mainChapters.findIndex((section) => section.reference === referenceId);
+
+  if (currentChapterIndex < 0 && typeof currentSection?.startCharacter === 'number') {
+    currentChapterIndex = mainChapters.findLastIndex(
+      (section) =>
+        typeof section.startCharacter === 'number' &&
+        (section.startCharacter as number) <= (currentSection.startCharacter as number)
+    );
+  }
 
   return [mainChapters, currentChapterIndex, referenceId];
 }

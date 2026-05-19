@@ -689,6 +689,10 @@
     const targetElement = findReaderTargetElement(contentEl, target);
 
     if (!targetElement) {
+      if (target.sourceHref) {
+        return false;
+      }
+
       return target.fragment ? jumpToSectionTarget(target.fragment) : false;
     }
 

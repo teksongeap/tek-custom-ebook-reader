@@ -18,6 +18,7 @@
   } from './annotation-range';
   import { getAnnotationColorValue } from './annotation-colors';
   import { formatAnnotationTimestamp, getAnnotationEditedAt } from './annotation-time';
+  import AnnotationLinkifiedText from './annotation-linkified-text.svelte';
 
   export let contentEl: HTMLElement | undefined;
   export let annotations: BooksDbAnnotation[] = [];
@@ -707,7 +708,7 @@
         class:book-annotation-card-comment--clamped={!isCommentExpanded}
         class:book-annotation-card-comment--expanded={isCommentExpanded}
       >
-        {activeAnnotation.comment}
+        <AnnotationLinkifiedText text={activeAnnotation.comment} />
       </div>
       {#if commentCanExpand}
         <button

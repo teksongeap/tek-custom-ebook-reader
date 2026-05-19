@@ -1,7 +1,14 @@
 <script lang="ts">
-  import { faXmark, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+  import {
+    faBookOpen,
+    faChevronDown,
+    faChevronLeft,
+    faChevronRight,
+    faXmark
+  } from '@fortawesome/free-solid-svg-icons';
   import {
     getChapterData,
+    getChapterSections,
     nextChapter$,
     tocIsOpen$,
     type SectionWithProgress
@@ -10,55 +17,63 @@
   import { dialogManager } from '$lib/data/dialog-manager';
   import { PAGE_CHANGE } from '$lib/data/events';
   import { skipKeyDownListener$, statisticsEnabled$ } from '$lib/data/store';
-  import { dummyFn, getWeightedAverage } from '$lib/functions/utils';
+  import { readerTargetNavigation$ } from '$lib/functions/reader-reference-layer/navigation';
+  import { getWeightedAverage } from '$lib/functions/utils';
   import { debounceTime, fromEvent, Subject, take, takeUntil } from 'rxjs';
   import { onMount } from 'svelte';
   import Fa from 'svelte-fa';
+
+  type TocItem = SectionWithProgress & {
+    children: TocItem[];
+  };
+
+  type VisibleTocItem = TocItem & {
+    depth: number;
+  };
 
   export let sectionData: SectionWithProgress[] = [];
   export let exploredCharCount = 0;
   export let verticalMode: boolean;
   export let wasTrackerPaused: boolean;
+  export let fontColor = '';
+  export let backgroundColor = '';
 
   let chapters: SectionWithProgress[] = [];
-  let currentChapter: SectionWithProgress;
+  let tocTree: TocItem[] = [];
+  let visibleTocItems: VisibleTocItem[] = [];
+  let currentChapter: SectionWithProgress | undefined;
   let currentChapterIndex = -1;
-  let currentChapterCharacterProgress = '0/0';
+  let currentChapterCharacterProgress = '0 / 0';
   let currentChapterProgress = '0.00';
+  let expandedReferences = new Set<string>();
+  let currentAncestorReferences = new Set<string>();
 
   const destroy$ = new Subject<void>();
 
+  $: panelStyle = `--reader-page-text: ${
+    fontColor || 'var(--font-color)'
+  }; --reader-page-bg: ${backgroundColor || 'var(--background-color)'};`;
   $: prevChapterAvailable = verticalMode
     ? currentChapterIndex < chapters.length - 1
-    : !!currentChapterIndex;
+    : currentChapterIndex > 0;
   $: nextChapterAvailable = verticalMode
-    ? !!currentChapterIndex
+    ? currentChapterIndex > 0
     : currentChapterIndex < chapters.length - 1;
 
   $: if (sectionData) {
-    const [mainChapters, chapterIndex, referenceId] = getChapterData(sectionData);
-    const relevantSections = sectionData.filter(
-      (section) => section.reference === referenceId || section.parentChapter === referenceId
-    );
+    const [nextChapters, chapterIndex, referenceId] = getChapterData(sectionData);
 
-    currentChapterProgress = getWeightedAverage(
-      relevantSections.map((section) => section.progress),
-      relevantSections.map((section) => section.charactersWeight)
-    ).toFixed(2);
-    chapters = mainChapters;
+    chapters = nextChapters;
     currentChapterIndex = chapterIndex;
-    currentChapter = mainChapters[currentChapterIndex];
+    currentChapter = nextChapters[currentChapterIndex];
+    tocTree = buildTocTree(sectionData);
+    currentAncestorReferences = getAncestorReferences(tocTree, currentChapter?.reference || '');
+    visibleTocItems = flattenTocTree(tocTree);
+    updateCurrentChapterProgress(referenceId);
   }
 
   $: if (currentChapter) {
-    scrollToChapterItem(document.getElementById(`for${currentChapter.reference}`));
-
-    const endCharacter = currentChapter.characters as number;
-
-    currentChapterCharacterProgress = `${Math.min(
-      Math.max(exploredCharCount - (currentChapter.startCharacter as number), 0),
-      endCharacter
-    )} / ${endCharacter}`;
+    scrollToChapterItem(document.getElementById(getTocItemId(currentChapter.reference)));
   }
 
   onMount(() => {
@@ -69,7 +84,7 @@
       }
     ]);
     if (currentChapter) {
-      scrollToChapterItem(document.getElementById(`for${currentChapter.reference}`));
+      scrollToChapterItem(document.getElementById(getTocItemId(currentChapter.reference)));
     }
 
     return () => {
@@ -80,6 +95,114 @@
     };
   });
 
+  function buildTocTree(sections: SectionWithProgress[]) {
+    const items = getChapterSections(sections).map((section) => ({
+      ...section,
+      children: [] as TocItem[]
+    }));
+    const itemByReference = new Map(items.map((item) => [item.reference, item]));
+    const roots: TocItem[] = [];
+
+    items.forEach((item) => {
+      const parent = item.parentChapter ? itemByReference.get(item.parentChapter) : undefined;
+
+      if (parent && parent.reference !== item.reference) {
+        parent.children.push(item);
+      } else {
+        roots.push(item);
+      }
+    });
+
+    return roots;
+  }
+
+  function flattenTocTree(items: TocItem[], depth = 0): VisibleTocItem[] {
+    return items.flatMap((item) => {
+      const visibleItem = { ...item, depth };
+      const shouldShowChildren =
+        item.children.length &&
+        (depth === 0 ||
+          expandedReferences.has(item.reference) ||
+          currentAncestorReferences.has(item.reference));
+
+      return shouldShowChildren
+        ? [visibleItem, ...flattenTocTree(item.children, depth + 1)]
+        : [visibleItem];
+    });
+  }
+
+  function getAncestorReferences(
+    items: TocItem[],
+    reference: string,
+    ancestors: string[] = []
+  ): Set<string> {
+    for (const item of items) {
+      if (item.reference === reference) {
+        return new Set(ancestors);
+      }
+
+      const childAncestors: Set<string> = getAncestorReferences(item.children, reference, [
+        ...ancestors,
+        item.reference
+      ]);
+
+      if (childAncestors.size) {
+        return childAncestors;
+      }
+    }
+
+    return new Set<string>();
+  }
+
+  function updateCurrentChapterProgress(referenceId: string) {
+    const relevantSections = getRelevantSections(referenceId);
+    const characters = relevantSections.reduce(
+      (sum, section) => sum + Math.max(section.characters || 0, 0),
+      0
+    );
+    const startCharacter = relevantSections.reduce((minStart, section) => {
+      if (typeof section.startCharacter !== 'number') {
+        return minStart;
+      }
+
+      return Math.min(minStart, section.startCharacter);
+    }, Number.POSITIVE_INFINITY);
+
+    currentChapterProgress = getWeightedAverage(
+      relevantSections.map((section) => section.progress),
+      relevantSections.map((section) => section.charactersWeight)
+    ).toFixed(2);
+    currentChapterCharacterProgress = `${Math.min(
+      Math.max(exploredCharCount - (Number.isFinite(startCharacter) ? startCharacter : 0), 0),
+      characters
+    )} / ${characters}`;
+  }
+
+  function getRelevantSections(referenceId: string) {
+    if (!referenceId) {
+      return [];
+    }
+
+    const references = new Set([referenceId]);
+    let changed = true;
+
+    while (changed) {
+      changed = false;
+      sectionData.forEach((section) => {
+        if (
+          section.parentChapter &&
+          references.has(section.parentChapter) &&
+          !references.has(section.reference)
+        ) {
+          references.add(section.reference);
+          changed = true;
+        }
+      });
+    }
+
+    return sectionData.filter((section) => references.has(section.reference));
+  }
+
   function scrollToChapterItem(elm: HTMLElement | null) {
     if (!elm) {
       return;
@@ -88,7 +211,7 @@
     if (elm.scrollIntoViewIfNeeded) {
       elm.scrollIntoViewIfNeeded();
     } else {
-      elm.scrollIntoView();
+      elm.scrollIntoView({ block: 'nearest' });
     }
   }
 
@@ -96,13 +219,16 @@
     if (canNavigate) {
       const nextChapter = chapters[currentChapterIndex + indexMod];
 
-      goToChapter(nextChapter.reference, false);
+      goToChapter(nextChapter, false);
     }
   }
 
-  function goToChapter(chapterId: string, closeToc = false) {
-    const nextChapter = chapters.find((chapter) => chapter.reference === chapterId);
-    const hasCharacterChange = exploredCharCount !== nextChapter?.startCharacter;
+  function goToChapter(chapter: SectionWithProgress | undefined, closeToc = false) {
+    if (!chapter) {
+      return;
+    }
+
+    const hasCharacterChange = exploredCharCount !== chapter.startCharacter;
 
     if ($statisticsEnabled$ && closeToc && hasCharacterChange && !wasTrackerPaused) {
       fromEvent(document, PAGE_CHANGE)
@@ -114,11 +240,59 @@
         });
     }
 
-    nextChapter$.next(chapterId);
+    navigateToChapter(chapter);
 
     if ((!hasCharacterChange || !$statisticsEnabled$ || wasTrackerPaused) && closeToc) {
       closeTocMenu();
     }
+  }
+
+  function toggleExpanded(reference: string) {
+    const nextExpandedReferences = new Set(expandedReferences);
+
+    if (nextExpandedReferences.has(reference)) {
+      nextExpandedReferences.delete(reference);
+    } else {
+      nextExpandedReferences.add(reference);
+    }
+
+    expandedReferences = nextExpandedReferences;
+  }
+
+  function navigateToChapter(chapter: SectionWithProgress) {
+    if (chapter.sourceHref) {
+      readerTargetNavigation$.next({
+        target: {
+          sourceHref: chapter.sourceHref,
+          fragment: chapter.targetFragment
+        },
+        highlight: false
+      });
+      return;
+    }
+
+    nextChapter$.next(chapter.reference);
+  }
+
+  function isExpanded(item: TocItem) {
+    return (
+      item.children.length > 0 &&
+      (item.tocDepth === 0 ||
+        expandedReferences.has(item.reference) ||
+        currentAncestorReferences.has(item.reference))
+    );
+  }
+
+  function formatTocMeta(item: SectionWithProgress) {
+    if (typeof item.startCharacter === 'number') {
+      return item.startCharacter.toLocaleString();
+    }
+
+    return '';
+  }
+
+  function getTocItemId(reference: string) {
+    return `toc-${reference}`;
   }
 
   function closeTocMenu() {
@@ -131,61 +305,345 @@
   }
 </script>
 
-<div class="flex justify-between p-4">
-  <div>Chapter Progress: {currentChapterCharacterProgress} ({currentChapterProgress}%)</div>
-  <div
-    tabindex="0"
-    role="button"
-    title="Close Table of Contents"
-    class="flex items-end md:items-center"
-    on:click={closeTocMenu}
-    on:keyup={dummyFn}
-  >
-    <Fa icon={faXmark} />
-  </div>
-</div>
-<div class="flex-1 overflow-auto p-4">
-  {#each chapters as chapter (chapter.reference)}
-    <div class="my-6 flex justify-between">
-      <div
-        tabindex="0"
-        role="button"
-        title={`Go to ${chapter.label}`}
-        id={`for${chapter.reference}`}
-        class="mr-4"
-        class:opacity-30={chapter.progress === 100 && chapter !== currentChapter}
-        class:hover:opacity-100={chapter.progress === 100 && chapter !== currentChapter}
-        class:hover:opacity-60={chapter.progress < 100 || chapter === currentChapter}
-        on:click={() => goToChapter(chapter.reference, true)}
-        on:keyup={dummyFn}
-      >
-        {chapter.label}
-      </div>
-      <div class:opacity-30={chapter.progress === 100 && chapter !== currentChapter}>
-        {chapter.startCharacter}
+<div
+  class="book-toc-panel"
+  style={panelStyle}
+  on:touchmove|stopPropagation={() => {}}
+  on:wheel|stopPropagation={() => {}}
+>
+  <div class="book-toc-panel-header">
+    <div class="book-toc-panel-title">
+      <span class="book-toc-panel-title-icon"><Fa icon={faBookOpen} /></span>
+      <div>
+        <div class="book-toc-panel-title-main">Contents</div>
+        <div class="book-toc-panel-title-sub">{chapters.length} entries</div>
       </div>
     </div>
-  {/each}
-</div>
-<div class="flex justify-between px-4 py-6">
-  <div
-    tabindex="0"
-    role="button"
-    title={prevChapterAvailable ? `${verticalMode ? 'Next' : 'Previous'} Chapter` : ''}
-    class:opacity-30={!prevChapterAvailable}
-    on:click={() => changeChapter(prevChapterAvailable, verticalMode ? 1 : -1)}
-    on:keyup={dummyFn}
-  >
-    <Fa icon={faChevronLeft} />
+    <button
+      type="button"
+      class="book-toc-panel-close"
+      title="Close contents"
+      aria-label="Close contents"
+      on:click={closeTocMenu}
+    >
+      <Fa icon={faXmark} />
+    </button>
   </div>
-  <div
-    tabindex="0"
-    role="button"
-    title={nextChapterAvailable ? `${verticalMode ? 'Previous' : 'Next'} Chapter` : ''}
-    class:opacity-30={!nextChapterAvailable}
-    on:click={() => changeChapter(nextChapterAvailable, verticalMode ? -1 : 1)}
-    on:keyup={dummyFn}
-  >
-    <Fa icon={faChevronRight} />
+
+  <div class="book-toc-panel-progress">
+    <span class="book-toc-panel-progress-label">{currentChapter?.label || 'Current chapter'}</span>
+    <span class="book-toc-panel-progress-value">
+      {currentChapterCharacterProgress} ({currentChapterProgress}%)
+    </span>
+  </div>
+
+  <div class="book-toc-panel-list">
+    {#if visibleTocItems.length}
+      {#each visibleTocItems as item (item.reference)}
+        <div
+          id={getTocItemId(item.reference)}
+          class="book-toc-item-row"
+          class:book-toc-item-row--current={item.reference === currentChapter?.reference}
+          style:--toc-depth={item.depth}
+        >
+          {#if item.children.length}
+            <button
+              type="button"
+              data-toc-disclosure
+              class="book-toc-item-disclosure"
+              aria-expanded={isExpanded(item)}
+              aria-label={isExpanded(item) ? 'Collapse section' : 'Expand section'}
+              on:click|stopPropagation={() => toggleExpanded(item.reference)}
+            >
+              <Fa icon={isExpanded(item) ? faChevronDown : faChevronRight} />
+            </button>
+          {:else}
+            <span class="book-toc-item-disclosure book-toc-item-disclosure--placeholder"></span>
+          {/if}
+          <button type="button" class="book-toc-item" on:click={() => goToChapter(item, true)}>
+            <span class="book-toc-item-label">{item.label}</span>
+            {#if formatTocMeta(item)}
+              <span class="book-toc-item-meta">{formatTocMeta(item)}</span>
+            {/if}
+          </button>
+        </div>
+      {/each}
+    {:else}
+      <div class="book-toc-panel-empty">
+        <div class="book-toc-panel-empty-icon"><Fa icon={faBookOpen} /></div>
+        <div class="book-toc-panel-empty-title">No contents</div>
+      </div>
+    {/if}
+  </div>
+
+  <div class="book-toc-panel-footer">
+    <button
+      type="button"
+      class="book-toc-panel-nav"
+      title={prevChapterAvailable ? `${verticalMode ? 'Next' : 'Previous'} chapter` : ''}
+      aria-label={verticalMode ? 'Next chapter' : 'Previous chapter'}
+      disabled={!prevChapterAvailable}
+      on:click={() => changeChapter(prevChapterAvailable, verticalMode ? 1 : -1)}
+    >
+      <Fa icon={faChevronLeft} />
+    </button>
+    <button
+      type="button"
+      class="book-toc-panel-nav"
+      title={nextChapterAvailable ? `${verticalMode ? 'Previous' : 'Next'} chapter` : ''}
+      aria-label={verticalMode ? 'Previous chapter' : 'Next chapter'}
+      disabled={!nextChapterAvailable}
+      on:click={() => changeChapter(nextChapterAvailable, verticalMode ? -1 : 1)}
+    >
+      <Fa icon={faChevronRight} />
+    </button>
   </div>
 </div>
+
+<style lang="scss">
+  .book-toc-panel {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    flex-direction: column;
+    overscroll-behavior: contain;
+    background:
+      linear-gradient(
+        145deg,
+        color-mix(in srgb, var(--reader-page-bg) 96%, transparent),
+        color-mix(in srgb, var(--reader-page-bg) 84%, var(--reader-page-text))
+      ),
+      var(--reader-page-bg);
+    color: var(--reader-page-text);
+  }
+
+  .book-toc-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--reader-page-text) 12%, transparent);
+    padding: 1rem;
+  }
+
+  .book-toc-panel-title {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .book-toc-panel-title-icon,
+  .book-toc-panel-empty-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.625rem;
+    background: color-mix(in srgb, var(--app-accent) 16%, transparent);
+    color: var(--app-accent);
+  }
+
+  .book-toc-panel-title-icon {
+    height: 2.35rem;
+    width: 2.35rem;
+    flex: 0 0 auto;
+  }
+
+  .book-toc-panel-title-main {
+    font-size: 1rem;
+    font-weight: 850;
+    line-height: 1.1;
+  }
+
+  .book-toc-panel-title-sub {
+    margin-top: 0.15rem;
+    color: color-mix(in srgb, var(--reader-page-text) 58%, transparent);
+    font-size: 0.78rem;
+    line-height: 1.1;
+  }
+
+  .book-toc-panel-close,
+  .book-toc-panel-nav,
+  .book-toc-item-disclosure,
+  .book-toc-item {
+    cursor: pointer;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    outline: none;
+  }
+
+  .book-toc-panel-close,
+  .book-toc-panel-nav,
+  .book-toc-item-disclosure {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .book-toc-panel-close {
+    height: 2.15rem;
+    width: 2.15rem;
+    flex: 0 0 auto;
+    border-radius: 0.5rem;
+    color: color-mix(in srgb, var(--reader-page-text) 62%, transparent);
+  }
+
+  .book-toc-panel-close:hover,
+  .book-toc-panel-close:focus-visible,
+  .book-toc-panel-nav:hover:not(:disabled),
+  .book-toc-panel-nav:focus-visible:not(:disabled),
+  .book-toc-item-disclosure:hover,
+  .book-toc-item-disclosure:focus-visible,
+  .book-toc-item:hover,
+  .book-toc-item:focus-visible {
+    background: color-mix(in srgb, var(--reader-page-text) 9%, transparent);
+    color: var(--reader-page-text);
+  }
+
+  .book-toc-panel-progress {
+    display: grid;
+    gap: 0.35rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--reader-page-text) 9%, transparent);
+    padding: 0.8rem 1rem;
+  }
+
+  .book-toc-panel-progress-label {
+    overflow: hidden;
+    color: var(--reader-page-text);
+    font-size: 0.88rem;
+    font-weight: 760;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .book-toc-panel-progress-value {
+    color: color-mix(in srgb, var(--reader-page-text) 58%, transparent);
+    font-size: 0.76rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+
+  .book-toc-panel-list {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 0.25rem;
+    overflow: auto;
+    padding: 0.75rem;
+  }
+
+  .book-toc-item-row {
+    --toc-depth: 0;
+    display: grid;
+    grid-template-columns: 1.75rem minmax(0, 1fr);
+    align-items: stretch;
+    gap: 0.25rem;
+    padding-left: calc(var(--toc-depth) * 0.85rem);
+  }
+
+  .book-toc-item-row--current {
+    color: var(--reader-page-text);
+  }
+
+  .book-toc-item-disclosure {
+    min-height: 2.35rem;
+    border-radius: 0.45rem;
+    color: color-mix(in srgb, var(--reader-page-text) 54%, transparent);
+    font-size: 0.72rem;
+  }
+
+  .book-toc-item-disclosure--placeholder {
+    pointer-events: none;
+  }
+
+  .book-toc-item {
+    display: grid;
+    min-height: 2.35rem;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.65rem;
+    border-radius: 0.55rem;
+    padding: 0.45rem 0.65rem;
+    text-align: left;
+  }
+
+  .book-toc-item-row--current .book-toc-item {
+    background:
+      linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--app-accent) 16%, transparent),
+        color-mix(in srgb, var(--reader-page-text) 7%, transparent)
+      ),
+      color-mix(in srgb, var(--reader-page-bg) 82%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 28%, transparent);
+  }
+
+  .book-toc-item-label {
+    min-width: 0;
+    overflow: hidden;
+    color: color-mix(in srgb, var(--reader-page-text) 86%, transparent);
+    font-size: 0.9rem;
+    font-weight: 650;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .book-toc-item-row--current .book-toc-item-label {
+    color: var(--reader-page-text);
+    font-weight: 820;
+  }
+
+  .book-toc-item-meta {
+    color: color-mix(in srgb, var(--reader-page-text) 42%, transparent);
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .book-toc-panel-footer {
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid color-mix(in srgb, var(--reader-page-text) 9%, transparent);
+    padding: 0.75rem 1rem;
+  }
+
+  .book-toc-panel-nav {
+    height: 2.2rem;
+    width: 2.2rem;
+    border-radius: 0.55rem;
+    color: color-mix(in srgb, var(--reader-page-text) 68%, transparent);
+  }
+
+  .book-toc-panel-nav:disabled {
+    cursor: not-allowed;
+    opacity: 0.28;
+  }
+
+  .book-toc-panel-empty {
+    display: grid;
+    min-height: 70%;
+    place-content: center;
+    justify-items: center;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .book-toc-panel-empty-icon {
+    height: 3rem;
+    width: 3rem;
+    font-size: 1.2rem;
+  }
+
+  .book-toc-panel-empty-title {
+    margin-top: 0.85rem;
+    color: var(--reader-page-text);
+    font-size: 1rem;
+    font-weight: 820;
+  }
+</style>

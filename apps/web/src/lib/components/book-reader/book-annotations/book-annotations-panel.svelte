@@ -15,7 +15,10 @@
     faXmark
   } from '@fortawesome/free-solid-svg-icons';
   import type { BooksDbAnnotation } from '$lib/data/database/books-db/versions/books-db';
-  import type { SectionWithProgress } from '$lib/components/book-reader/book-toc/book-toc';
+  import {
+    getChapterSections,
+    type SectionWithProgress
+  } from '$lib/components/book-reader/book-toc/book-toc';
   import {
     AnnotationSortMode,
     annotationSortOptions,
@@ -29,6 +32,7 @@
     type AnnotationColor
   } from './annotation-colors';
   import { formatAnnotationTimestamp, getAnnotationEditedAt } from './annotation-time';
+  import AnnotationLinkifiedText from './annotation-linkified-text.svelte';
 
   type AnnotationColorFilter = AnnotationColor | 'all';
 
@@ -55,7 +59,7 @@
     fontColor || 'var(--font-color)'
   }; --reader-page-bg: ${backgroundColor || 'var(--background-color)'};`;
   $: activeSortMode = getAnnotationSortMode($lastAnnotationSortMode$);
-  $: mainChapters = sectionData.filter((section) => !section.parentChapter);
+  $: chapterSections = getChapterSections(sectionData);
   $: sectionOrder = new Map(sectionData.map((section, index) => [section.reference, index]));
   $: searchTerms = normalizeForSearch(searchQuery).split(/\s+/).filter(Boolean);
   $: colorFilteredAnnotations =
@@ -142,17 +146,29 @@
     const annotationSection = sectionData.find(
       (section) => section.reference === annotation.anchor.sectionId
     );
-    const anchorChapter = annotationSection?.parentChapter
-      ? mainChapters.find((section) => section.reference === annotationSection.parentChapter)
-      : annotationSection && !annotationSection.parentChapter
-        ? annotationSection
-        : undefined;
-    const fallbackChapter = mainChapters
+    const anchorChapter = getNearestLabeledSection(annotationSection);
+    const fallbackChapter = chapterSections
       .slice()
       .reverse()
       .find((section) => (section.startCharacter || 0) <= annotation.exploredCharCount);
 
     return anchorChapter?.label || fallbackChapter?.label || 'Current Book';
+  }
+
+  function getNearestLabeledSection(section: SectionWithProgress | undefined) {
+    let currentSection = section;
+
+    while (currentSection) {
+      if (currentSection.label) {
+        return currentSection;
+      }
+
+      currentSection = currentSection.parentChapter
+        ? sectionData.find((item) => item.reference === currentSection?.parentChapter)
+        : undefined;
+    }
+
+    return undefined;
   }
 
   function matchesAnnotationSearch(annotation: BooksDbAnnotation, terms: string[]) {
@@ -268,7 +284,7 @@
   function isAnnotationPanelControl(target: EventTarget | null) {
     return (
       target instanceof Element &&
-      !!target.closest('button, input, select, textarea, [data-annotation-panel-control]')
+      !!target.closest('a, button, input, select, textarea, [data-annotation-panel-control]')
     );
   }
 
@@ -408,7 +424,7 @@
                   class:annotation-item-comment--clamped={!expandedCommentIds.has(annotation.id)}
                   class:annotation-item-comment--expanded={expandedCommentIds.has(annotation.id)}
                 >
-                  {annotation.comment}
+                  <AnnotationLinkifiedText text={annotation.comment} />
                 </span>
                 {#if canExpandComment(annotation.comment)}
                   <button
@@ -820,7 +836,7 @@
   .annotation-item-comment {
     color: color-mix(in srgb, var(--reader-page-text) 68%, transparent);
     overflow-wrap: anywhere;
-    font-size: 1.0rem;
+    font-size: 1rem;
     font-weight: 250;
     line-height: 1.35;
     white-space: pre-wrap;
@@ -832,7 +848,6 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     line-clamp: 2;
-    white-space: normal;
   }
 
   .annotation-item-comment--expanded {

@@ -199,6 +199,8 @@ export function findReaderTargetElement(source: Document | Element, target: Read
         return getReadableTargetElement(targetElement);
       }
     }
+
+    return undefined;
   }
 
   if (target.sectionId) {

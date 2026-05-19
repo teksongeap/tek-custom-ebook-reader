@@ -2261,6 +2261,8 @@
       verticalMode={$verticalMode$}
       {exploredCharCount}
       {wasTrackerPaused}
+      fontColor={$themeOption$?.fontColor ?? ''}
+      backgroundColor={$backgroundColor$ ?? ''}
     />
   </div>
 {/if}
