@@ -8,6 +8,7 @@ import buildDummyBookImage from '../utils/build-dummy-book-image';
 import clearAllBadImageRef from '../utils/clear-all-bad-image-ref';
 import fixXHtmlHref from '../utils/fix-xhtml-href';
 import type { HtmlzContent } from './types';
+import { annotateReaderSearchBlocks } from '$lib/functions/reader-reference-layer/search';
 
 export function getFormattedElementHtmlz(data: HtmlzContent, document: Document) {
   const regexResult = /.*<body[^>]*>((.|\s)+)<\/body>.*/.exec(data['index.html'])!;
@@ -22,6 +23,7 @@ export function getFormattedElementHtmlz(data: HtmlzContent, document: Document)
 
   clearAllBadImageRef(result);
   fixXHtmlHref(result);
+  annotateReaderSearchBlocks(result, 'htmlz');
 
   return result;
 }

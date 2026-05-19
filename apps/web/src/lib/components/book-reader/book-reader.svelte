@@ -26,6 +26,12 @@
   import { ViewMode } from '$lib/data/view-mode';
   import { iffBrowser } from '$lib/functions/rxjs/iff-browser';
   import { reduceToEmptyString } from '$lib/functions/rxjs/reduce-to-empty-string';
+  import {
+    findReaderTargetElement,
+    type ReaderTarget
+  } from '$lib/functions/reader-reference-layer/epub-reference';
+  import { readerFootnoteRequest$ } from '$lib/functions/reader-reference-layer/footnote';
+  import { readerTargetNavigation$ } from '$lib/functions/reader-reference-layer/navigation';
   import { writableSubject } from '$lib/functions/svelte/store';
   import { convertRemToPixels } from '$lib/functions/utils';
   import { logger } from '$lib/data/logger';
@@ -37,6 +43,8 @@
   import { enableReaderWakeLock$, enableTapEdgeToFlip$, hoverFocusEnabled$ } from '$lib/data/store';
   import { createEventDispatcher, onDestroy } from 'svelte';
   import BookAnnotationsRenderer from './book-annotations/book-annotations-renderer.svelte';
+  import { faArrowUpRightFromSquare, faXmark } from '@fortawesome/free-solid-svg-icons';
+  import Fa from 'svelte-fa';
 
   export let htmlContent: string;
 
@@ -158,6 +166,10 @@
 
   let contentEl: HTMLElement | undefined;
 
+  let footnotePreviewHtml = '';
+
+  let footnotePreviewTarget: ReaderTarget | undefined;
+
   let annotationRenderRevision = 0;
 
   const dispatch = createEventDispatcher<{
@@ -266,6 +278,13 @@
     reduceToEmptyString()
   );
 
+  const footnoteRequest$ = iffBrowser(() => readerFootnoteRequest$).pipe(
+    tap(({ target }) => {
+      openFootnotePreview(target);
+    }),
+    reduceToEmptyString()
+  );
+
   $: width$.next(width);
 
   $: height$.next(height);
@@ -301,6 +320,54 @@
     contentEl = detail;
     annotationRenderRevision += 1;
     contentEl$.next(detail);
+  }
+
+  function openFootnotePreview(target: ReaderTarget) {
+    const previewHtml = getFootnotePreviewHtml(target);
+
+    if (!previewHtml) {
+      readerTargetNavigation$.next({ target });
+      return;
+    }
+
+    footnotePreviewTarget = target;
+    footnotePreviewHtml = previewHtml;
+  }
+
+  function closeFootnotePreview() {
+    footnotePreviewHtml = '';
+    footnotePreviewTarget = undefined;
+  }
+
+  function jumpToFootnotePreviewTarget() {
+    if (footnotePreviewTarget) {
+      readerTargetNavigation$.next({ target: footnotePreviewTarget });
+    }
+
+    closeFootnotePreview();
+  }
+
+  function getFootnotePreviewHtml(target: ReaderTarget) {
+    const tempContainer = document.createElement('div');
+    tempContainer.innerHTML = htmlContent;
+
+    const targetElement = findReaderTargetElement(tempContainer, target);
+    const previewHtml = targetElement ? clonePreviewHtml(targetElement) : '';
+
+    tempContainer.textContent = '';
+
+    return previewHtml;
+  }
+
+  function clonePreviewHtml(element: Element) {
+    const clone = element.cloneNode(true) as Element;
+
+    [clone, ...Array.from(clone.querySelectorAll('[id],[name]'))].forEach((item) => {
+      item.removeAttribute('id');
+      item.removeAttribute('name');
+    });
+
+    return clone.outerHTML;
   }
 
   function isEditableEventTarget(target: EventTarget | null) {
@@ -507,6 +574,59 @@
     />
   {/if}
 </div>
+{#if footnotePreviewHtml}
+  <div
+    class="fixed inset-x-0 bottom-0 z-50 px-3 pb-3 sm:px-6 sm:pb-6"
+    on:touchmove|stopPropagation={() => {}}
+    on:wheel|stopPropagation={() => {}}
+  >
+    <section
+      class="mx-auto max-h-[45vh] max-w-3xl overflow-hidden rounded-t-lg border shadow-2xl"
+      role="dialog"
+      aria-label="Footnote"
+      style:color={fontColor}
+      style:background-color={backgroundColor}
+      style:border-color={fontColor}
+    >
+      <div
+        class="flex items-center justify-between border-b px-4 py-2"
+        style:border-color={fontColor}
+      >
+        <div class="text-sm font-semibold">Footnote</div>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            class="rounded px-3 py-2 opacity-80 hover:opacity-100"
+            title="Jump to Footnote"
+            aria-label="Jump to Footnote"
+            on:click={jumpToFootnotePreviewTarget}
+          >
+            <Fa icon={faArrowUpRightFromSquare} />
+          </button>
+          <button
+            type="button"
+            class="rounded px-3 py-2 opacity-80 hover:opacity-100"
+            title="Close Footnote"
+            aria-label="Close Footnote"
+            on:click={closeFootnotePreview}
+          >
+            <Fa icon={faXmark} />
+          </button>
+        </div>
+      </div>
+      <div
+        class="max-h-[calc(45vh-3rem)] overflow-auto overscroll-contain px-4 py-3"
+        style:font-family="var(--font-family-serif, 'Lora', 'Noto Serif JP', serif)"
+        style:font-size="{fontSize}px"
+        style:line-height={lineHeight}
+        on:touchmove|stopPropagation={() => {}}
+        on:wheel|stopPropagation={() => {}}
+      >
+        {@html footnotePreviewHtml}
+      </div>
+    </section>
+  </div>
+{/if}
 <BookAnnotationsRenderer
   {contentEl}
   {annotations}
@@ -523,4 +643,5 @@
 {$blurListener$ ?? ''}
 {$reactiveElements$ ?? ''}
 {$hoverFocusKeybind$ ?? ''}
+{$footnoteRequest$ ?? ''}
 <svelte:document bind:visibilityState />

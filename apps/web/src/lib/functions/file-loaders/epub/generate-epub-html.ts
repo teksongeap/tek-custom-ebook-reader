@@ -13,6 +13,15 @@ import { importHTMLFixMode$, restrictImportFixToAnchor$ } from '$lib/data/store'
 import { ImportHTMLFixMode } from '$lib/data/import-html-fix-mode';
 import { getCharacterCount } from '$lib/functions/get-character-count';
 import { getParagraphNodes } from '../../../components/book-reader/get-paragraph-nodes';
+import {
+  ReaderReferenceAttribute,
+  createReaderLinkReference,
+  getLegacyHashHref,
+  normalizeEpubPath,
+  resolveReaderTargetHref,
+  writeReaderLinkReference
+} from '$lib/functions/reader-reference-layer/epub-reference';
+import { annotateReaderSearchBlocks } from '$lib/functions/reader-reference-layer/search';
 import path from 'path-browserify';
 
 export const prependValue = 'ttu-';
@@ -105,6 +114,7 @@ export default function generateEpubHtml(
   const itemRefs = Array.isArray(spineItemRef) ? spineItemRef : [spineItemRef];
   const sectionData: Section[] = [];
   const result = document.createElement('div');
+  const spineHrefToIndex = createSpineHrefToIndex(itemRefs, itemIdToHtmlRef, fallbackData);
 
   let mainChapters: Section[] = [];
   let firstChapterMatchIndex = -1;
@@ -172,14 +182,8 @@ export default function generateEpubHtml(
   let previousCharacterCount = 0;
   let currentCharCount = 0;
 
-  itemRefs.forEach((item) => {
-    let itemIdRef = item['@_idref'];
-    let htmlHref = itemIdToHtmlRef[itemIdRef];
-
-    if (!htmlHref && fallbackData.has(itemIdRef)) {
-      itemIdRef = fallbackData.get(itemIdRef) as string;
-      htmlHref = itemIdToHtmlRef[itemIdRef];
-    }
+  itemRefs.forEach((item, spineIndex) => {
+    const { itemIdRef, htmlHref } = resolveSpineItemHtmlRef(item, itemIdToHtmlRef, fallbackData);
 
     let contentToParse = (data[htmlHref] as string) || '';
 
@@ -256,7 +260,15 @@ export default function generateEpubHtml(
 
     const childWrapperDiv = document.createElement('div');
     childWrapperDiv.id = `${prependValue}${itemIdRef}`;
+    childWrapperDiv.setAttribute(ReaderReferenceAttribute.spineIndex, `${spineIndex}`);
+    childWrapperDiv.setAttribute(ReaderReferenceAttribute.spineIdRef, itemIdRef);
+    childWrapperDiv.setAttribute(ReaderReferenceAttribute.sourceHref, normalizeEpubPath(htmlHref));
     childWrapperDiv.appendChild(childHtmlDiv);
+    annotateReaderSearchBlocks(childWrapperDiv, `epub-${spineIndex}`);
+    annotateAnchorReferences(childWrapperDiv, htmlHref, {
+      sourceSpineIndex: spineIndex,
+      spineHrefToIndex
+    });
 
     result.appendChild(childWrapperDiv);
 
@@ -307,7 +319,6 @@ export default function generateEpubHtml(
 
   clearAllBadImageRef(result);
   fixXHtmlHref(result);
-  flattenAnchorHref(result);
 
   return {
     element: result,
@@ -328,12 +339,63 @@ function countForElement(containerEl: Node) {
   return characterCount;
 }
 
-function flattenAnchorHref(el: HTMLElement) {
+function annotateAnchorReferences(
+  el: HTMLElement,
+  sourceHref: string,
+  context: {
+    sourceSpineIndex: number;
+    spineHrefToIndex: Map<string, number>;
+  }
+) {
   Array.from(el.getElementsByTagName('a')).forEach((tag) => {
     const oldHref = tag.getAttribute('href');
     if (!oldHref) return;
-    tag.setAttribute('href', `#${oldHref.replace(/.+#/, '')}`);
+
+    const targetHref = resolveReaderTargetHref(sourceHref, oldHref);
+    const reference = createReaderLinkReference(sourceHref, oldHref, tag, {
+      sourceSpineIndex: context.sourceSpineIndex,
+      targetSpineIndex: targetHref ? context.spineHrefToIndex.get(targetHref) : undefined
+    });
+
+    if (!reference) return;
+
+    writeReaderLinkReference(tag, reference);
+    tag.setAttribute('href', getLegacyHashHref(reference));
   });
+}
+
+function createSpineHrefToIndex(
+  itemRefs: { '@_idref': string }[],
+  itemIdToHtmlRef: Record<string, string>,
+  fallbackData: Map<string, string>
+) {
+  const spineHrefToIndex = new Map<string, number>();
+
+  itemRefs.forEach((item, spineIndex) => {
+    const { htmlHref } = resolveSpineItemHtmlRef(item, itemIdToHtmlRef, fallbackData);
+
+    if (htmlHref) {
+      spineHrefToIndex.set(normalizeEpubPath(htmlHref), spineIndex);
+    }
+  });
+
+  return spineHrefToIndex;
+}
+
+function resolveSpineItemHtmlRef(
+  item: { '@_idref': string },
+  itemIdToHtmlRef: Record<string, string>,
+  fallbackData: Map<string, string>
+) {
+  let itemIdRef = item['@_idref'];
+  let htmlHref = itemIdToHtmlRef[itemIdRef];
+
+  if (!htmlHref && fallbackData.has(itemIdRef)) {
+    itemIdRef = fallbackData.get(itemIdRef) as string;
+    htmlHref = itemIdToHtmlRef[itemIdRef];
+  }
+
+  return { itemIdRef, htmlHref };
 }
 
 /**

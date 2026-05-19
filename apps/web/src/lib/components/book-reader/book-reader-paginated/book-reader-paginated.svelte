@@ -18,6 +18,13 @@
     userFonts$
   } from '$lib/data/store';
   import { clearRange, createRange, pulseElement } from '$lib/functions/range-util';
+  import {
+    ReaderReferenceAttribute,
+    findReaderTargetElement,
+    type ReaderTarget
+  } from '$lib/functions/reader-reference-layer/epub-reference';
+  import { highlightReaderTargetElement } from '$lib/functions/reader-reference-layer/highlight';
+  import { readerTargetNavigation$ } from '$lib/functions/reader-reference-layer/navigation';
   import { iffBrowser } from '$lib/functions/rxjs/iff-browser';
   import { getExternalTargetElement, isMobile$ } from '$lib/functions/utils';
   import { faBookmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
@@ -143,6 +150,7 @@
 
   type ReaderSection = {
     id: string;
+    sourceHref?: string;
     html: string;
     characterCount: number;
   };
@@ -184,6 +192,8 @@
   let fontLoadingDoneHandler: (() => void) | undefined;
 
   let currentSectionId = '';
+
+  let currentSectionSourceHref = '';
 
   let swipeStartedWithTouch = false;
 
@@ -296,6 +306,7 @@
 
       if (section) {
         currentSectionId = section.id;
+        currentSectionSourceHref = section.sourceHref || '';
       }
     }
   }
@@ -410,11 +421,19 @@
     selector: string
   ) {
     const targetElement = getExternalTargetElement(document, selector);
-    const nodeRange = document.createRange();
 
     if (!targetElement) {
       return -1;
     }
+
+    return getTargetElementScrollPos(calculatorInstance, targetElement);
+  }
+
+  function getTargetElementScrollPos(
+    calculatorInstance: SectionCharacterStatsCalculator,
+    targetElement: Element
+  ) {
+    const nodeRange = document.createRange();
 
     nodeRange.setStart(targetElement, 0);
     nodeRange.setEnd(targetElement, targetElement.childNodes.length);
@@ -430,6 +449,7 @@
 
     const readerSections = Array.from(tempContainer.children).map((section) => ({
       id: section.id,
+      sourceHref: section.getAttribute(ReaderReferenceAttribute.sourceHref) || undefined,
       html: section.innerHTML,
       characterCount: getSectionCharacterCount(section)
     }));
@@ -447,14 +467,34 @@
   }
 
   function sectionContainsSelector(section: ReaderSection, selector: string) {
-    const tempContainer = document.createElement('div');
-    tempContainer.id = section.id;
-    tempContainer.innerHTML = section.html;
+    const tempContainer = createTempSectionElement(section);
 
     const hasMatch = !!getExternalTargetElement(tempContainer, selector);
     tempContainer.textContent = '';
 
     return hasMatch;
+  }
+
+  function sectionContainsReaderTarget(section: ReaderSection, target: ReaderTarget) {
+    const tempContainer = createTempSectionElement(section);
+    const hasMatch = !!findReaderTargetElement(tempContainer, target);
+
+    tempContainer.textContent = '';
+
+    return hasMatch;
+  }
+
+  function createTempSectionElement(section: ReaderSection) {
+    const tempContainer = document.createElement('div');
+    tempContainer.id = section.id;
+
+    if (section.sourceHref) {
+      tempContainer.setAttribute(ReaderReferenceAttribute.sourceHref, section.sourceHref);
+    }
+
+    tempContainer.innerHTML = section.html;
+
+    return tempContainer;
   }
   /** Experimental Code - May be removed or changed any time without warning */
 
@@ -728,6 +768,47 @@
     return !!(await jumpToSectionStart(nextSectionIndex, isUser));
   }
 
+  async function jumpToReaderTarget(target: ReaderTarget, isUser = true, highlight = true) {
+    const nextSectionIndex = sections.findIndex((section) =>
+      sectionContainsReaderTarget(section, target)
+    );
+
+    if (nextSectionIndex < 0) {
+      return target.fragment ? jumpToSectionTarget(target.fragment, isUser) : false;
+    }
+
+    const updatedCalculator = await jumpToSectionStart(nextSectionIndex, isUser);
+
+    if (!updatedCalculator || !contentEl) {
+      return false;
+    }
+
+    if (target.sourceHref && !target.fragment && !target.blockId) {
+      return true;
+    }
+
+    const targetElement = findReaderTargetElement(contentEl, target);
+
+    if (!targetElement) {
+      return true;
+    }
+
+    const targetScrollPos = getTargetElementScrollPos(updatedCalculator, targetElement);
+
+    if (targetScrollPos < 0) {
+      return true;
+    }
+
+    concretePageManager?.jumpTo(targetScrollPos, isUser);
+    updatedCalculator.updateParagraphPos();
+
+    if (highlight) {
+      highlightReaderTargetElement(targetElement);
+    }
+
+    return true;
+  }
+
   function onHtmlLoad() {
     if (skipFirstHtmlLoad) {
       skipFirstHtmlLoad = false;
@@ -978,6 +1059,10 @@
   nextChapter$.pipe(takeUntil(destroy$)).subscribe((chapterId) => {
     void jumpToSectionTarget(chapterId, true);
   });
+
+  readerTargetNavigation$.pipe(takeUntil(destroy$)).subscribe(({ target, highlight = true }) => {
+    void jumpToReaderTarget(target, true, highlight);
+  });
 </script>
 
 <div
@@ -1035,7 +1120,12 @@
   on:mousedown={onSwipeMouseDown}
   on:swipe={onSwipe}
 >
-  <div class="book-content-container" id={currentSectionId || null} bind:this={contentEl}>
+  <div
+    class="book-content-container"
+    id={currentSectionId || null}
+    data-ttu-source-href={currentSectionSourceHref || null}
+    bind:this={contentEl}
+  >
     <HtmlRenderer html={displayedHtml} on:load={onHtmlLoad} />
   </div>
   <div class="book-content-tail-spacer" bind:this={tailSpacerEl} aria-hidden="true"></div>

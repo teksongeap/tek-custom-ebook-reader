@@ -19,6 +19,12 @@
   } from '$lib/data/store';
   import { prependValue } from '$lib/functions/file-loaders/epub/generate-epub-html';
   import { getReferencePoints } from '$lib/functions/range-util';
+  import {
+    findReaderTargetElement,
+    type ReaderTarget
+  } from '$lib/functions/reader-reference-layer/epub-reference';
+  import { highlightReaderTargetElement } from '$lib/functions/reader-reference-layer/highlight';
+  import { readerTargetNavigation$ } from '$lib/functions/reader-reference-layer/navigation';
   import { getExternalTargetElement } from '$lib/functions/utils';
   import { faBookmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
   import {
@@ -670,6 +676,32 @@
       ? targetElement.closest(`div[id^="${prependValue}"]`) || targetElement
       : targetElement;
 
+    scrollToTargetElement(targetElement);
+
+    return true;
+  }
+
+  async function jumpToReaderTarget(target: ReaderTarget, highlight = true) {
+    if (!contentEl) {
+      return false;
+    }
+
+    const targetElement = findReaderTargetElement(contentEl, target);
+
+    if (!targetElement) {
+      return target.fragment ? jumpToSectionTarget(target.fragment) : false;
+    }
+
+    scrollToTargetElement(targetElement);
+
+    if (highlight) {
+      highlightReaderTargetElement(targetElement);
+    }
+
+    return true;
+  }
+
+  function scrollToTargetElement(targetElement: Element) {
     willNavigate = true;
 
     const rect = targetElement.getBoundingClientRect();
@@ -700,12 +732,14 @@
             : 0)
       );
     }
-
-    return true;
   }
 
   nextChapter$.pipe(takeUntil(destroy$)).subscribe((chapterId) => {
     void jumpToSectionTarget(chapterId);
+  });
+
+  readerTargetNavigation$.pipe(takeUntil(destroy$)).subscribe(({ target, highlight = true }) => {
+    void jumpToReaderTarget(target, highlight);
   });
 </script>
 

@@ -22,6 +22,9 @@ import {
 import { FuriganaStyle } from '../../data/furigana-style';
 import { nextChapter$ } from '$lib/components/book-reader/book-toc/book-toc';
 import { pulseElement } from '$lib/functions/range-util';
+import { readerFootnoteRequest$ } from '$lib/functions/reader-reference-layer/footnote';
+import { readReaderLinkReference } from '$lib/functions/reader-reference-layer/epub-reference';
+import { readerTargetNavigation$ } from '$lib/functions/reader-reference-layer/navigation';
 import { toggleImageGalleryPictureSpoiler$ } from '$lib/components/book-reader/book-reader-image-gallery/book-reader-image-gallery';
 
 export function reactiveElements(
@@ -50,7 +53,27 @@ function anchorTagListener(document: Document) {
     });
 
     return fromDelegatedClickEvent<HTMLAnchorElement>(contentEl, 'a').pipe(
-      tap(({ element }) => nextChapter$.next(element.hash.substring(1)))
+      tap(({ element }) => {
+        const reference = readReaderLinkReference(element);
+
+        if (reference && reference.kind !== 'external') {
+          if (reference.kind === 'footnote') {
+            readerFootnoteRequest$.next({
+              reference,
+              target: reference.target
+            });
+            return;
+          }
+
+          readerTargetNavigation$.next({
+            target: reference.target,
+            highlight: reference.kind !== 'backlink'
+          });
+          return;
+        }
+
+        nextChapter$.next(element.hash.substring(1));
+      })
     );
   };
 }

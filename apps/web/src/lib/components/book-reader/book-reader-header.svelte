@@ -8,6 +8,7 @@
     faFlag,
     faHighlighter,
     faList,
+    faMagnifyingGlass,
     faRotateLeft,
     type IconDefinition
   } from '@fortawesome/free-solid-svg-icons';
@@ -52,6 +53,7 @@
     statisticsClick: void;
     readerImageGalleryClick: void;
     annotationsClick: void;
+    searchClick: void;
     settingsClick: void;
     domainHintClick: void;
     bookManagerClick: void;
@@ -128,6 +130,15 @@
       </button>
     {/if}
     {#if hasText}
+      <button
+        type="button"
+        title="Search Book"
+        aria-label="Search Book"
+        class={baseIconClasses}
+        on:click={() => dispatch('searchClick')}
+      >
+        <Fa icon={faMagnifyingGlass} />
+      </button>
       <button
         type="button"
         title={annotationCount ? `Open Annotations (${annotationCount})` : 'Open Annotations'}

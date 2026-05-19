@@ -5,6 +5,7 @@
  */
 
 import { getCharacterCount } from '$lib/functions/get-character-count';
+import { annotateReaderSearchBlocks } from '$lib/functions/reader-reference-layer/search';
 
 export function getFormattedElementTxt(data: string) {
   const result = document.createElement('div');
@@ -105,6 +106,8 @@ export function getFormattedElementTxt(data: string) {
 
     result.appendChild(currentChildDiv);
   }
+
+  annotateReaderSearchBlocks(result, 'txt');
 
   return { element: result, characters: getCharacterCount(result) };
 }

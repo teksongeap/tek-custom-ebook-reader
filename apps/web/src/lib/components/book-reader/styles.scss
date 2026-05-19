@@ -1,6 +1,7 @@
 .book-content {
   font-family: var(--font-family-serif, 'Lora', 'Noto Serif JP', serif);
   --book-content-ruby-edge-clearance: max(0.65em, 12px);
+  --book-content-reference-highlight-color: #f5c84b;
   --book-content-selection-color: var(--font-color);
   --book-content-selection-background-color: var(--app-accent-soft);
 }
@@ -37,7 +38,7 @@
     user-select: none;
   }
 
-  &.book-content--hover-focus-dim {
+  &.book-content--hover-focus-dim:not(.book-content--reference-target-active) {
     :global(p),
     :global(.para),
     :global(.reader-paragraph),
@@ -48,9 +49,16 @@
     }
 
     :global(.book-content__hover-focus-active),
-    :global(.book-content__hover-focus-active *) {
+    :global(.book-content__hover-focus-active *),
+    :global(.book-content__reference-target-active),
+    :global(.book-content__reference-target-active *) {
       opacity: 1 !important;
     }
+  }
+
+  :global(.book-content__reference-target-active) {
+    border-radius: 0.25rem;
+    animation: book-content-reference-target-active 2.4s ease-out both;
   }
 
   :global([data-ttu-spoiler-img]) {
@@ -138,6 +146,39 @@
         text-wrap: pretty !important;
       }
     }
+  }
+}
+
+@keyframes -global-book-content-reference-target-active {
+  0% {
+    background-color: color-mix(
+      in srgb,
+      var(--book-content-reference-highlight-color) 0%,
+      transparent
+    );
+    box-shadow: 0 0 0 0
+      color-mix(in srgb, var(--book-content-reference-highlight-color) 0%, transparent);
+  }
+
+  12%,
+  58% {
+    background-color: color-mix(
+      in srgb,
+      var(--book-content-reference-highlight-color) 24%,
+      transparent
+    );
+    box-shadow: 0 0 0.75em 0.12em
+      color-mix(in srgb, var(--book-content-reference-highlight-color) 22%, transparent);
+  }
+
+  100% {
+    background-color: color-mix(
+      in srgb,
+      var(--book-content-reference-highlight-color) 0%,
+      transparent
+    );
+    box-shadow: 0 0 0.75em 0.12em
+      color-mix(in srgb, var(--book-content-reference-highlight-color) 0%, transparent);
   }
 }
 

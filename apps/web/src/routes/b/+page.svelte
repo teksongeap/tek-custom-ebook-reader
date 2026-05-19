@@ -98,6 +98,7 @@
   import AnnotationSelectionToolbar from '$lib/components/book-reader/book-annotations/annotation-selection-toolbar.svelte';
   import BookAnnotationsPanel from '$lib/components/book-reader/book-annotations/book-annotations-panel.svelte';
   import { serializeAnnotationRange } from '$lib/components/book-reader/book-annotations/annotation-range';
+  import BookSearchPanel from '$lib/components/book-reader/book-search/book-search-panel.svelte';
   import BookReaderHeader from '$lib/components/book-reader/book-reader-header.svelte';
   import {
     readerImageGalleryPictures$,
@@ -168,6 +169,10 @@
   import { getDateKey } from '$lib/functions/statistic-util';
   import { clickOutside } from '$lib/functions/use-click-outside';
   import { convertRemToPixels, isMobile$, limitToRange } from '$lib/functions/utils';
+  import {
+    readerTargetNavigation$,
+    type ReaderTargetNavigation
+  } from '$lib/functions/reader-reference-layer/navigation';
   import { onKeydownReader } from './on-keydown-reader';
   import { onDestroy, onMount, tick } from 'svelte';
   import Fa from 'svelte-fa';
@@ -203,6 +208,7 @@
   let annotationSelectionText = '';
   let annotations: BooksDbAnnotation[] = [];
   let showAnnotationsPanel = false;
+  let showSearchPanel = false;
   let activeAnnotationId = '';
   let activeAnnotationEditId = '';
   let annotationPopoverResetKey = 0;
@@ -1567,6 +1573,21 @@
     }
   }
 
+  function closeSearchPanel() {
+    showSearchPanel = false;
+
+    if ($statisticsEnabled$ && !wasTrackerPaused) {
+      isTrackerPaused$.next(false);
+    }
+  }
+
+  function jumpToSearchTarget(navigation: ReaderTargetNavigation) {
+    closeSearchPanel();
+    showHeader = false;
+    pauseTracker(true);
+    readerTargetNavigation$.next(navigation);
+  }
+
   async function bookmarkPage() {
     const bookId = getBookIdSync();
     if (!bookId || !bookmarkManager) return;
@@ -2099,6 +2120,11 @@
         pauseTracker();
         showAnnotationsPanel = true;
       }}
+      on:searchClick={() => {
+        showHeader = false;
+        pauseTracker();
+        showSearchPanel = true;
+      }}
       on:settingsClick={() => leaveReader(mergeEntries.SETTINGS.routeId, false)}
       on:domainHintClick={onDomainHintClick}
       on:bookManagerClick={() => leaveReader(mergeEntries.MANAGE.routeId)}
@@ -2235,6 +2261,24 @@
       verticalMode={$verticalMode$}
       {exploredCharCount}
       {wasTrackerPaused}
+    />
+  </div>
+{/if}
+
+{#if showSearchPanel && $bookData$}
+  <div
+    class="writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
+    style:color={$themeOption$?.fontColor}
+    style:background-color={$backgroundColor$}
+    in:fly|local={{ x: -100, duration: 100, easing: quintInOut }}
+    use:clickOutside={closeSearchPanel}
+  >
+    <BookSearchPanel
+      htmlContent={$bookData$.htmlContent}
+      fontColor={$themeOption$?.fontColor ?? ''}
+      backgroundColor={$backgroundColor$ ?? ''}
+      on:close={closeSearchPanel}
+      on:jump={({ detail }) => jumpToSearchTarget(detail)}
     />
   </div>
 {/if}
