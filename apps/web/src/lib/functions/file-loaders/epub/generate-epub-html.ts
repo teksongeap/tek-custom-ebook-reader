@@ -32,6 +32,7 @@ const controlCharactersRegex = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/gim;
 const htmlHexEntitiesRegex = /&#x([0-9A-Fa-f]+);/gim;
 const htmlDecEntitiesRegex = /&#(\d+);/gim;
 const selfClosingTagsRegex = /><\/(meta|link)>/gim;
+const tocFragmentAttributeRegex = /\s(?:id|name)\s*=\s*(["'])(.*?)\1/gim;
 const selfClosingContentTags = [
   'a',
   'body',
@@ -137,7 +138,10 @@ export default function generateEpubHtml(
     selfClosingContentTagsToFix.push('a');
   }
 
-  const parsedTocEntries = parseTocEntries(tocData, parser);
+  const parsedTocEntries = repairTocEntries(
+    parseTocEntries(tocData, parser),
+    createNormalizedTextContentByHref(data)
+  );
   const toc = buildBookTocEntries(parsedTocEntries);
 
   mainChapters = [...parsedTocEntries];
@@ -367,6 +371,70 @@ function parseTocEntries(
   const navMap = findFirstDescendantByLocalName(parsedToc, 'navMap');
 
   return navMap ? parseNcxTocEntries(navMap, tocData.sourceHref) : [];
+}
+
+function repairTocEntries(
+  entries: ParsedTocEntry[],
+  contentByHref: Map<string, string>
+) {
+  const fragmentIdsByHref = new Map<string, Set<string>>();
+
+  return entries.map((entry) => {
+    if (!entry.targetFragment || hasTocFragment(entry, contentByHref, fragmentIdsByHref)) {
+      return entry;
+    }
+
+    return {
+      ...entry,
+      reference: entry.sourceHref,
+      targetFragment: undefined
+    };
+  });
+}
+
+function createNormalizedTextContentByHref(data: Record<string, string | Blob>) {
+  const contentByHref = new Map<string, string>();
+
+  Object.entries(data).forEach(([href, content]) => {
+    if (typeof content === 'string') {
+      contentByHref.set(normalizeEpubPath(href), content);
+    }
+  });
+
+  return contentByHref;
+}
+
+function hasTocFragment(
+  entry: ParsedTocEntry,
+  contentByHref: Map<string, string>,
+  fragmentIdsByHref: Map<string, Set<string>>
+) {
+  const content = contentByHref.get(entry.sourceHref);
+
+  if (!content) {
+    return true;
+  }
+
+  let fragmentIds = fragmentIdsByHref.get(entry.sourceHref);
+
+  if (!fragmentIds) {
+    fragmentIds = collectTocFragmentIds(content);
+    fragmentIdsByHref.set(entry.sourceHref, fragmentIds);
+  }
+
+  return fragmentIds.has(entry.targetFragment || '');
+}
+
+function collectTocFragmentIds(content: string) {
+  const fragmentIds = new Set<string>();
+
+  tocFragmentAttributeRegex.lastIndex = 0;
+
+  Array.from(content.matchAll(tocFragmentAttributeRegex)).forEach((match) => {
+    fragmentIds.add(match[2]);
+  });
+
+  return fragmentIds;
 }
 
 function parseNavTocEntries(navTocElement: Element, tocSourceHref: string) {

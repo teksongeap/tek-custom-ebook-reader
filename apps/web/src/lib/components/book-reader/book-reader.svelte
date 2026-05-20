@@ -171,6 +171,12 @@
 
   let footnotePreviewTarget: ReaderTarget | undefined;
 
+  let footnotePreviewHtmlContent = '';
+
+  const footnotePreviewCache = new Map<string, string>();
+
+  const footnotePreviewCacheLimit = 80;
+
   let annotationRenderRevision = 0;
 
   const dispatch = createEventDispatcher<{
@@ -290,6 +296,12 @@
 
   $: height$.next(height);
 
+  $: if (htmlContent !== footnotePreviewHtmlContent) {
+    footnotePreviewHtmlContent = htmlContent;
+    clearFootnotePreviewCache();
+    closeFootnotePreview();
+  }
+
   function getAdjustedWidth(widthValue: number) {
     if (ViewMode.Paginated === viewMode && !verticalMode && secondDimensionMaxValue) {
       return Math.min(secondDimensionMaxValue, widthValue);
@@ -349,6 +361,33 @@
   }
 
   function getFootnotePreviewHtml(target: ReaderTarget) {
+    const cacheKey = getFootnotePreviewCacheKey(target);
+    const cachedPreviewHtml = footnotePreviewCache.get(cacheKey);
+
+    if (cachedPreviewHtml !== undefined) {
+      return cachedPreviewHtml;
+    }
+
+    const previewHtml =
+      getFootnotePreviewHtmlFromSource(contentEl, target) || getFootnotePreviewHtmlFromBook(target);
+
+    setFootnotePreviewCache(cacheKey, previewHtml);
+
+    return previewHtml;
+  }
+
+  function getFootnotePreviewHtmlFromSource(source: HTMLElement | undefined, target: ReaderTarget) {
+    if (!source) {
+      return '';
+    }
+
+    const targetElement = findReaderTargetElement(source, target);
+    const previewElement = targetElement ? getFootnotePreviewElement(targetElement) : undefined;
+
+    return previewElement ? clonePreviewHtml(previewElement) : '';
+  }
+
+  function getFootnotePreviewHtmlFromBook(target: ReaderTarget) {
     const tempContainer = document.createElement('div');
     tempContainer.innerHTML = htmlContent;
 
@@ -359,6 +398,33 @@
     tempContainer.textContent = '';
 
     return previewHtml;
+  }
+
+  function getFootnotePreviewCacheKey(target: ReaderTarget) {
+    return [
+      target.sourceHref || '',
+      target.fragment || '',
+      target.blockId || '',
+      target.sectionId || '',
+      target.textStart ?? '',
+      target.textEnd ?? ''
+    ].join('#');
+  }
+
+  function setFootnotePreviewCache(cacheKey: string, previewHtml: string) {
+    if (footnotePreviewCache.size >= footnotePreviewCacheLimit) {
+      const oldestKey = footnotePreviewCache.keys().next().value;
+
+      if (oldestKey !== undefined) {
+        footnotePreviewCache.delete(oldestKey);
+      }
+    }
+
+    footnotePreviewCache.set(cacheKey, previewHtml);
+  }
+
+  function clearFootnotePreviewCache() {
+    footnotePreviewCache.clear();
   }
 
   function getFootnotePreviewElement(element: Element) {

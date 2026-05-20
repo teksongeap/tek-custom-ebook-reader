@@ -33,21 +33,56 @@ export type TocTarget = ActiveTocItem & {
   order: number;
 };
 
-export function flattenBookTocEntries(entries: BooksDbTocEntry[], depth = 0, order = { value: 0 }) {
-  return entries.flatMap((entry): TocTarget[] => {
-    const target: TocTarget = {
+export function flattenBookTocEntries(entries: BooksDbTocEntry[]) {
+  const targets: TocTarget[] = [];
+
+  appendBookTocEntries(entries, targets);
+
+  return targets;
+}
+
+export function groupTocTargetsBySourceHref(targets: TocTarget[]) {
+  const targetsBySourceHref = new Map<string, TocTarget[]>();
+
+  targets.forEach((target) => {
+    if (!target.sourceHref) {
+      return;
+    }
+
+    let sourceTargets = targetsBySourceHref.get(target.sourceHref);
+
+    if (!sourceTargets) {
+      sourceTargets = [];
+      targetsBySourceHref.set(target.sourceHref, sourceTargets);
+    }
+
+    sourceTargets.push(target);
+  });
+
+  return targetsBySourceHref;
+}
+
+export function getTocTargetLocationKey(target: ActiveTocItem) {
+  return [target.sourceHref || '', target.targetFragment || ''].join('#');
+}
+
+function appendBookTocEntries(
+  entries: BooksDbTocEntry[],
+  targets: TocTarget[],
+  depth = 0
+) {
+  entries.forEach((entry) => {
+    targets.push({
       id: entry.id,
       label: entry.label,
       reference: entry.reference,
       sourceHref: entry.sourceHref,
       targetFragment: entry.targetFragment,
       depth,
-      order: order.value
-    };
+      order: targets.length
+    });
 
-    order.value += 1;
-
-    return [target, ...flattenBookTocEntries(entry.children || [], depth + 1, order)];
+    appendBookTocEntries(entry.children || [], targets, depth + 1);
   });
 }
 

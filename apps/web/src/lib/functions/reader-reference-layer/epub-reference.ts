@@ -45,6 +45,7 @@ export interface CreateReaderLinkReferenceOptions {
 
 const externalHrefRegex = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 const footnoteIdPattern = /(?:^|[-_:])(fn|footnote|note|endnote|en)(?:[-_:]|\d|$)/i;
+const legacyFootnoteTargetIdPattern = /(?:^|[-_:])(fn|ft|footnote|note|endnote|en)(?:[-_:]|\d|$)/i;
 const backlinkIdPattern = /(?:^|[-_:])(fnref|noteref|backlink|return)(?:[-_:]|\d|$)/i;
 const bracketedNoteMarkerPattern = /^\[\s*(?:\d{1,4}|[ivxlcdm]{1,10}|[*#]+)\s*\]$/i;
 const bareNoteMarkerPattern = /^(?:\d{1,4}|[ivxlcdm]{1,10}|[*#]+)$/i;
@@ -257,6 +258,10 @@ function classifyReaderLink(
   targetFragment: string | undefined,
   options: CreateReaderLinkReferenceOptions
 ) {
+  if (targetFragment && isLikelyFootnoteBacklink(element)) {
+    return 'backlink';
+  }
+
   if (
     hasReferenceToken(element, 'epub:type', 'noteref') ||
     hasReferenceToken(element, 'role', 'doc-noteref')
@@ -280,6 +285,10 @@ function classifyReaderLink(
     if (isEarlierSpineTarget(options)) {
       return 'backlink';
     }
+
+    if (legacyFootnoteTargetIdPattern.test(targetFragment)) {
+      return 'footnote';
+    }
   }
 
   if (targetFragment && footnoteIdPattern.test(targetFragment)) {
@@ -287,6 +296,10 @@ function classifyReaderLink(
   }
 
   return 'internal';
+}
+
+function isLikelyFootnoteBacklink(element: Element | undefined) {
+  return !!element && isLikelyNumberedNoteMarker(element) && isInsideFootnoteElement(element);
 }
 
 function hasReferenceToken(element: Element | undefined, attribute: string, token: string) {
@@ -341,6 +354,12 @@ function isInsideNavigationElement(element: Element) {
   }
 
   return false;
+}
+
+function isInsideFootnoteElement(element: Element) {
+  return !!element.closest(
+    '[role="doc-footnote"],[epub\\:type~="footnote"],[epub\\:type~="endnote"],.fnote,.footnote,.endnote'
+  );
 }
 
 function isReaderLinkKind(value: string | null): value is ReaderLinkKind {

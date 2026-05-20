@@ -1,6 +1,8 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import {
+    getTocTargetLocationKey,
+    groupTocTargetsBySourceHref,
     nextChapter$,
     setActiveTocItem,
     tocTargets$,
@@ -212,6 +214,18 @@
 
   let tocTargets: TocTarget[] = [];
 
+  let tocTargetsBySourceHref = new Map<string, TocTarget[]>();
+
+  let activeTocFrame: number | undefined;
+
+  let activeTocTargetCacheRoot: HTMLElement | undefined;
+
+  let activeTocTargetCacheSectionIndex = -1;
+
+  let activeTocTargetCache = new Map<string, ResolvedPaginatedTocTarget | undefined>();
+
+  let activeTocLayoutKey = '';
+
   const width$ = new Subject<number>();
 
   const height$ = new Subject<number>();
@@ -254,6 +268,21 @@
   $: if (height) height$.next(height);
 
   $: columnCount = verticalMode ? 1 : pageColumns || Math.ceil(width / 1000);
+
+  $: if (browser) {
+    const nextActiveTocLayoutKey = [
+      displayedSectionIndex,
+      width,
+      height,
+      columnCount,
+      verticalMode
+    ].join('|');
+
+    if (nextActiveTocLayoutKey !== activeTocLayoutKey) {
+      activeTocLayoutKey = nextActiveTocLayoutKey;
+      clearActiveTocTargetCache();
+    }
+  }
 
   $: {
     if (htmlContent) {
@@ -513,6 +542,7 @@
 
     document.body.classList.remove(cssClassOverflowHidden);
 
+    cancelActiveTocFrame();
     calculator?.destroy();
     concretePageManager?.destroy();
     pageManager = undefined;
@@ -571,6 +601,8 @@
 
   tocTargets$.pipe(takeUntil(destroy$)).subscribe((targets) => {
     tocTargets = targets;
+    tocTargetsBySourceHref = groupTocTargetsBySourceHref(targets);
+    clearActiveTocTargetCache();
     scheduleActiveTocItemUpdate();
   });
 
@@ -592,6 +624,7 @@
       takeUntil(destroy$)
     )
     .subscribe(() => {
+      clearActiveTocTargetCache();
       allowDisplay = false;
     });
 
@@ -694,6 +727,8 @@
   function setPageManager(nextPageManager: PageManagerPaginated) {
     sectionJumpToken += 1;
     sectionJumpPending = false;
+    clearActiveTocTargetCache();
+    cancelActiveTocFrame();
     concretePageManager?.destroy();
     concretePageManager = nextPageManager;
     pageManager = nextPageManager;
@@ -846,6 +881,7 @@
       document
     );
     calculator?.destroy();
+    clearActiveTocTargetCache();
     calculator = nextCalculator;
     calculatorSectionIndex = loadedSectionIndex;
     exploredCharCount = 0;
@@ -996,7 +1032,12 @@
       return;
     }
 
-    requestAnimationFrame(() => updateActiveTocItemFromPage());
+    cancelActiveTocFrame();
+
+    activeTocFrame = requestAnimationFrame(() => {
+      activeTocFrame = undefined;
+      updateActiveTocItemFromPage();
+    });
   }
 
   function updateActiveTocItemFromPage() {
@@ -1011,7 +1052,7 @@
     }
 
     const activeTarget = getActivePaginatedTocTarget(
-      tocTargets.filter((target) => target.sourceHref === sourceHref)
+      tocTargetsBySourceHref.get(sourceHref) || []
     );
 
     if (!activeTarget) {
@@ -1036,28 +1077,16 @@
     let closestUpcomingTarget: PaginatedTocTargetCandidate | undefined;
 
     sourceTargets.forEach((target) => {
-      const targetElement = findReaderTargetElement(contentEl as HTMLElement, {
-        sourceHref: target.sourceHref,
-        fragment: target.targetFragment
-      });
+      const resolvedTarget = resolvePaginatedTocTarget(target);
 
-      if (!targetElement) {
+      if (!resolvedTarget) {
         return;
       }
 
-      const targetScrollPos = getTargetElementScrollPos(
-        calculator as SectionCharacterStatsCalculator,
-        targetElement
-      );
-
-      if (targetScrollPos < 0) {
-        return;
-      }
-
-      const rect = targetElement.getBoundingClientRect();
+      const rect = resolvedTarget.element.getBoundingClientRect();
       const candidate = {
         target,
-        pageDistance: Math.abs(targetScrollPos - currentScrollPos),
+        pageDistance: Math.abs(resolvedTarget.scrollPos - currentScrollPos),
         visualDistance: getPaginatedTocVisualDistance(rect, viewportRect),
         visible: rectIntersects(rect, viewportRect),
         specificity: target.targetFragment ? 1 : 0,
@@ -1065,7 +1094,7 @@
         order: target.order
       };
 
-      if (targetScrollPos <= currentScrollPos + 1) {
+      if (resolvedTarget.scrollPos <= currentScrollPos + 1) {
         if (isBetterPaginatedTocTargetCandidate(candidate, closestReachedTarget, true)) {
           closestReachedTarget = candidate;
         }
@@ -1085,6 +1114,11 @@
     specificity: number;
     depth: number;
     order: number;
+  };
+
+  type ResolvedPaginatedTocTarget = {
+    element: Element;
+    scrollPos: number;
   };
 
   function isBetterPaginatedTocTargetCandidate(
@@ -1136,6 +1170,65 @@
       rect.top <= viewportRect.bottom &&
       (rect.width > 0 || rect.height > 0)
     );
+  }
+
+  function cancelActiveTocFrame() {
+    if (activeTocFrame === undefined) {
+      return;
+    }
+
+    cancelAnimationFrame(activeTocFrame);
+    activeTocFrame = undefined;
+  }
+
+  function resolvePaginatedTocTarget(target: TocTarget) {
+    if (!contentEl || !calculator) {
+      return undefined;
+    }
+
+    if (
+      activeTocTargetCacheRoot !== contentEl ||
+      activeTocTargetCacheSectionIndex !== displayedSectionIndex
+    ) {
+      clearActiveTocTargetCache();
+      activeTocTargetCacheRoot = contentEl;
+      activeTocTargetCacheSectionIndex = displayedSectionIndex;
+    }
+
+    const cacheKey = getTocTargetLocationKey(target);
+
+    if (activeTocTargetCache.has(cacheKey)) {
+      return activeTocTargetCache.get(cacheKey);
+    }
+
+    const targetElement = findReaderTargetElement(contentEl, {
+      sourceHref: target.sourceHref,
+      fragment: target.targetFragment
+    });
+
+    if (!targetElement) {
+      activeTocTargetCache.set(cacheKey, undefined);
+      return undefined;
+    }
+
+    const targetScrollPos = getTargetElementScrollPos(calculator, targetElement);
+    const resolvedTarget =
+      targetScrollPos < 0
+        ? undefined
+        : {
+            element: targetElement,
+            scrollPos: targetScrollPos
+          };
+
+    activeTocTargetCache.set(cacheKey, resolvedTarget);
+
+    return resolvedTarget;
+  }
+
+  function clearActiveTocTargetCache() {
+    activeTocTargetCacheRoot = undefined;
+    activeTocTargetCacheSectionIndex = -1;
+    activeTocTargetCache.clear();
   }
 
   function setDefaultBookmarkPositions(dimensionAdjustment: number) {

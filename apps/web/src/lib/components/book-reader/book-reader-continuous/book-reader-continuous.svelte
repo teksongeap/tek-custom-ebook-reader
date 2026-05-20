@@ -1,6 +1,8 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import {
+    getTocTargetLocationKey,
+    groupTocTargetsBySourceHref,
     nextChapter$,
     sectionList$,
     sectionProgress$,
@@ -196,6 +198,14 @@
 
   let tocTargets: TocTarget[] = [];
 
+  let tocTargetsBySourceHref = new Map<string, TocTarget[]>();
+
+  let activeTocFrame: number | undefined;
+
+  let activeTocTargetCacheRoot: HTMLElement | undefined;
+
+  let activeTocTargetCache = new Map<string, Element | undefined>();
+
   let scrollAdjustment = 0;
 
   let willNavigate = false;
@@ -385,6 +395,7 @@
     document.removeEventListener('ttu-action', handleAction, false);
     sectionNavigator = undefined;
     clearFontLoadingListener();
+    cancelActiveTocFrame();
     calculator?.destroy();
     contentReset$.next();
     contentReset$.complete();
@@ -399,7 +410,9 @@
 
     tocTargets$.pipe(takeUntil(destroy$)).subscribe((targets) => {
       tocTargets = targets;
-      requestAnimationFrame(() => updateActiveTocItemFromScroll());
+      tocTargetsBySourceHref = groupTocTargetsBySourceHref(targets);
+      clearActiveTocTargetCache();
+      scheduleActiveTocItemUpdate();
     });
   }
 
@@ -579,7 +592,7 @@
 
     willNavigate = false;
     sectionProgress$.next(sectionData);
-    updateActiveTocItemFromScroll(getCurrentSectionSourceHref());
+    scheduleActiveTocItemUpdate(getCurrentSectionSourceHref());
   }
 
   function getCurrentSectionSourceHref() {
@@ -595,7 +608,7 @@
     }
 
     const activeTarget = getActiveContinuousTocTarget(
-      tocTargets.filter((target) => target.sourceHref === sourceHref)
+      tocTargetsBySourceHref.get(sourceHref) || []
     );
 
     if (!activeTarget) {
@@ -621,10 +634,7 @@
     let closestUpcomingTarget: TocTargetCandidate | undefined;
 
     sourceTargets.forEach((target) => {
-      const targetElement = findReaderTargetElement(contentEl as HTMLElement, {
-        sourceHref: target.sourceHref,
-        fragment: target.targetFragment
-      });
+      const targetElement = resolveContinuousTocTargetElement(target);
 
       if (!targetElement) {
         return;
@@ -643,6 +653,7 @@
       const candidate = {
         target,
         distance: Math.abs(axisPosition - readingPoint),
+        specificity: target.targetFragment ? 1 : 0,
         depth: target.depth,
         order: target.order
       };
@@ -662,6 +673,7 @@
   type TocTargetCandidate = {
     target: TocTarget;
     distance: number;
+    specificity: number;
     depth: number;
     order: number;
   };
@@ -679,6 +691,10 @@
       return candidate.distance < current.distance;
     }
 
+    if (candidate.specificity !== current.specificity) {
+      return candidate.specificity > current.specificity;
+    }
+
     if (candidate.depth !== current.depth) {
       return candidate.depth > current.depth;
     }
@@ -688,6 +704,59 @@
 
   function isUsableTocTargetRect(rect: DOMRect) {
     return rect.width > 0 || rect.height > 0;
+  }
+
+  function scheduleActiveTocItemUpdate(sourceHref?: string) {
+    if (!browser) {
+      return;
+    }
+
+    cancelActiveTocFrame();
+
+    activeTocFrame = requestAnimationFrame(() => {
+      activeTocFrame = undefined;
+      updateActiveTocItemFromScroll(sourceHref || getCurrentSectionSourceHref());
+    });
+  }
+
+  function cancelActiveTocFrame() {
+    if (activeTocFrame === undefined) {
+      return;
+    }
+
+    cancelAnimationFrame(activeTocFrame);
+    activeTocFrame = undefined;
+  }
+
+  function resolveContinuousTocTargetElement(target: TocTarget) {
+    if (!contentEl) {
+      return undefined;
+    }
+
+    if (activeTocTargetCacheRoot !== contentEl) {
+      clearActiveTocTargetCache();
+      activeTocTargetCacheRoot = contentEl;
+    }
+
+    const cacheKey = getTocTargetLocationKey(target);
+
+    if (activeTocTargetCache.has(cacheKey)) {
+      return activeTocTargetCache.get(cacheKey);
+    }
+
+    const targetElement = findReaderTargetElement(contentEl, {
+      sourceHref: target.sourceHref,
+      fragment: target.targetFragment
+    });
+
+    activeTocTargetCache.set(cacheKey, targetElement);
+
+    return targetElement;
+  }
+
+  function clearActiveTocTargetCache() {
+    activeTocTargetCacheRoot = undefined;
+    activeTocTargetCache.clear();
   }
 
   function onWheel(ev: WheelEvent) {
@@ -778,6 +847,8 @@
     contentReset$.next();
     sectionToElement.clear();
     sectionData.clear();
+    clearActiveTocTargetCache();
+    cancelActiveTocFrame();
     scrollAdjustment = 0;
     willNavigate = false;
   }

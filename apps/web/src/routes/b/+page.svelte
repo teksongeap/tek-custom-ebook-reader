@@ -113,12 +113,12 @@
   } from '$lib/components/book-reader/book-reading-tracker/book-reading-tracker';
   import BookReadingTracker from '$lib/components/book-reader/book-reading-tracker/book-reading-tracker.svelte';
   import {
-    activeTocItem$,
     flattenBookTocEntries,
     getChapterData,
     nextChapter$,
     sectionList$,
     sectionProgress$,
+    setActiveTocItem,
     tocIsOpen$,
     tocTargets$,
     type SectionWithProgress
@@ -395,10 +395,14 @@
 
   const bookData$ = rawBookData$.pipe(
     switchMap((rawBookData) => {
-      if (!rawBookData) return EMPTY;
+      if (!rawBookData) {
+        setActiveTocItem(undefined);
+        tocTargets$.next([]);
+        return EMPTY;
+      }
 
       sectionList$.next(rawBookData.sections || []);
-      activeTocItem$.next(undefined);
+      setActiveTocItem(undefined);
       tocTargets$.next(flattenBookTocEntries(rawBookData.toc || []));
 
       return loadBookData(
