@@ -248,7 +248,7 @@
 />
 <div class={baseHeaderClasses}>
   {#if !replicationToProgress}
-    <div class="flex h-full justify-between {pxScreen}">
+    <div class="absolute inset-0 flex h-full justify-between {pxScreen}">
       {#if selectedCount === 0}
         <div
           title={selectMode ? 'Disable Book Selection' : 'Enable Book Selection'}
@@ -581,7 +581,7 @@
   {:else}
     <div
       title="Cancel Operation"
-      class="mx-auto flex h-full transform-gpu items-center justify-center px-4 md:px-8 lg:max-w-4xl xl:max-w-none 2xl:max-w-6xl"
+      class="absolute inset-0 mx-auto flex h-full transform-gpu items-center justify-center px-4 md:px-8 lg:max-w-4xl xl:max-w-none 2xl:max-w-6xl"
       in:scale={inAnimationParams}
       out:scale={outAnimationParams}
     >

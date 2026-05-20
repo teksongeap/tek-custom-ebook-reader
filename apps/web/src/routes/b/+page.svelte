@@ -100,6 +100,7 @@
   import { serializeAnnotationRange } from '$lib/components/book-reader/book-annotations/annotation-range';
   import BookSearchPanel from '$lib/components/book-reader/book-search/book-search-panel.svelte';
   import BookReaderHeader from '$lib/components/book-reader/book-reader-header.svelte';
+  import LoadingDialog from '$lib/components/loading-dialog.svelte';
   import {
     readerImageGalleryPictures$,
     toggleImageGalleryPictureSpoiler$,
@@ -815,12 +816,7 @@
       return;
     }
 
-    dialogManager.dialogs$.next([
-      {
-        component: '<div/>',
-        disableCloseOnClick: true
-      }
-    ]);
+    await openActionBackdrop('Completing book');
 
     try {
       if (diffToComplete) {
@@ -1701,7 +1697,7 @@
     if (!isSilent) {
       skipKeyDownListener$.next(true);
       logger.clearHistory();
-      openActionBackdrop();
+      await openActionBackdrop('Syncing reader data');
     }
 
     const currentHandlerStorageSource = $rawBookData$.storageSource || $syncTarget$;
@@ -1794,13 +1790,34 @@
     }
   }
 
-  function openActionBackdrop() {
+  async function openActionBackdrop(label = 'Working') {
     dialogManager.dialogs$.next([
       {
-        component: '<div/>',
+        component: LoadingDialog,
+        props: { label },
         disableCloseOnClick: true
       }
     ]);
+
+    await tick();
+    await waitForNextPaint();
+  }
+
+  function waitForNextPaint() {
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const settle = () => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        resolve();
+      };
+
+      requestAnimationFrame(settle);
+      setTimeout(settle, 80);
+    });
   }
 
   async function leaveReader(routeId: string, deleteLastItem = true) {
@@ -1839,7 +1856,7 @@
         await tick();
       }
 
-      openActionBackdrop();
+      await openActionBackdrop('Opening page');
 
       if (deleteLastItem) {
         await database.deleteLastItem();

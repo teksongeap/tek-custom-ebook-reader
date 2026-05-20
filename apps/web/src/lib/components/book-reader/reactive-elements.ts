@@ -89,7 +89,7 @@ function anchorTagListener(document: Document) {
 
           readerTargetNavigation$.next({
             target: reference.target,
-            highlight: reference.kind !== 'backlink'
+            highlight: true
           });
           return;
         }

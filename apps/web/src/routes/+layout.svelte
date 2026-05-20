@@ -1,11 +1,19 @@
 <script lang="ts">
   import { browser } from '$app/environment';
-  import { page } from '$app/stores';
+  import { navigating, page } from '$app/stores';
   import DomainHint from '$lib/components/domain-hint.svelte';
+  import LoadingDialog from '$lib/components/loading-dialog.svelte';
   import { basePath, clearConsoleOnReload } from '$lib/data/env';
   import { dialogManager, type Dialog } from '$lib/data/dialog-manager';
   import { userFontsCacheName, type UserFont } from '$lib/data/fonts';
-  import { fontFamilyGroupOne$, isOnline$, userFonts$ } from '$lib/data/store';
+  import {
+    customThemes$,
+    fontFamilyGroupOne$,
+    isOnline$,
+    theme$,
+    userFonts$
+  } from '$lib/data/store';
+  import { availableThemes, type ThemeOption } from '$lib/data/theme-option';
   import { dummyFn, isMobile, isMobile$ } from '$lib/functions/utils';
   import { MetaTags } from 'svelte-meta-tags';
   import '../app.scss';
@@ -14,10 +22,14 @@
   let dialogs: Dialog[] = [];
   let clickOnCloseDisabled = false;
   let zIndex = '';
+  let navigationRouteId: string | null | undefined;
+  let showNavigationWarmup = false;
+  let appTheme: ThemeOption | undefined;
 
   $: if (browser) {
     isMobile$.next(isMobile(window));
     addUserFonts($userFonts$);
+    applyAppTheme(appTheme);
   }
 
   if (clearConsoleOnReload && import.meta.hot) {
@@ -69,6 +81,15 @@
     }
   }
 
+  function applyAppTheme(themeOption: ThemeOption | undefined) {
+    if (!themeOption) {
+      return;
+    }
+
+    document.documentElement.style.setProperty('--font-color', themeOption.fontColor);
+    document.documentElement.style.setProperty('--background-color', themeOption.backgroundColor);
+  }
+
   function closeAllDialogs() {
     dialogManager.dialogs$.next([]);
     clickOnCloseDisabled = false;
@@ -80,6 +101,12 @@
     zIndex = d[0]?.zIndex ?? '';
     dialogs = d;
   });
+
+  $: navigationRouteId = $navigating?.to?.route?.id;
+  $: showNavigationWarmup =
+    !!navigationRouteId && ['/b', '/settings'].includes(navigationRouteId) && dialogs.length === 0;
+  $: appTheme =
+    availableThemes.get($theme$) || $customThemes$[$theme$] || availableThemes.get('light-theme');
 
   page.subscribe((p) => (path = p.url.pathname));
 </script>
@@ -103,6 +130,17 @@
 />
 
 <slot />
+
+{#if showNavigationWarmup}
+  <div class="writing-horizontal-tb fixed inset-0 z-50 h-full w-full">
+    <div class="tap-highlight-transparent absolute inset-0 bg-black/[.24]" />
+    <div
+      class="relative top-1/2 left-1/2 inline-block max-w-[80vw] -translate-x-1/2 -translate-y-1/2"
+    >
+      <LoadingDialog label="Warming up" />
+    </div>
+  </div>
+{/if}
 
 {#if dialogs.length > 0}
   <div class="writing-horizontal-tb fixed inset-0 z-50 h-full w-full" style:z-index={zIndex}>

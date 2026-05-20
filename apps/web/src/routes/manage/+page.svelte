@@ -7,6 +7,7 @@
   import BookExportDialog from '$lib/components/book-export/book-export-dialog.svelte';
   import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
   import LogReportDialog from '$lib/components/log-report-dialog.svelte';
+  import LoadingDialog from '$lib/components/loading-dialog.svelte';
   import { mergeEntries } from '$lib/components/merged-header-icon/merged-entries';
   import MessageDialog from '$lib/components/message-dialog.svelte';
   import { preFilteredTitlesForStatistics$ } from '$lib/components/statistics/statistics-types';
@@ -159,12 +160,7 @@
     }
 
     if (!selectMode) {
-      dialogManager.dialogs$.next([
-        {
-          component: '<div/>',
-          disableCloseOnClick: true
-        }
-      ]);
+      await showLoadingDialog('Opening book');
 
       let idToOpen = bookId;
 
@@ -386,10 +382,6 @@
       $keepLocalStatisticsOnDeletion$
     );
 
-    resetProgress();
-
-    await tick();
-
     if (deleted.length === currentBookCount) {
       selectMode = false;
     } else {
@@ -398,9 +390,43 @@
       });
     }
 
+    await tick();
+
+    resetProgress();
+
     if (error) {
       showError('Deletion failed', error, 'Error(s) occurred during deletion');
     }
+  }
+
+  async function showLoadingDialog(label: string) {
+    dialogManager.dialogs$.next([
+      {
+        component: LoadingDialog,
+        props: { label },
+        disableCloseOnClick: true
+      }
+    ]);
+
+    await tick();
+    await waitForNextPaint();
+  }
+
+  function waitForNextPaint() {
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const settle = () => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        resolve();
+      };
+
+      requestAnimationFrame(settle);
+      setTimeout(settle, 80);
+    });
   }
 
   async function onImportBackup(file: File) {

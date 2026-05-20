@@ -25,6 +25,47 @@
     <link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
     <meta name="theme-color" content="#37474f" />
     <link rel="mask-icon" href="%sveltekit.assets%/safari-pinned-tab.svg" color="#37474f" />
+    <script>
+      (() => {
+        try {
+          const themes = {
+            'light-theme': {
+              fontColor: 'rgba(0, 0, 0, 0.87)',
+              backgroundColor: 'rgba(255, 255, 255, 1)'
+            },
+            'ecru-theme': {
+              fontColor: 'rgba(0, 0, 0, 0.87)',
+              backgroundColor: 'rgba(247, 246, 235, 1)'
+            },
+            'water-theme': {
+              fontColor: 'rgba(0, 0, 0, 0.87)',
+              backgroundColor: 'rgba(223, 236, 244, 1)'
+            },
+            'gray-theme': {
+              fontColor: 'rgba(255, 255, 255, 0.87)',
+              backgroundColor: 'rgba(35, 39, 42, 1)'
+            },
+            'dark-theme': {
+              fontColor: 'rgba(255, 255, 255, 0.6)',
+              backgroundColor: 'rgba(18, 18, 18, 1)'
+            },
+            'black-theme': {
+              fontColor: 'rgba(255, 255, 255, 0.87)',
+              backgroundColor: 'rgba(0, 0, 0, 1)'
+            }
+          };
+          const selectedTheme = window.localStorage.getItem('theme') || 'light-theme';
+          const customThemes = JSON.parse(window.localStorage.getItem('customThemes') || '{}');
+          const theme =
+            themes[selectedTheme] || customThemes[selectedTheme] || themes['light-theme'];
+
+          document.documentElement.style.setProperty('--font-color', theme.fontColor);
+          document.documentElement.style.setProperty('--background-color', theme.backgroundColor);
+        } catch {
+          // Keep first paint usable even when storage is unavailable.
+        }
+      })();
+    </script>
     %sveltekit.head%
   </head>
   <body class="h-full w-full break-words font-sans">
