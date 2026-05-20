@@ -2,9 +2,9 @@
 
 ## とく Ebook Reader
 
-とく Ebook Reader is a customized browser ebook reader for Japanese reading, progress tracking, and dictionary lookup workflows. It is based on [TTU Reader](https://github.com/ttu-ttu/ebook-reader) and keeps compatibility with TTU-style book data and the default `ttu-reader-data` storage root.
+とく Ebook Reader is a customized browser ebook reader for multilanguage reading, progress tracking, and dictionary lookup workflows. It is based on [TTU Reader](https://github.com/ttu-ttu/ebook-reader) and keeps compatibility with TTU-style book data and the default `ttu-reader-data` storage root.
 
-The app runs fully in the browser, can be installed as a PWA, and is designed to work well with extensions such as Yomitan, DeepL, and Read Aloud. Now with reader reference layer. Enjoy, king.
+The app runs fully in the browser (can be used offline), can be installed as a PWA, and is designed to work well with extensions such as Yomitan, DeepL, and Read Aloud. Now with reader reference layer, so that you have functioning search and a Table of Contents that fully respects the hierarchy of the EPUB's original table of contents, so this isn't just some fancy light novel slop funnel. Enjoy, king.
 
 ## Features
 
@@ -16,6 +16,8 @@ The app runs fully in the browser, can be installed as a PWA, and is designed to
 - Tune Japanese-learning behavior with furigana hiding modes, spoiler image blur, hover focus, custom reading points, selection-to-bookmark, avoid-page-break pagination, and a character counter.
 - Highlight selected text with color-coded annotations, optional comments, an annotation list, jump-to-highlight, edit, delete, and export/sync support.
 - Track reading time, characters read, speed, completion, session history, freeze positions, idle rollback, skip thresholds, dictionary popup detection, reading goals, and completion behavior.
+- Search for text within the book
+- Footnotes are fully navigable and even provide a preview popup so you don't have to jump to the actual note (depends on book however, some books are just made special)
 - Review statistics with date ranges, title filters, overview charts, summaries, heatmaps, aggregation modes, copy/export actions, and selective deletion.
 - Manage a local library with covers, progress, sorting, selection, deletion, import/export, external placeholders, and bug-report logs.
 - Import, export, and sync book data, bookmarks, annotations, statistics, reading goals, audiobook progress, and subtitles.
@@ -29,7 +31,7 @@ Open the app and import books from the manager by selecting files, selecting a f
 
 Reader controls are available from the reader header and footer. The header includes table of contents, bookmarks, completion, statistics, image gallery, settings, and library actions. The footer shows tracker state, sync state, and reading progress.
 
-For EPUBs with malformed HTML, enable `Settings -> Data -> Epub Import Fixes` and reimport the book. Plain text imports use the file name as the title, split paragraphs around Japanese punctuation, and split sections around 10,000 characters.
+For EPUBs with malformed HTML, enable `Settings -> Data -> Epub Import Fixes` and reimport the book (use this if all the text looks clickable for some reason). Plain text imports use the file name as the title, split paragraphs around Japanese punctuation, and split sections around 10,000 characters.
 
 Most reading data is local-first. Export or configure sync if you want a backup or want to move between devices.
 
