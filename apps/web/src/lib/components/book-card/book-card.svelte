@@ -68,14 +68,17 @@
 <div
   tabindex="0"
   role="button"
-  class="aspect-w-2 aspect-h-3 group relative outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--app-accent-soft)]"
+  class="book-card-button aspect-w-2 aspect-h-3 group relative outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--app-accent-soft)]"
   on:click
   on:keyup
 >
-  <div class="inline">
-    <div class="h-full w-full text-5xl sm:text-7xl">
+  <div class="book-card-media">
+    <div class="book-card-cover-placeholder h-full w-full text-5xl sm:text-7xl">
       {#if !imageLoadComplete}
-        <Fa class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" icon={faImage} />
+        <Fa
+          class="book-card-placeholder-icon absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+          icon={faImage}
+        />
       {/if}
 
       {#if imagePath}
@@ -83,8 +86,8 @@
           decoding="async"
           loading="lazy"
           referrerpolicy="no-referrer"
-          class="book-cover relative h-full w-full object-cover transition delay-150 duration-700 ease-out group-hover:scale-[1.015]"
-          class:blur={!imageLoadComplete}
+          class="book-cover book-card-cover relative h-full w-full object-cover transition delay-150 duration-700 ease-out group-hover:scale-[1.018]"
+          class:book-card-cover--loading={!imageLoadComplete}
           src={mapImagePath(imagePath)}
           {alt}
           bind:this={imgEl}
@@ -95,12 +98,12 @@
 
     <div class="absolute inset-x-0 bottom-0">
       <div
-        class="book-card-title-scrim sm:h-21 h-16 p-0.5 px-1.5 text-justify text-sm text-white sm:p-1.5 sm:text-base"
+        class="book-card-title-scrim sm:h-21 h-16 p-0.5 px-1.5 text-sm text-white sm:p-1.5 sm:text-base"
       >
-        <span class="line-clamp-3">{title}</span>
+        <span class="book-card-title line-clamp-3">{title}</span>
       </div>
-      <div class="book-progress-track h-2">
-        <div class="book-progress-fill h-full rounded-r-full" style:width="{progress * 100}%" />
+      <div class="book-progress-track h-2" aria-hidden="true">
+        <div class="book-progress-fill h-full" style:width="{progress * 100}%" />
       </div>
     </div>
   </div>
