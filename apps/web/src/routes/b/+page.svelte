@@ -1409,7 +1409,7 @@
     activeAnnotationId = annotation.id;
     activeAnnotationEditId = annotation.id;
     hideAnnotationComposer();
-    clearRange(window, 0);
+    clearRange(window, 0, false);
   }
 
   function createAnnotationId() {

@@ -68,8 +68,12 @@ export function getNodeBoundingRect(document: Document, node: Node) {
   return range.getBoundingClientRect();
 }
 
-export function clearRange(window: Window, timeout = 250) {
+export function clearRange(window: Window, timeout = 250, restoreEmptyRange = true) {
   window.getSelection()?.removeAllRanges();
+
+  if (!restoreEmptyRange) {
+    return;
+  }
 
   setTimeout(() => {
     window.getSelection()?.addRange(new Range());
