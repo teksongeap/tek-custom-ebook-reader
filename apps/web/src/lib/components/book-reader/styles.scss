@@ -4,6 +4,8 @@
   --book-content-reference-highlight-color: #f5c84b;
   --book-content-selection-color: var(--font-color);
   --book-content-selection-background-color: var(--app-accent-soft);
+  --book-content-hover-focus-enter-duration: 140ms;
+  --book-content-hover-focus-exit-duration: 300ms;
 }
 
 .book-content {
@@ -38,6 +40,14 @@
     user-select: none;
   }
 
+  :global(p),
+  :global(.para),
+  :global(.reader-paragraph),
+  :global(li),
+  :global(blockquote) {
+    transition: opacity var(--book-content-hover-focus-exit-duration) ease;
+  }
+
   &.book-content--hover-focus-dim:not(.book-content--reference-target-active) {
     :global(p),
     :global(.para),
@@ -45,7 +55,7 @@
     :global(li),
     :global(blockquote) {
       opacity: var(--book-content-hover-focus-dim-opacity, 0.15);
-      transition: opacity 180ms ease;
+      transition-duration: var(--book-content-hover-focus-enter-duration);
     }
 
     :global(.book-content__hover-focus-active),
