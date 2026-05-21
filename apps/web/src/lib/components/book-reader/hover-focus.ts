@@ -6,15 +6,38 @@
 
 const hoverFocusBlockSelector = 'p, .para, .reader-paragraph, li, blockquote, dd, dt';
 const hoverFocusFallbackBlockSelector = 'div, section, article';
+const hoverFocusActivateDelay = 120;
+const hoverFocusDeactivateDelay = 240;
 const hoverFocusPopupSelector =
-  '.yomichan-popup, .yomichan-float, .yomitan-popup, .yomitan-float, [data-yomichan-popup], [data-yomitan-popup]';
+  '.yomichan-popup, .yomichan-float, .yomitan-popup, .yomitan-float, [data-yomichan-popup], [data-yomitan-popup], .annotation-toolbar, [data-ttu-annotation-card], .app-popover-panel, .app-dialog, .app-loading-dialog, [role="dialog"]';
 
 export function hoverFocus(node: HTMLElement, enabled: boolean) {
   let currentEnabled = enabled;
   let activeContentEl: HTMLElement | undefined;
   let activeBlock: Element | undefined;
-  let lastBlock: Element | undefined;
-  let timer = 0;
+  let activateTimer = 0;
+  let deactivateTimer = 0;
+  let lastPointerClientX = Number.NaN;
+  let lastPointerClientY = Number.NaN;
+
+  const rememberPointerPosition = (event: PointerEvent) => {
+    lastPointerClientX = event.clientX;
+    lastPointerClientY = event.clientY;
+  };
+
+  const getElementsAtLastPointerPosition = () => {
+    if (!Number.isFinite(lastPointerClientX) || !Number.isFinite(lastPointerClientY)) {
+      return [];
+    }
+
+    return document.elementsFromPoint(lastPointerClientX, lastPointerClientY);
+  };
+
+  const isPointerOverIsolatedPopupHost = () =>
+    getElementsAtLastPointerPosition().some(isLikelyIsolatedPopupHost);
+
+  const hasBlockingPopup = () =>
+    hasVisibleHoverFocusPopup() || isPointerOverIsolatedPopupHost();
 
   const activate = (contentEl: HTMLElement, block: Element | undefined) => {
     if (activeContentEl === contentEl && activeBlock === block) {
@@ -31,9 +54,19 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
     activeContentEl?.classList.add('book-content--hover-focus-dim');
   };
 
+  const clearActivateTimer = () => {
+    window.clearTimeout(activateTimer);
+    activateTimer = 0;
+  };
+
+  const clearDeactivateTimer = () => {
+    window.clearTimeout(deactivateTimer);
+    deactivateTimer = 0;
+  };
+
   const clear = () => {
-    window.clearTimeout(timer);
-    lastBlock = undefined;
+    clearActivateTimer();
+    clearDeactivateTimer();
 
     const contentEl = activeContentEl || getBookContentEl(node);
 
@@ -43,53 +76,100 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
   };
 
   const scheduleActivate = (contentEl: HTMLElement, block: Element) => {
-    window.clearTimeout(timer);
-    timer = window.setTimeout(() => {
-      if (!currentEnabled || !contentEl.isConnected || hasVisibleHoverFocusPopup()) {
+    clearActivateTimer();
+    activateTimer = window.setTimeout(() => {
+      activateTimer = 0;
+
+      if (!currentEnabled || !contentEl.isConnected || hasBlockingPopup()) {
         return;
       }
 
       activate(contentEl, block);
-    }, 120);
+    }, hoverFocusActivateDelay);
+  };
+
+  const scheduleDeactivate = () => {
+    clearActivateTimer();
+    clearDeactivateTimer();
+
+    deactivateTimer = window.setTimeout(() => {
+      deactivateTimer = 0;
+
+      if (!currentEnabled || !node.isConnected) {
+        clear();
+        return;
+      }
+
+      // Popups often live outside the reader, so preserve the last active paragraph
+      // until the popup is gone.
+      if (hasBlockingPopup()) {
+        scheduleDeactivate();
+        return;
+      }
+
+      clear();
+    }, hoverFocusDeactivateDelay);
   };
 
   const onPointerOver = (event: PointerEvent) => {
-    if (!currentEnabled || event.pointerType === 'touch' || hasVisibleHoverFocusPopup()) {
+    if (!currentEnabled || event.pointerType === 'touch') {
       return;
     }
 
+    rememberPointerPosition(event);
+
     const target = event.target;
 
-    if (!(target instanceof Element) || isInHoverFocusPopup(target)) {
+    if (!(target instanceof Element) || isHoverFocusPopupTarget(target)) {
+      return;
+    }
+
+    clearDeactivateTimer();
+
+    if (hasBlockingPopup()) {
       return;
     }
 
     const contentEl = getBookContentEl(target);
     const block = contentEl ? getHoverFocusBlock(contentEl, target) : undefined;
 
-    if (!contentEl || !block || block === lastBlock) {
+    if (!contentEl || !block || block === activeBlock) {
       return;
     }
 
-    lastBlock = block;
     scheduleActivate(contentEl, block);
   };
 
   const onPointerLeave = (event: PointerEvent) => {
-    if (
-      event.relatedTarget instanceof Element &&
-      (node.contains(event.relatedTarget) || isInHoverFocusPopup(event.relatedTarget))
-    ) {
+    rememberPointerPosition(event);
+
+    if (event.relatedTarget instanceof Element && node.contains(event.relatedTarget)) {
       return;
     }
 
-    if (!hasVisibleHoverFocusPopup()) {
-      clear();
+    scheduleDeactivate();
+  };
+
+  const onDocumentPointerOver = (event: PointerEvent) => {
+    if (!currentEnabled || event.pointerType === 'touch' || !activeBlock) {
+      return;
     }
+
+    rememberPointerPosition(event);
+
+    const target = event.target;
+
+    if (target instanceof Element && node.contains(target)) {
+      clearDeactivateTimer();
+      return;
+    }
+
+    scheduleDeactivate();
   };
 
   node.addEventListener('pointerover', onPointerOver, { capture: true, passive: true });
   node.addEventListener('pointerleave', onPointerLeave, { passive: true });
+  document.addEventListener('pointerover', onDocumentPointerOver, { capture: true, passive: true });
 
   return {
     update(nextEnabled: boolean) {
@@ -102,6 +182,7 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
     destroy() {
       node.removeEventListener('pointerover', onPointerOver, { capture: true });
       node.removeEventListener('pointerleave', onPointerLeave);
+      document.removeEventListener('pointerover', onDocumentPointerOver, { capture: true });
       clear();
     }
   };
@@ -148,8 +229,22 @@ function hasVisibleHoverFocusPopup() {
   );
 }
 
-function isInHoverFocusPopup(target: Element) {
-  return !!target.closest(hoverFocusPopupSelector);
+function isHoverFocusPopupTarget(target: Element) {
+  return !!target.closest(hoverFocusPopupSelector) || isLikelyIsolatedPopupHost(target);
+}
+
+function isLikelyIsolatedPopupHost(target: Element) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  // Modern Yomitan hosts the popup iframe inside a closed shadow root on an
+  // anonymous div, so the page can only see the retargeted host element.
+  return (
+    target.localName === 'div' &&
+    target.style.getPropertyValue('all') === 'initial' &&
+    target.style.getPropertyPriority('all') === 'important'
+  );
 }
 
 function isVisibleHoverFocusPopup(popup: HTMLElement) {

@@ -509,6 +509,20 @@
   function handleDraftCommentKeydown(event: KeyboardEvent) {
     event.stopPropagation();
 
+    if (
+      event.key === 'Delete' &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      !event.isComposing &&
+      !draftComment.trim()
+    ) {
+      event.preventDefault();
+      deleteActiveAnnotation();
+      return;
+    }
+
     if (event.key !== 'Enter' || event.shiftKey || event.isComposing) {
       return;
     }

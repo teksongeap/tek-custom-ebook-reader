@@ -45,7 +45,7 @@
     :global(li),
     :global(blockquote) {
       opacity: var(--book-content-hover-focus-dim-opacity, 0.15);
-      transition: opacity 120ms ease;
+      transition: opacity 180ms ease;
     }
 
     :global(.book-content__hover-focus-active),
