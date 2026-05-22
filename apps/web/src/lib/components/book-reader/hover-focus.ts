@@ -36,8 +36,7 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
   const isPointerOverIsolatedPopupHost = () =>
     getElementsAtLastPointerPosition().some(isLikelyIsolatedPopupHost);
 
-  const hasBlockingPopup = () =>
-    hasVisibleHoverFocusPopup() || isPointerOverIsolatedPopupHost();
+  const hasBlockingPopup = () => hasVisibleHoverFocusPopup() || isPointerOverIsolatedPopupHost();
 
   const activate = (contentEl: HTMLElement, block: Element | undefined) => {
     if (activeContentEl === contentEl && activeBlock === block) {
@@ -75,6 +74,24 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
     }
   };
 
+  const schedulePointerActivate = () => {
+    clearActivateTimer();
+    activateTimer = window.setTimeout(() => {
+      activateTimer = 0;
+
+      if (!currentEnabled || !node.isConnected) {
+        return;
+      }
+
+      if (hasBlockingPopup()) {
+        schedulePointerActivate();
+        return;
+      }
+
+      activateAtLastPointerPosition();
+    }, hoverFocusActivateDelay);
+  };
+
   const scheduleActivate = (contentEl: HTMLElement, block: Element) => {
     clearActivateTimer();
     activateTimer = window.setTimeout(() => {
@@ -107,6 +124,10 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
         return;
       }
 
+      if (activateAtLastPointerPosition()) {
+        return;
+      }
+
       clear();
     }, hoverFocusDeactivateDelay);
   };
@@ -127,6 +148,7 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
     clearDeactivateTimer();
 
     if (hasBlockingPopup()) {
+      schedulePointerActivate();
       return;
     }
 
@@ -186,6 +208,26 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
       clear();
     }
   };
+
+  function activateAtLastPointerPosition() {
+    const target = getElementsAtLastPointerPosition().find(
+      (element) => node.contains(element) && getBookContentEl(element)
+    );
+    const contentEl = target ? getBookContentEl(target) : undefined;
+    const block = contentEl && target ? getHoverFocusBlock(contentEl, target) : undefined;
+
+    if (!contentEl || !block) {
+      return false;
+    }
+
+    clearDeactivateTimer();
+
+    if (block !== activeBlock) {
+      scheduleActivate(contentEl, block);
+    }
+
+    return true;
+  }
 }
 
 function getBookContentEl(target: Element) {

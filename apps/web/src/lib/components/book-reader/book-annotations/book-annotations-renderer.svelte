@@ -531,6 +531,49 @@
     void saveActiveAnnotation(true);
   }
 
+  function handleAnnotationCardKeydown(event: KeyboardEvent) {
+    if (!activeAnnotation || event.defaultPrevented || event.repeat || event.isComposing) {
+      return;
+    }
+
+    if (isArrowKey(event)) {
+      if (isEditing) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      closeAnnotationCard();
+      return;
+    }
+
+    if (
+      isEditing ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      isEditableEventTarget(event.target)
+    ) {
+      return;
+    }
+
+    const key = event.key.toLowerCase();
+
+    if (key === 'e') {
+      event.preventDefault();
+      event.stopPropagation();
+      void editActiveAnnotation();
+      return;
+    }
+
+    if (key === 's' && (commentCanExpand || isCommentExpanded)) {
+      event.preventDefault();
+      event.stopPropagation();
+      void toggleCommentExpanded();
+    }
+  }
+
   function deleteActiveAnnotation() {
     if (!activeAnnotation) {
       return;
@@ -627,7 +670,27 @@
       editingPopoverWidth = nextWidth;
     }
   }
+
+  function isEditableEventTarget(target: EventTarget | null) {
+    return (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLElement && target.isContentEditable)
+    );
+  }
+
+  function isArrowKey(event: KeyboardEvent) {
+    return (
+      event.key === 'ArrowLeft' ||
+      event.key === 'ArrowRight' ||
+      event.key === 'ArrowUp' ||
+      event.key === 'ArrowDown'
+    );
+  }
 </script>
+
+<svelte:document on:keydown={handleAnnotationCardKeydown} />
 
 {#if activeAnnotation}
   <div
@@ -661,6 +724,7 @@
             class="book-annotation-card-action book-annotation-card-action--labeled"
             title="Edit annotation"
             aria-label="Edit annotation"
+            aria-keyshortcuts="E"
             on:click|stopPropagation={editActiveAnnotation}
           >
             <span>Edit</span>
@@ -707,7 +771,7 @@
               class="book-annotation-card-editor-action book-annotation-card-editor-action--primary"
               title="Save annotation"
               aria-label="Save annotation"
-              on:click|stopPropagation={() => saveActiveAnnotation()}
+              on:click|stopPropagation={() => saveActiveAnnotation(true)}
             >
               <span>Save</span>
               <Fa icon={faCheck} />
@@ -729,6 +793,7 @@
           type="button"
           class="book-annotation-card-expand"
           aria-expanded={isCommentExpanded}
+          aria-keyshortcuts="S"
           on:click|stopPropagation={toggleCommentExpanded}
         >
           <span class="book-annotation-card-expand-label">
