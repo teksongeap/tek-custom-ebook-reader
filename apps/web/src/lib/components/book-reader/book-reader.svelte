@@ -23,6 +23,7 @@
   } from '$lib/data/database/books-db/versions/books-db';
   import type { FuriganaStyle } from '$lib/data/furigana-style';
   import type { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
+  import { BookReaderAvailableKeybind } from '$lib/data/book-reader-keybind';
   import { ViewMode } from '$lib/data/view-mode';
   import { iffBrowser } from '$lib/functions/rxjs/iff-browser';
   import { reduceToEmptyString } from '$lib/functions/rxjs/reduce-to-empty-string';
@@ -40,7 +41,12 @@
   import type { AutoScroller, BookmarkManager, PageManager, SectionNavigator } from './types';
   import BookReaderPaginated from './book-reader-paginated/book-reader-paginated.svelte';
   import { hoverFocus } from './hover-focus';
-  import { enableReaderWakeLock$, enableTapEdgeToFlip$, hoverFocusEnabled$ } from '$lib/data/store';
+  import {
+    bookReaderKeybindMap$,
+    enableReaderWakeLock$,
+    enableTapEdgeToFlip$,
+    hoverFocusEnabled$
+  } from '$lib/data/store';
   import { createEventDispatcher, onDestroy } from 'svelte';
   import BookAnnotationsRenderer from './book-annotations/book-annotations-renderer.svelte';
   import { faArrowUpRightFromSquare, faXmark } from '@fortawesome/free-solid-svg-icons';
@@ -474,8 +480,39 @@
   }
 
   function handleFootnoteKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape' && footnotePreviewHtml) {
+    if (!footnotePreviewHtml) {
+      return;
+    }
+
+    if (event.key === 'Escape') {
       event.preventDefault();
+      closeFootnotePreview();
+      return;
+    }
+
+    if (
+      event.repeat ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      isEditableEventTarget(event.target) ||
+      !isFootnoteNavigationKey(event)
+    ) {
+      return;
+    }
+
+    closeFootnotePreview();
+  }
+
+  function handleFootnoteNavigationWheel() {
+    if (footnotePreviewHtml) {
+      closeFootnotePreview();
+    }
+  }
+
+  function handleFootnoteNavigationScroll() {
+    if (footnotePreviewHtml) {
       closeFootnotePreview();
     }
   }
@@ -486,6 +523,28 @@
       target instanceof HTMLTextAreaElement ||
       target instanceof HTMLSelectElement ||
       (target instanceof HTMLElement && target.isContentEditable)
+    );
+  }
+
+  function isFootnoteNavigationKey(event: KeyboardEvent) {
+    const readerKeybind = $bookReaderKeybindMap$[event.code || event.key?.toLowerCase()];
+
+    return (
+      readerKeybind === BookReaderAvailableKeybind.JUMP_TO_BOOKMARK ||
+      readerKeybind === BookReaderAvailableKeybind.NEXT_CHAPTER ||
+      readerKeybind === BookReaderAvailableKeybind.NEXT_PAGE ||
+      readerKeybind === BookReaderAvailableKeybind.PREV_CHAPTER ||
+      readerKeybind === BookReaderAvailableKeybind.PREV_PAGE ||
+      event.code === 'ArrowLeft' ||
+      event.code === 'ArrowRight' ||
+      event.code === 'ArrowUp' ||
+      event.code === 'ArrowDown' ||
+      event.code === 'PageUp' ||
+      event.code === 'PageDown' ||
+      event.code === 'Home' ||
+      event.code === 'End' ||
+      event.code === 'KeyA' ||
+      event.code === 'KeyD'
     );
   }
 
@@ -753,7 +812,12 @@
 {$reactiveElements$ ?? ''}
 {$hoverFocusKeybind$ ?? ''}
 {$footnoteRequest$ ?? ''}
-<svelte:document bind:visibilityState on:keydown={handleFootnoteKeydown} />
+<svelte:document
+  bind:visibilityState
+  on:keydown={handleFootnoteKeydown}
+  on:wheel={handleFootnoteNavigationWheel}
+/>
+<svelte:window on:scroll={handleFootnoteNavigationScroll} />
 
 <style lang="scss">
   .book-footnote-preview-root {
