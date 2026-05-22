@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { BookReaderAvailableKeybind } from '$lib/data/book-reader-keybind';
   import type { BooksDbAnnotation } from '$lib/data/database/books-db/versions/books-db';
+  import { bookReaderKeybindMap$ } from '$lib/data/store';
   import { createEventDispatcher, onDestroy, tick } from 'svelte';
   import Fa from 'svelte-fa';
   import {
@@ -536,7 +538,7 @@
       return;
     }
 
-    if (isArrowKey(event)) {
+    if (isAnnotationNavigationKey(event)) {
       if (isEditing) {
         event.preventDefault();
         event.stopPropagation();
@@ -571,6 +573,18 @@
       event.preventDefault();
       event.stopPropagation();
       void toggleCommentExpanded();
+    }
+  }
+
+  function handleAnnotationCardNavigationWheel() {
+    if (activeAnnotation && !isEditing) {
+      closeAnnotationCard();
+    }
+  }
+
+  function handleAnnotationCardNavigationScroll() {
+    if (activeAnnotation && !isEditing) {
+      closeAnnotationCard();
     }
   }
 
@@ -680,17 +694,34 @@
     );
   }
 
-  function isArrowKey(event: KeyboardEvent) {
+  function isAnnotationNavigationKey(event: KeyboardEvent) {
+    const readerKeybind = $bookReaderKeybindMap$[event.code || event.key?.toLowerCase()];
+
     return (
-      event.key === 'ArrowLeft' ||
-      event.key === 'ArrowRight' ||
-      event.key === 'ArrowUp' ||
-      event.key === 'ArrowDown'
+      readerKeybind === BookReaderAvailableKeybind.JUMP_TO_BOOKMARK ||
+      readerKeybind === BookReaderAvailableKeybind.NEXT_CHAPTER ||
+      readerKeybind === BookReaderAvailableKeybind.NEXT_PAGE ||
+      readerKeybind === BookReaderAvailableKeybind.PREV_CHAPTER ||
+      readerKeybind === BookReaderAvailableKeybind.PREV_PAGE ||
+      event.code === 'ArrowLeft' ||
+      event.code === 'ArrowRight' ||
+      event.code === 'ArrowUp' ||
+      event.code === 'ArrowDown' ||
+      event.code === 'PageUp' ||
+      event.code === 'PageDown' ||
+      event.code === 'Home' ||
+      event.code === 'End' ||
+      event.code === 'KeyA' ||
+      event.code === 'KeyD'
     );
   }
 </script>
 
-<svelte:document on:keydown={handleAnnotationCardKeydown} />
+<svelte:document
+  on:keydown={handleAnnotationCardKeydown}
+  on:wheel={handleAnnotationCardNavigationWheel}
+/>
+<svelte:window on:scroll={handleAnnotationCardNavigationScroll} />
 
 {#if activeAnnotation}
   <div
