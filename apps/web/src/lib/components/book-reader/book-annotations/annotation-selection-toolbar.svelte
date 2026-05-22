@@ -155,18 +155,18 @@
   .annotation-toolbar {
     width: max-content;
     max-width: calc(100vw - 1.5rem);
-    border: 1px solid color-mix(in srgb, var(--reader-page-text) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--reader-page-text) 26%, var(--reader-page-bg));
     border-radius: 0.65rem;
     background:
       linear-gradient(
-        145deg,
-        color-mix(in srgb, var(--reader-page-bg) 94%, transparent),
-        color-mix(in srgb, var(--reader-page-bg) 78%, var(--reader-page-text))
+        180deg,
+        color-mix(in srgb, var(--reader-page-bg) 91%, var(--reader-page-text)),
+        color-mix(in srgb, var(--reader-page-bg) 97%, var(--reader-page-text))
       ),
       var(--reader-page-bg);
     box-shadow:
-      0 22px 58px rgba(5, 7, 10, 0.3),
-      inset 0 1px 0 color-mix(in srgb, #ffffff 16%, transparent);
+      0 18px 42px rgba(5, 7, 10, 0.32),
+      inset 0 1px 0 color-mix(in srgb, #ffffff 12%, transparent);
     color: var(--reader-page-text);
     padding: 0.42rem;
     backdrop-filter: blur(20px) saturate(140%);
@@ -216,22 +216,44 @@
   .annotation-toolbar-swatch {
     --book-annotation-base: #f5c84b;
     position: relative;
-    height: 1.55rem;
-    width: 1.55rem;
+    height: 1.5rem;
+    width: 1.5rem;
+    flex: 0 0 auto;
     cursor: pointer;
+    overflow: hidden;
+    padding: 0;
     border: 1px solid color-mix(in srgb, var(--reader-page-text) 18%, transparent);
     border-radius: 999px;
+    appearance: none;
     background: var(--book-annotation-base);
-    box-shadow: 0 8px 18px color-mix(in srgb, var(--book-annotation-base) 20%, transparent);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, #ffffff 10%, transparent),
+      0 8px 18px color-mix(in srgb, var(--book-annotation-base) 20%, transparent);
     outline: none;
     transition:
       box-shadow 140ms ease,
       transform 140ms ease;
   }
 
+  .annotation-toolbar-swatch::before {
+    position: absolute;
+    inset: 1px;
+    border-radius: inherit;
+    background: linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.34),
+      rgba(255, 255, 255, 0.08) 42%,
+      transparent 56%,
+      rgba(0, 0, 0, 0.18)
+    );
+    content: '';
+    pointer-events: none;
+  }
+
   .annotation-toolbar-swatch:hover,
   .annotation-toolbar-swatch:focus-visible {
     box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, #ffffff 16%, transparent),
       0 0 0 2px color-mix(in srgb, var(--reader-page-bg) 82%, transparent),
       0 0 0 4px var(--book-annotation-base),
       0 12px 24px color-mix(in srgb, var(--book-annotation-base) 24%, transparent);
@@ -253,6 +275,7 @@
     font-weight: 900;
     line-height: 1;
     pointer-events: none;
+    z-index: 1;
     text-shadow:
       0 1px 0 rgba(255, 255, 255, 0.54),
       0 -1px 0 rgba(255, 255, 255, 0.28);
