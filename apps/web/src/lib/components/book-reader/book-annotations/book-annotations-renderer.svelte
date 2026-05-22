@@ -331,7 +331,7 @@
   }
 
   function scheduleClose() {
-    if (isPinned || editingAnnotationId) {
+    if ((isPinned && !isCommentExpanded) || editingAnnotationId) {
       return;
     }
 
