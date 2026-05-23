@@ -36,7 +36,14 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
   const isPointerOverIsolatedPopupHost = () =>
     getElementsAtLastPointerPosition().some(isLikelyIsolatedPopupHost);
 
+  const isPointerOverHoverFocusPopup = () =>
+    getElementsAtLastPointerPosition().some(isHoverFocusPopupTarget);
+
   const hasBlockingPopup = () => hasVisibleHoverFocusPopup() || isPointerOverIsolatedPopupHost();
+
+  const shouldDeferActivationForPopup = () =>
+    isPointerOverHoverFocusPopup() ||
+    (hasVisibleHoverFocusPopup() && !getHoverFocusTargetAtLastPointerPosition());
 
   const activate = (contentEl: HTMLElement, block: Element | undefined) => {
     if (activeContentEl === contentEl && activeBlock === block) {
@@ -83,7 +90,7 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
         return;
       }
 
-      if (hasBlockingPopup()) {
+      if (shouldDeferActivationForPopup()) {
         schedulePointerActivate();
         return;
       }
@@ -97,7 +104,12 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
     activateTimer = window.setTimeout(() => {
       activateTimer = 0;
 
-      if (!currentEnabled || !contentEl.isConnected || hasBlockingPopup()) {
+      if (!currentEnabled || !contentEl.isConnected) {
+        return;
+      }
+
+      if (shouldDeferActivationForPopup()) {
+        schedulePointerActivate();
         return;
       }
 
@@ -147,7 +159,7 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
 
     clearDeactivateTimer();
 
-    if (hasBlockingPopup()) {
+    if (shouldDeferActivationForPopup()) {
       schedulePointerActivate();
       return;
     }
@@ -173,11 +185,15 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
   };
 
   const onDocumentPointerOver = (event: PointerEvent) => {
-    if (!currentEnabled || event.pointerType === 'touch' || !activeBlock) {
+    if (!currentEnabled || event.pointerType === 'touch') {
       return;
     }
 
     rememberPointerPosition(event);
+
+    if (!activeBlock) {
+      return;
+    }
 
     const target = event.target;
 
@@ -210,23 +226,30 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
   };
 
   function activateAtLastPointerPosition() {
-    const target = getElementsAtLastPointerPosition().find(
-      (element) => node.contains(element) && getBookContentEl(element)
-    );
-    const contentEl = target ? getBookContentEl(target) : undefined;
-    const block = contentEl && target ? getHoverFocusBlock(contentEl, target) : undefined;
+    const target = getHoverFocusTargetAtLastPointerPosition();
 
-    if (!contentEl || !block) {
+    if (!target) {
       return false;
     }
 
     clearDeactivateTimer();
 
-    if (block !== activeBlock) {
-      scheduleActivate(contentEl, block);
+    if (target.block !== activeBlock) {
+      scheduleActivate(target.contentEl, target.block);
     }
 
     return true;
+  }
+
+  function getHoverFocusTargetAtLastPointerPosition() {
+    const element = getElementsAtLastPointerPosition().find(
+      (element) =>
+        !isHoverFocusPopupTarget(element) && node.contains(element) && getBookContentEl(element)
+    );
+    const contentEl = element ? getBookContentEl(element) : undefined;
+    const block = contentEl && element ? getHoverFocusBlock(contentEl, element) : undefined;
+
+    return contentEl && block ? { contentEl, block } : undefined;
   }
 }
 
