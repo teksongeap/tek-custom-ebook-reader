@@ -26,6 +26,8 @@
   let showNavigationWarmup = false;
   let appTheme: ThemeOption | undefined;
 
+  const navigationWarmupRoutes = new Set(['/b', '/manage', '/settings', '/statistics']);
+
   $: if (browser) {
     isMobile$.next(isMobile(window));
     addUserFonts($userFonts$);
@@ -104,7 +106,7 @@
 
   $: navigationRouteId = $navigating?.to?.route?.id;
   $: showNavigationWarmup =
-    !!navigationRouteId && ['/b', '/settings'].includes(navigationRouteId) && dialogs.length === 0;
+    !!navigationRouteId && navigationWarmupRoutes.has(navigationRouteId) && dialogs.length === 0;
   $: appTheme =
     availableThemes.get($theme$) || $customThemes$[$theme$] || availableThemes.get('light-theme');
 
