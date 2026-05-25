@@ -864,11 +864,10 @@
   :global(.book-annotation-highlight:focus-visible) {
     background: linear-gradient(
       to top,
-      color-mix(in srgb, var(--book-annotation-base) 64%, transparent) 0 72%,
-      color-mix(in srgb, var(--book-annotation-base) 16%, transparent) 72%
+      color-mix(in srgb, var(--book-annotation-base) 64%, transparent) 0 62%,
+      transparent 62%
     );
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--book-annotation-base) 42%, transparent);
-    filter: saturate(1.1);
+    filter: saturate(1.06);
   }
 
   :global(.book-content--writing-vertical-rl .book-annotation-highlight) {
