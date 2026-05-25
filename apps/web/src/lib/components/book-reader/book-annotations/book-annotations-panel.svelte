@@ -547,8 +547,8 @@
     background:
       linear-gradient(
         145deg,
-        color-mix(in srgb, var(--reader-page-bg) 96%, transparent),
-        color-mix(in srgb, var(--reader-page-bg) 82%, var(--reader-page-text))
+        color-mix(in srgb, var(--reader-page-bg) 94%, var(--reader-page-text) 6%),
+        color-mix(in srgb, var(--reader-page-bg) 88%, var(--reader-page-text) 12%)
       ),
       var(--reader-page-bg);
     color: var(--reader-page-text);

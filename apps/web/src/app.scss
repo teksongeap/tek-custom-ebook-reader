@@ -197,6 +197,14 @@
     color: var(--reader-page-text);
   }
 
+  .reader-side-panel-shell {
+    box-sizing: border-box;
+    border-right: 1px solid color-mix(in srgb, var(--reader-page-text) 20%, transparent);
+    box-shadow:
+      20px 0 48px rgba(5, 7, 10, 0.34),
+      inset -1px 0 0 color-mix(in srgb, var(--reader-page-text) 10%, transparent);
+  }
+
   .reader-footer {
     color: color-mix(in srgb, var(--reader-page-text) 74%, transparent);
     background: linear-gradient(

@@ -2271,7 +2271,7 @@
 
 {#if $tocIsOpen$ && $sectionData$}
   <div
-    class="writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
+    class="reader-side-panel-shell writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
     style:color={$themeOption$?.fontColor}
     style:background-color={$backgroundColor$}
     in:fly|local={{ x: -100, duration: 100, easing: quintInOut }}
@@ -2296,7 +2296,7 @@
 
 {#if showSearchPanel && $bookData$}
   <div
-    class="writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
+    class="reader-side-panel-shell writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
     style:color={$themeOption$?.fontColor}
     style:background-color={$backgroundColor$}
     in:fly|local={{ x: -100, duration: 100, easing: quintInOut }}
@@ -2314,7 +2314,7 @@
 
 {#if showAnnotationsPanel}
   <div
-    class="writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
+    class="reader-side-panel-shell writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
     style:color={$themeOption$?.fontColor}
     style:background-color={$backgroundColor$}
     in:fly|local={{ x: -100, duration: 100, easing: quintInOut }}
