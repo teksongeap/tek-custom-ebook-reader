@@ -2,6 +2,8 @@
   import { createEventDispatcher, tick } from 'svelte';
   import Fa from 'svelte-fa';
   import {
+    faArrowDownWideShort,
+    faArrowUpShortWide,
     faCheck,
     faChevronDown,
     faChevronRight,
@@ -10,7 +12,6 @@
     faHighlighter,
     faMagnifyingGlass,
     faPen,
-    faSort,
     faTrash,
     faXmark
   } from '@fortawesome/free-solid-svg-icons';
@@ -22,9 +23,12 @@
   import {
     AnnotationSortMode,
     annotationSortOptions,
+    getAnnotationSortDirection,
+    getAnnotationSortLabel,
     getAnnotationSortMode
   } from '$lib/data/annotation-sort';
-  import { lastAnnotationSortMode$ } from '$lib/data/store';
+  import { SortDirection } from '$lib/data/sort-types';
+  import { lastAnnotationSortDirection$, lastAnnotationSortMode$ } from '$lib/data/store';
   import {
     annotationColorOptions,
     getAnnotationColorLabel,
@@ -59,6 +63,14 @@
     fontColor || 'var(--font-color)'
   }; --reader-page-bg: ${backgroundColor || 'var(--background-color)'};`;
   $: activeSortMode = getAnnotationSortMode($lastAnnotationSortMode$);
+  $: activeSortDirection = getAnnotationSortDirection(
+    $lastAnnotationSortDirection$,
+    activeSortMode
+  );
+  $: activeSortDirectionLabel =
+    activeSortDirection === SortDirection.ASC ? 'Ascending' : 'Descending';
+  $: nextSortDirectionLabel =
+    activeSortDirection === SortDirection.ASC ? 'descending' : 'ascending';
   $: chapterSections = getChapterSections(sectionData);
   $: sectionOrder = new Map(sectionData.map((section, index) => [section.reference, index]));
   $: searchTerms = normalizeForSearch(searchQuery).split(/\s+/).filter(Boolean);
@@ -73,7 +85,7 @@
     : colorFilteredAnnotations;
   $: sortedAnnotations = filteredAnnotations
     .slice()
-    .sort((a, b) => compareAnnotationsForPanel(a, b, activeSortMode));
+    .sort((a, b) => compareAnnotationsForPanel(a, b, activeSortMode, activeSortDirection));
   $: isFilteringAnnotations = searchTerms.length > 0 || selectedAnnotationColor !== 'all';
   $: panelSubtitle = isFilteringAnnotations
     ? `${sortedAnnotations.length} of ${annotations.length} shown`
@@ -89,27 +101,30 @@
   function compareAnnotationsForPanel(
     annotationA: BooksDbAnnotation,
     annotationB: BooksDbAnnotation,
-    sortMode: AnnotationSortMode
+    sortMode: AnnotationSortMode,
+    sortDirection: SortDirection
   ) {
+    const directionMultiplier = sortDirection === SortDirection.ASC ? 1 : -1;
+
     switch (sortMode) {
       case AnnotationSortMode.UPDATED:
         return (
-          getAnnotationUpdatedAt(annotationB) - getAnnotationUpdatedAt(annotationA) ||
-          compareAnnotationsByLocation(annotationA, annotationB)
+          (getAnnotationUpdatedAt(annotationA) - getAnnotationUpdatedAt(annotationB)) *
+            directionMultiplier || compareAnnotationsByLocation(annotationA, annotationB)
         );
       case AnnotationSortMode.CREATED:
         return (
-          annotationB.createdAt - annotationA.createdAt ||
+          (annotationA.createdAt - annotationB.createdAt) * directionMultiplier ||
           compareAnnotationsByLocation(annotationA, annotationB)
         );
       case AnnotationSortMode.NOTES:
         return (
-          Number(hasAnnotationComment(annotationB)) - Number(hasAnnotationComment(annotationA)) ||
-          compareAnnotationsByLocation(annotationA, annotationB)
+          (Number(hasAnnotationComment(annotationA)) - Number(hasAnnotationComment(annotationB))) *
+            directionMultiplier || compareAnnotationsByLocation(annotationA, annotationB)
         );
       case AnnotationSortMode.LOCATION:
       default:
-        return compareAnnotationsByLocation(annotationA, annotationB);
+        return compareAnnotationsByLocation(annotationA, annotationB) * directionMultiplier;
     }
   }
 
@@ -200,6 +215,11 @@
     }
 
     $lastAnnotationSortMode$ = getAnnotationSortMode(event.currentTarget.value);
+  }
+
+  function toggleAnnotationSortDirection() {
+    $lastAnnotationSortDirection$ =
+      activeSortDirection === SortDirection.ASC ? SortDirection.DESC : SortDirection.ASC;
   }
 
   function setAnnotationColorFilter(event: Event) {
@@ -374,10 +394,22 @@
         {/each}
       </select>
     </label>
-    <label class="annotations-panel-sort">
-      <span class="annotations-panel-control-icon" aria-hidden="true">
-        <Fa icon={faSort} />
-      </span>
+    <div class="annotations-panel-sort">
+      <button
+        type="button"
+        class="annotations-panel-sort-direction"
+        title={`${activeSortDirectionLabel}. Click to switch ${nextSortDirectionLabel}.`}
+        aria-label={`Sort direction: ${activeSortDirectionLabel}. Click to switch ${nextSortDirectionLabel}.`}
+        aria-pressed={activeSortDirection === SortDirection.DESC}
+        on:click|stopPropagation={toggleAnnotationSortDirection}
+        on:keydown|stopPropagation={() => {}}
+      >
+        <Fa
+          icon={activeSortDirection === SortDirection.ASC
+            ? faArrowUpShortWide
+            : faArrowDownWideShort}
+        />
+      </button>
       <select
         value={activeSortMode}
         aria-label="Sort annotations"
@@ -385,10 +417,12 @@
         on:keydown|stopPropagation={() => {}}
       >
         {#each annotationSortOptions as sortOption (sortOption.id)}
-          <option value={sortOption.id}>{sortOption.label}</option>
+          <option value={sortOption.id}>
+            {getAnnotationSortLabel(sortOption.id, activeSortDirection)}
+          </option>
         {/each}
       </select>
-    </label>
+    </div>
   </div>
 
   <div class="annotations-panel-list">
@@ -684,7 +718,8 @@
     color: var(--reader-page-text);
   }
 
-  .annotations-panel-search-clear {
+  .annotations-panel-search-clear,
+  .annotations-panel-sort-direction {
     display: inline-flex;
     height: 1.5rem;
     width: 1.5rem;
@@ -700,8 +735,18 @@
     outline: none;
   }
 
+  .annotations-panel-sort-direction {
+    color: color-mix(in srgb, var(--reader-page-text) 68%, transparent);
+  }
+
+  .annotations-panel-sort-direction[aria-pressed='true'] {
+    color: var(--reader-page-text);
+  }
+
   .annotations-panel-search-clear:hover,
-  .annotations-panel-search-clear:focus-visible {
+  .annotations-panel-search-clear:focus-visible,
+  .annotations-panel-sort-direction:hover,
+  .annotations-panel-sort-direction:focus-visible {
     background: color-mix(in srgb, var(--reader-page-text) 9%, transparent);
     color: var(--reader-page-text);
   }

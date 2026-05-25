@@ -15,7 +15,7 @@ import {
   TrackerSkipThresholdAction
 } from '$lib/components/book-reader/book-reading-tracker/book-reading-tracker';
 import { HeatmapDataAggregration } from '$lib/components/statistics/statistics-heatmap/statistics-heatmap';
-import { AnnotationSortMode } from '$lib/data/annotation-sort';
+import { AnnotationSortMode, type AnnotationSortDirection } from '$lib/data/annotation-sort';
 import {
   StatisticsRangeTemplate,
   StatisticsTab,
@@ -93,7 +93,7 @@ export const furiganaStyle$ = writableStringLocalStorageSubject<FuriganaStyle>()
 );
 export const writingMode$ = writableStringLocalStorageSubject<WritingMode>()(
   'writingMode',
-  'vertical-rl'
+  'horizontal-tb'
 );
 export const enableVerticalFontKerning$ = writableBooleanLocalStorageSubject()(
   'enableVerticalFontKerning',
@@ -439,6 +439,12 @@ export const lastAnnotationSortMode$ = writableStringLocalStorageSubject<Annotat
   'lastAnnotationSortMode',
   AnnotationSortMode.LOCATION
 );
+
+export const lastAnnotationSortDirection$ =
+  writableStringLocalStorageSubject<AnnotationSortDirection>()(
+    'lastAnnotationSortDirection',
+    'default'
+  );
 
 export const fileCountData$ = writableSubject<Record<string, number> | undefined>(undefined);
 

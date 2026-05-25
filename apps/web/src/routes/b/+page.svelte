@@ -209,6 +209,7 @@
   let lastSelectedRange: Range | undefined;
   let lastSelectedRangeWasEmpty = true;
   let annotationSelectionRect: DOMRect | undefined;
+  let annotationSelectionAnchorRect: DOMRect | undefined;
   let annotationSelectionText = '';
   let annotations: BooksDbAnnotation[] = [];
   let showAnnotationsPanel = false;
@@ -512,16 +513,17 @@
 
       if (currentSelected && selection?.rangeCount && isUserReaderSelection) {
         const range = selection.getRangeAt(0).cloneRange();
-        const selectionRect = getRangeViewportRect(range);
+        const selectionRects = getRangeViewportRects(range);
 
-        if (!selectionRect) {
+        if (!selectionRects) {
           hideAnnotationComposer();
           return;
         }
 
         lastSelectedRange = range;
         lastSelectedRangeWasEmpty = false;
-        annotationSelectionRect = selectionRect;
+        annotationSelectionRect = selectionRects.selectionRect;
+        annotationSelectionAnchorRect = selectionRects.anchorRect;
         annotationSelectionText = currentSelected;
       } else {
         lastSelectedRangeWasEmpty = true;
@@ -1278,7 +1280,7 @@
     return bookId;
   }
 
-  function getRangeViewportRect(range: Range) {
+  function getRangeViewportRects(range: Range) {
     if (!getRangeBookContent(range)) {
       return undefined;
     }
@@ -1291,12 +1293,20 @@
       const bottom = Math.max(...rects.map((rect) => rect.bottom));
       const left = Math.min(...rects.map((rect) => rect.left));
 
-      return new DOMRect(left, top, right - left, bottom - top);
+      return {
+        selectionRect: new DOMRect(left, top, right - left, bottom - top),
+        anchorRect: new DOMRect(rects[0].left, rects[0].top, rects[0].width, rects[0].height)
+      };
     }
 
     const rect = range.getBoundingClientRect();
 
-    return rect.width || rect.height ? rect : undefined;
+    return rect.width || rect.height
+      ? {
+          selectionRect: rect,
+          anchorRect: rect
+        }
+      : undefined;
   }
 
   function getRangeBookContent(range: Range) {
@@ -1308,6 +1318,7 @@
 
   function hideAnnotationComposer() {
     annotationSelectionRect = undefined;
+    annotationSelectionAnchorRect = undefined;
     annotationSelectionText = '';
   }
 
@@ -2253,6 +2264,8 @@
   />
   <AnnotationSelectionToolbar
     selectionRect={annotationSelectionRect}
+    anchorRect={annotationSelectionAnchorRect}
+    verticalMode={$verticalMode$}
     fontColor={$themeOption$?.fontColor ?? ''}
     backgroundColor={$backgroundColor$ ?? ''}
     on:save={createAnnotation}

@@ -5,6 +5,8 @@
   import { annotationColorOptions, type AnnotationColor } from './annotation-colors';
 
   export let selectionRect: DOMRect | undefined;
+  export let anchorRect: DOMRect | undefined;
+  export let verticalMode = false;
   export let fontColor = '';
   export let backgroundColor = '';
 
@@ -36,22 +38,92 @@
     const viewportTop = viewport?.offsetTop || 0;
     const viewportWidth = viewport?.width || window.innerWidth;
     const viewportHeight = viewport?.height || window.innerHeight;
+    const anchor = anchorRect ?? selectionRect;
     const toolbarRect = toolbarEl.getBoundingClientRect();
     const width = Math.min(toolbarRect.width || 360, viewportWidth - 24);
     const height = toolbarRect.height || 180;
     const gap = 12;
-    const anchorCenter = selectionRect.left + selectionRect.width / 2;
+
+    if (!anchor) {
+      return;
+    }
+
+    const { top, left } = verticalMode
+      ? getVerticalToolbarPosition(
+          anchor,
+          width,
+          height,
+          viewportLeft,
+          viewportTop,
+          viewportWidth,
+          viewportHeight,
+          gap
+        )
+      : getHorizontalToolbarPosition(
+          anchor,
+          width,
+          height,
+          viewportLeft,
+          viewportTop,
+          viewportWidth,
+          viewportHeight,
+          gap
+        );
+
+    toolbarStyle = `${chromeStyle}; top: ${top}px; left: ${left}px; max-width: ${viewportWidth - 24}px`;
+  }
+
+  function getHorizontalToolbarPosition(
+    anchor: DOMRect,
+    width: number,
+    height: number,
+    viewportLeft: number,
+    viewportTop: number,
+    viewportWidth: number,
+    viewportHeight: number,
+    gap: number
+  ) {
+    const anchorCenter = anchor.left + anchor.width / 2;
     const top =
-      selectionRect.top - viewportTop > height + gap
-        ? selectionRect.top - height - gap
-        : Math.min(viewportTop + viewportHeight - height - 12, selectionRect.bottom + gap);
+      anchor.top - viewportTop > height + gap
+        ? anchor.top - height - gap
+        : Math.min(viewportTop + viewportHeight - height - 12, anchor.bottom + gap);
     const left = limitToRange(
       viewportLeft + 12,
       viewportLeft + viewportWidth - width - 12,
       anchorCenter - width / 2
     );
 
-    toolbarStyle = `${chromeStyle}; top: ${top}px; left: ${left}px; max-width: ${viewportWidth - 24}px`;
+    return { top, left };
+  }
+
+  function getVerticalToolbarPosition(
+    anchor: DOMRect,
+    width: number,
+    height: number,
+    viewportLeft: number,
+    viewportTop: number,
+    viewportWidth: number,
+    viewportHeight: number,
+    gap: number
+  ) {
+    const minLeft = viewportLeft + 12;
+    const maxLeft = viewportLeft + viewportWidth - width - 12;
+    const preferredRight = anchor.right + gap;
+    const preferredLeft = anchor.left - width - gap;
+    const left =
+      preferredRight <= maxLeft
+        ? preferredRight
+        : preferredLeft >= minLeft
+          ? preferredLeft
+          : limitToRange(minLeft, maxLeft, preferredRight);
+    const top = limitToRange(
+      viewportTop + 12,
+      viewportTop + viewportHeight - height - 12,
+      anchor.top + anchor.height / 2 - height / 2
+    );
+
+    return { top, left };
   }
 
   function saveAnnotation(color: AnnotationColor) {
@@ -122,7 +194,9 @@
 {#if selectionRect}
   <div
     bind:this={toolbarEl}
-    class="annotation-toolbar writing-horizontal-tb fixed z-50"
+    class="annotation-toolbar fixed z-50 {verticalMode
+      ? 'annotation-toolbar--vertical'
+      : 'writing-horizontal-tb'}"
     role="dialog"
     aria-label="Create annotation"
     style={toolbarStyle || chromeStyle}
@@ -182,6 +256,11 @@
     gap: 0.4rem;
   }
 
+  .annotation-toolbar--vertical {
+    max-height: calc(100vh - 1.5rem);
+    writing-mode: vertical-rl;
+  }
+
   .annotation-toolbar-title {
     display: inline-flex;
     align-items: center;
@@ -203,6 +282,11 @@
 
   .annotation-toolbar-title span {
     display: none;
+  }
+
+  .annotation-toolbar--vertical .annotation-toolbar-title,
+  .annotation-toolbar--vertical .annotation-toolbar-swatch-number {
+    writing-mode: horizontal-tb;
   }
 
   .annotation-toolbar-colors {
