@@ -15,6 +15,8 @@
     avoidPageBreak$,
     cacheStorageData$,
     confirmClose$,
+    customFootnoteBacklinkRegexRules$,
+    customFootnoteTargetRegexRules$,
     customReadingPointEnabled$,
     disableWheelNavigation$,
     enableFontVPAL$,
@@ -188,6 +190,8 @@
       bind:autoBookmarkTime={$autoBookmarkTime$}
       bind:importHTMLFixMode={$importHTMLFixMode$}
       bind:restrictImportFixToAnchor={$restrictImportFixToAnchor$}
+      bind:customFootnoteTargetRegexRules={$customFootnoteTargetRegexRules$}
+      bind:customFootnoteBacklinkRegexRules={$customFootnoteBacklinkRegexRules$}
       bind:cacheStorageData={$cacheStorageData$}
       bind:replicationSaveBehavior={$replicationSaveBehavior$}
       bind:autoReplication={$autoReplication$}

@@ -204,6 +204,16 @@ export const restrictImportFixToAnchor$ = writableBooleanLocalStorageSubject()(
   true
 );
 
+export const customFootnoteTargetRegexRules$ = writableStringLocalStorageSubject()(
+  'customFootnoteTargetRegexRules',
+  ''
+);
+
+export const customFootnoteBacklinkRegexRules$ = writableStringLocalStorageSubject()(
+  'customFootnoteBacklinkRegexRules',
+  ''
+);
+
 export const cacheStorageData$ = writableBooleanLocalStorageSubject()('cacheStorageData', false);
 
 export const autoReplication$ = writableStringLocalStorageSubject<AutoReplicationType>()(

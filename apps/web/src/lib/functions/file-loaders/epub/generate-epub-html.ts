@@ -10,7 +10,12 @@ import type { Section } from '../../../data/database/books-db/versions/v3/books-
 import buildDummyBookImage from '../utils/build-dummy-book-image';
 import clearAllBadImageRef from '../utils/clear-all-bad-image-ref';
 import fixXHtmlHref from '../utils/fix-xhtml-href';
-import { importHTMLFixMode$, restrictImportFixToAnchor$ } from '$lib/data/store';
+import {
+  customFootnoteBacklinkRegexRules$,
+  customFootnoteTargetRegexRules$,
+  importHTMLFixMode$,
+  restrictImportFixToAnchor$
+} from '$lib/data/store';
 import { ImportHTMLFixMode } from '$lib/data/import-html-fix-mode';
 import { getCharacterCount } from '$lib/functions/get-character-count';
 import { getParagraphNodes } from '../../../components/book-reader/get-paragraph-nodes';
@@ -19,6 +24,7 @@ import {
   createReaderLinkReference,
   getLegacyHashHref,
   normalizeEpubPath,
+  parseCustomReaderReferenceRegexRules,
   resolveReaderTargetHref,
   writeReaderLinkReference
 } from '$lib/functions/reader-reference-layer/epub-reference';
@@ -79,6 +85,12 @@ export default function generateEpubHtml(
   const fallbackData = new Map<string, string>();
   const importHTMLFixMode = importHTMLFixMode$.getValue();
   const restrictImportFixToAnchor = restrictImportFixToAnchor$.getValue();
+  const customFootnoteTargetPatterns = parseCustomReaderReferenceRegexRules(
+    customFootnoteTargetRegexRules$.getValue()
+  );
+  const customFootnoteBacklinkPatterns = parseCustomReaderReferenceRegexRules(
+    customFootnoteBacklinkRegexRules$.getValue()
+  );
   const applyImportFixes = importHTMLFixMode !== ImportHTMLFixMode.OFF;
   const selfClosingContentTagsToFix =
     applyImportFixes && !restrictImportFixToAnchor ? selfClosingContentTags : [];
@@ -263,10 +275,6 @@ export default function generateEpubHtml(
     childWrapperDiv.setAttribute(ReaderReferenceAttribute.sourceHref, normalizedHtmlHref);
     childWrapperDiv.appendChild(childHtmlDiv);
     annotateReaderSearchBlocks(childWrapperDiv, `epub-${spineIndex}`);
-    annotateAnchorReferences(childWrapperDiv, htmlHref, {
-      sourceSpineIndex: spineIndex,
-      spineHrefToIndex
-    });
 
     result.appendChild(childWrapperDiv);
 
@@ -324,6 +332,11 @@ export default function generateEpubHtml(
     previousCharacterCount = currentCharCount;
   });
 
+  annotateAnchorReferences(result, {
+    customFootnoteBacklinkPatterns,
+    customFootnoteTargetPatterns,
+    spineHrefToIndex
+  });
   clearAllBadImageRef(result);
   fixXHtmlHref(result);
 
@@ -373,10 +386,7 @@ function parseTocEntries(
   return navMap ? parseNcxTocEntries(navMap, tocData.sourceHref) : [];
 }
 
-function repairTocEntries(
-  entries: ParsedTocEntry[],
-  contentByHref: Map<string, string>
-) {
+function repairTocEntries(entries: ParsedTocEntry[], contentByHref: Map<string, string>) {
   const fragmentIdsByHref = new Map<string, Set<string>>();
 
   return entries.map((entry) => {
@@ -689,27 +699,43 @@ function findFirstDescendantByLocalName(
 }
 
 function annotateAnchorReferences(
-  el: HTMLElement,
-  sourceHref: string,
+  root: HTMLElement,
   context: {
-    sourceSpineIndex: number;
+    customFootnoteBacklinkPatterns: RegExp[];
+    customFootnoteTargetPatterns: RegExp[];
     spineHrefToIndex: Map<string, number>;
   }
 ) {
-  Array.from(el.getElementsByTagName('a')).forEach((tag) => {
-    const oldHref = tag.getAttribute('href');
-    if (!oldHref) return;
+  const sourceRoots = Array.from(
+    root.querySelectorAll<HTMLElement>(`[${ReaderReferenceAttribute.sourceHref}]`)
+  );
 
-    const targetHref = resolveReaderTargetHref(sourceHref, oldHref);
-    const reference = createReaderLinkReference(sourceHref, oldHref, tag, {
-      sourceSpineIndex: context.sourceSpineIndex,
-      targetSpineIndex: targetHref ? context.spineHrefToIndex.get(targetHref) : undefined
+  sourceRoots.forEach((sourceRoot) => {
+    const sourceHref = sourceRoot.getAttribute(ReaderReferenceAttribute.sourceHref);
+    const sourceSpineIndex = Number(sourceRoot.getAttribute(ReaderReferenceAttribute.spineIndex));
+
+    if (!sourceHref) {
+      return;
+    }
+
+    Array.from(sourceRoot.getElementsByTagName('a')).forEach((tag) => {
+      const oldHref = tag.getAttribute('href');
+      if (!oldHref) return;
+
+      const targetHref = resolveReaderTargetHref(sourceHref, oldHref);
+      const reference = createReaderLinkReference(sourceHref, oldHref, tag, {
+        customFootnoteBacklinkPatterns: context.customFootnoteBacklinkPatterns,
+        customFootnoteTargetPatterns: context.customFootnoteTargetPatterns,
+        sourceSpineIndex: Number.isFinite(sourceSpineIndex) ? sourceSpineIndex : undefined,
+        targetSpineIndex: targetHref ? context.spineHrefToIndex.get(targetHref) : undefined,
+        referenceRoot: root
+      });
+
+      if (!reference) return;
+
+      writeReaderLinkReference(tag, reference);
+      tag.setAttribute('href', getLegacyHashHref(reference));
     });
-
-    if (!reference) return;
-
-    writeReaderLinkReference(tag, reference);
-    tag.setAttribute('href', getLegacyHashHref(reference));
   });
 }
 

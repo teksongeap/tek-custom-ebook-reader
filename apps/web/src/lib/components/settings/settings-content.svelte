@@ -155,6 +155,10 @@
 
   export let restrictImportFixToAnchor: boolean;
 
+  export let customFootnoteTargetRegexRules: string;
+
+  export let customFootnoteBacklinkRegexRules: string;
+
   export let cacheStorageData: boolean;
 
   export let autoReplication: string;
@@ -794,6 +798,30 @@
         />
       </SettingsItemGroup>
     {/if}
+    <SettingsItemGroup
+      title="Footnote Target Regex"
+      tooltip="One pattern per line, matched against the link target id. Use this for ids that belong to note text."
+    >
+      <textarea
+        class={`${inputClasses} min-h-24 w-full resize-y p-2 font-mono text-sm`}
+        rows="3"
+        spellcheck="false"
+        placeholder={'^jz[-_]\\d\n^note-[0-9]+$'}
+        bind:value={customFootnoteTargetRegexRules}
+      />
+    </SettingsItemGroup>
+    <SettingsItemGroup
+      title="Footnote Backlink Regex"
+      tooltip="One pattern per line, matched against the link target id. Use this for ids that jump back to the main text."
+    >
+      <textarea
+        class={`${inputClasses} min-h-24 w-full resize-y p-2 font-mono text-sm`}
+        rows="3"
+        spellcheck="false"
+        placeholder={'^jzyy[-_]\\d\n^note-ref-[0-9]+$'}
+        bind:value={customFootnoteBacklinkRegexRules}
+      />
+    </SettingsItemGroup>
     <SettingsItemGroup title="Cache Data" tooltip={cacheStorageDataTooltip}>
       <ButtonToggleGroup options={optionsForToggle} bind:selectedOptionId={cacheStorageData} />
     </SettingsItemGroup>

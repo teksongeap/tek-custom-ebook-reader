@@ -41,14 +41,44 @@ export interface ReaderLinkReference {
 export interface CreateReaderLinkReferenceOptions {
   sourceSpineIndex?: number;
   targetSpineIndex?: number;
+  referenceRoot?: Document | Element;
+  targetElement?: Element;
+  customFootnoteTargetPatterns?: RegExp[];
+  customFootnoteBacklinkPatterns?: RegExp[];
 }
 
 const externalHrefRegex = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
-const footnoteIdPattern = /(?:^|[-_:])(fn|footnote|note|endnote|en)(?:[-_:]|\d|$)/i;
-const legacyFootnoteTargetIdPattern = /(?:^|[-_:])(fn|ft|footnote|note|endnote|en)(?:[-_:]|\d|$)/i;
-const backlinkIdPattern = /(?:^|[-_:])(fnref|noteref|backlink|return)(?:[-_:]|\d|$)/i;
-const bracketedNoteMarkerPattern = /^\[\s*(?:\d{1,4}|[ivxlcdm]{1,10}|[*#]+)\s*\]$/i;
-const bareNoteMarkerPattern = /^(?:\d{1,4}|[ivxlcdm]{1,10}|[*#]+)$/i;
+const footnoteIdPatterns = [
+  /(?:^|[-_:])(?:fn|ftn|footnotes?|notes?|endnotes?|en)(?:[-_:]|\d|$)/i,
+  /(?:^|[-_:])(?:_?id)?(?:footnote|endnote)(?:[-_:]|\d|$)/i,
+  /(?:^|[-_:])(?:ref[-_:])?(?:footnote|endnote)bookmark[-_:]?end(?:[-_:]|\d|$)/i,
+  /(?:^|[-_:])sd(?:footnote|endnote)\d+anc$/i,
+  /(?:^|[-_:])cite[-_:]note(?:[-_:]|\d|$)/i,
+  /(?:^|[-_:])jz[-_:]\d/i,
+  /(?:^|[-_:])zhu\d+$/i
+];
+const legacyFootnoteTargetIdPatterns = [
+  ...footnoteIdPatterns,
+  /(?:^|[-_:])(?:ft|_ftn)(?:[-_:]|\d|$)/i
+];
+const backlinkIdPatterns = [
+  /(?:^|[-_:])(?:fnref|ftnref|_ftnref|noteref|footnoteref|endnoteref)(?:[-_:]|\d|$)/i,
+  /(?:^|[-_:])(?:backlink|backref|return)(?:[-_:]|\d|$)/i,
+  /(?:^|[-_:])(?:ref[-_:])?(?:footnote|endnote)bookmark[-_:]?start(?:[-_:]|\d|$)/i,
+  /(?:^|[-_:])(?:_?id)?(?:footnote|endnote)anchor(?:[-_:]|\d|$)/i,
+  /(?:^|[-_:])sd(?:footnote|endnote)\d+sym$/i,
+  /(?:^|[-_:])cite[-_:]ref(?:[-_:]|\d|$)/i,
+  /(?:^|[-_:])jzyy[-_:]\d/i,
+  /(?:^|[-_:])zw\d+$/i
+];
+const bracketedNoteMarkerPattern =
+  /^\[\s*(?:\d{1,4}|[ivxlcdm]{1,10}|[*#\u2020\u2021\u00a7\u00b6]+)\s*\]$/i;
+const parenthesizedNoteMarkerPattern =
+  /^\(\s*(?:\d{1,3}|[ivxlcdm]{1,10}|[*#\u2020\u2021\u00a7\u00b6]+)\s*\)$/i;
+const bareNoteMarkerPattern = /^(?:\d{1,4}|[ivxlcdm]{1,10}|[*#\u2020\u2021\u00a7\u00b6]+)$/i;
+const superscriptClassPattern = /(?:^|[-_\s])(?:note)?sup(?:er|erscript)?(?:[-_\s]|$)/i;
+const footnoteClassPattern =
+  /(?:^|[-_\s])(?:fnote|fncontent|footnote|endnote|notecontent|footnotes?|endnotes?)(?:[-_\s]|$)/i;
 
 export function normalizeEpubPath(value: string) {
   const normalized = path.normalize(value.replace(/\\/g, '/')).replace(/\\/g, '/');
@@ -87,7 +117,14 @@ export function createReaderLinkReference(
   const { hrefPath, fragment } = splitHref(href);
   const targetHref = resolveEpubPath(normalizedSourceHref, hrefPath);
   const targetFragment = fragment === undefined ? undefined : decodeEpubFragment(fragment);
-  const kind = classifyReaderLink(element, targetFragment, options);
+  const targetElement =
+    options.referenceRoot && targetFragment && isLikelyNumberedNoteMarker(element)
+      ? findReaderTargetElement(options.referenceRoot, {
+          sourceHref: targetHref,
+          fragment: targetFragment
+        })
+      : undefined;
+  const kind = classifyReaderLink(element, targetFragment, { ...options, targetElement });
 
   return {
     kind,
@@ -100,6 +137,15 @@ export function createReaderLinkReference(
       fragment: targetFragment
     }
   };
+}
+
+export function parseCustomReaderReferenceRegexRules(value: string | undefined) {
+  return (value || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map(parseCustomReaderReferenceRegexRule)
+    .filter((pattern): pattern is RegExp => !!pattern);
 }
 
 export function resolveReaderTargetHref(sourceHref: string, originalHref: string) {
@@ -258,6 +304,8 @@ function classifyReaderLink(
   targetFragment: string | undefined,
   options: CreateReaderLinkReferenceOptions
 ) {
+  const targetElement = options.targetElement;
+
   if (targetFragment && isLikelyFootnoteBacklink(element)) {
     return 'backlink';
   }
@@ -272,12 +320,27 @@ function classifyReaderLink(
   if (
     hasReferenceToken(element, 'epub:type', 'backlink') ||
     hasReferenceToken(element, 'role', 'doc-backlink') ||
-    (targetFragment && backlinkIdPattern.test(targetFragment))
+    (targetFragment &&
+      (matchesAnyPattern(backlinkIdPatterns, targetFragment) ||
+        matchesAnyPattern(options.customFootnoteBacklinkPatterns || [], targetFragment)))
   ) {
     return 'backlink';
   }
 
+  if (
+    targetFragment &&
+    matchesAnyPattern(options.customFootnoteTargetPatterns || [], targetFragment)
+  ) {
+    return 'footnote';
+  }
+
   if (targetFragment && isLikelyNumberedNoteMarker(element)) {
+    const structuralKind = classifyStructuralFootnoteLink(element, targetElement);
+
+    if (structuralKind) {
+      return structuralKind;
+    }
+
     if (isLaterSpineTarget(options)) {
       return 'footnote';
     }
@@ -286,12 +349,12 @@ function classifyReaderLink(
       return 'backlink';
     }
 
-    if (legacyFootnoteTargetIdPattern.test(targetFragment)) {
+    if (matchesAnyPattern(legacyFootnoteTargetIdPatterns, targetFragment)) {
       return 'footnote';
     }
   }
 
-  if (targetFragment && footnoteIdPattern.test(targetFragment)) {
+  if (targetFragment && matchesAnyPattern(footnoteIdPatterns, targetFragment)) {
     return 'footnote';
   }
 
@@ -319,7 +382,11 @@ function isLikelyNumberedNoteMarker(element: Element | undefined) {
     return true;
   }
 
-  return bareNoteMarkerPattern.test(text) && !!element.closest('sup');
+  if (parenthesizedNoteMarkerPattern.test(text)) {
+    return isInsideSuperscriptLikeElement(element);
+  }
+
+  return bareNoteMarkerPattern.test(text) && isInsideSuperscriptLikeElement(element);
 }
 
 function isLaterSpineTarget(options: CreateReaderLinkReferenceOptions) {
@@ -357,9 +424,191 @@ function isInsideNavigationElement(element: Element) {
 }
 
 function isInsideFootnoteElement(element: Element) {
-  return !!element.closest(
-    '[role="doc-footnote"],[epub\\:type~="footnote"],[epub\\:type~="endnote"],.fnote,.footnote,.endnote'
+  if (element.closest(getFootnoteContainerSelector())) {
+    return true;
+  }
+
+  let currentElement: Element | null = element;
+
+  while (currentElement) {
+    if (footnoteClassPattern.test(getElementClassName(currentElement))) {
+      return true;
+    }
+
+    currentElement = currentElement.parentElement;
+  }
+
+  return false;
+}
+
+function getFootnoteContainerSelector() {
+  return '[role="doc-footnote"],[role="doc-endnote"],[epub\\:type~="footnote"],[epub\\:type~="footnotes"],[epub\\:type~="endnote"],[epub\\:type~="endnotes"],.fnote,.fncontent,.footnote,.endnote,.notecontent';
+}
+
+function isInsideSuperscriptLikeElement(element: Element) {
+  if (hasSuperscriptLikeDescendant(element)) {
+    return true;
+  }
+
+  let currentElement: Element | null = element;
+
+  while (currentElement) {
+    const tagName = currentElement.tagName.toLowerCase();
+    const className = getElementClassName(currentElement);
+    const style = currentElement.getAttribute('style') || '';
+
+    if (
+      tagName === 'sup' ||
+      superscriptClassPattern.test(className) ||
+      /vertical-align\s*:\s*(?:super|text-top)/i.test(style)
+    ) {
+      return true;
+    }
+
+    if (isBlockBoundaryElement(currentElement)) {
+      return false;
+    }
+
+    currentElement = currentElement.parentElement;
+  }
+
+  return false;
+}
+
+function hasSuperscriptLikeDescendant(element: Element) {
+  return !!Array.from(element.querySelectorAll('*')).find((child) => {
+    const tagName = child.tagName.toLowerCase();
+    const className = getElementClassName(child);
+    const style = child.getAttribute('style') || '';
+
+    return (
+      tagName === 'sup' ||
+      superscriptClassPattern.test(className) ||
+      /vertical-align\s*:\s*(?:super|text-top)/i.test(style)
+    );
+  });
+}
+
+function classifyStructuralFootnoteLink(
+  element: Element | undefined,
+  targetElement: Element | undefined
+): ReaderLinkKind | undefined {
+  if (!element || !targetElement) {
+    return undefined;
+  }
+
+  if (isInsideFootnoteElement(element)) {
+    return 'backlink';
+  }
+
+  if (isInsideFootnoteElement(targetElement)) {
+    return 'footnote';
+  }
+
+  const sourceMarkerIds = getMarkerReferenceIds(element);
+
+  if (!sourceMarkerIds.length) {
+    return undefined;
+  }
+
+  const targetContainer = getLikelyFootnoteContainer(targetElement);
+
+  if (!targetContainer || !hasReadableTextBeyondMarker(targetContainer, targetElement)) {
+    return undefined;
+  }
+
+  return hasLinkToAnyFragment(targetContainer, sourceMarkerIds) ? 'footnote' : undefined;
+}
+
+function getLikelyFootnoteContainer(element: Element) {
+  return element.closest(`${getFootnoteContainerSelector()},p,li,aside,div`) || element;
+}
+
+function hasReadableTextBeyondMarker(container: Element, marker: Element) {
+  const containerText = normalizeReferenceText(container.textContent || '');
+  const markerText = normalizeReferenceText(marker.textContent || '');
+
+  return containerText.length > markerText.length;
+}
+
+function getMarkerReferenceIds(element: Element) {
+  const ids = new Set<string>();
+
+  addElementReferenceIds(ids, element);
+  addElementReferenceIds(ids, element.previousElementSibling);
+
+  const parent = element.parentElement;
+
+  if (parent && !isBlockBoundaryElement(parent)) {
+    addElementReferenceIds(ids, parent.previousElementSibling);
+  }
+
+  return [...ids];
+}
+
+function addElementReferenceIds(ids: Set<string>, element: Element | null) {
+  if (!element) {
+    return;
+  }
+
+  const id = element.id || '';
+  const name = element.getAttribute('name') || '';
+
+  if (id) {
+    ids.add(id);
+  }
+
+  if (name) {
+    ids.add(name);
+  }
+}
+
+function hasLinkToAnyFragment(container: Element, fragments: string[]) {
+  const fragmentSet = new Set(fragments);
+
+  return Array.from(container.querySelectorAll<HTMLAnchorElement>('a[href]')).some((anchor) => {
+    const href = anchor.getAttribute('href') || '';
+    const { fragment } = splitHref(href);
+
+    return fragment !== undefined && fragmentSet.has(decodeEpubFragment(fragment));
+  });
+}
+
+function isBlockBoundaryElement(element: Element) {
+  return /^(?:address|article|aside|blockquote|body|dd|div|dl|dt|figcaption|figure|footer|h[1-6]|header|hr|li|main|nav|ol|p|section|table|td|th|tr|ul)$/i.test(
+    element.tagName
   );
+}
+
+function getElementClassName(element: Element) {
+  const className = element.getAttribute('class') || '';
+
+  return typeof className === 'string' ? className : '';
+}
+
+function normalizeReferenceText(value: string) {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function parseCustomReaderReferenceRegexRule(value: string) {
+  try {
+    const slashMatch = value.match(/^\/(.*)\/([a-z]*)$/i);
+
+    if (slashMatch) {
+      return new RegExp(slashMatch[1], slashMatch[2]);
+    }
+
+    return new RegExp(value, 'i');
+  } catch (_) {
+    return undefined;
+  }
+}
+
+function matchesAnyPattern(patterns: RegExp[], value: string) {
+  return patterns.some((pattern) => {
+    pattern.lastIndex = 0;
+    return pattern.test(value);
+  });
 }
 
 function isReaderLinkKind(value: string | null): value is ReaderLinkKind {

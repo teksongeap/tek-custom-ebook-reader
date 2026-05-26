@@ -26,8 +26,13 @@ import { readerFootnoteRequest$ } from '$lib/functions/reader-reference-layer/fo
 import {
   createReaderLinkReference,
   getElementSourceHref,
+  parseCustomReaderReferenceRegexRules,
   readReaderLinkReference
 } from '$lib/functions/reader-reference-layer/epub-reference';
+import {
+  customFootnoteBacklinkRegexRules$,
+  customFootnoteTargetRegexRules$
+} from '$lib/data/store';
 import { readerTargetNavigation$ } from '$lib/functions/reader-reference-layer/navigation';
 import { toggleImageGalleryPictureSpoiler$ } from '$lib/components/book-reader/book-reader-image-gallery/book-reader-image-gallery';
 
@@ -68,8 +73,7 @@ function anchorTagListener(document: Document) {
 
     return fromDelegatedClickEvent<HTMLAnchorElement>(contentEl, 'a').pipe(
       tap(({ element }) => {
-        const reference =
-          readReaderLinkReference(element) || readLegacyReaderLinkReference(element);
+        const reference = readInteractiveReaderLinkReference(element, contentEl);
 
         if (reference?.kind === 'external') {
           if (reference.targetHref) {
@@ -100,13 +104,44 @@ function anchorTagListener(document: Document) {
   };
 }
 
+function readInteractiveReaderLinkReference(element: HTMLAnchorElement, contentEl: HTMLElement) {
+  const reference = readReaderLinkReference(element) || readLegacyReaderLinkReference(element);
+
+  if (reference?.kind !== 'internal') {
+    return reference;
+  }
+
+  const refreshedReference = createReaderLinkReference(
+    reference.sourceHref,
+    reference.originalHref,
+    element,
+    {
+      ...getCustomFootnotePatterns(),
+      referenceRoot: contentEl
+    }
+  );
+
+  return refreshedReference?.kind !== 'internal' ? refreshedReference : reference;
+}
+
 function readLegacyReaderLinkReference(element: HTMLAnchorElement) {
   const originalHref = element.getAttribute(legacyHrefAttribute);
   const sourceHref = getElementSourceHref(element);
 
   return sourceHref && originalHref
-    ? createReaderLinkReference(sourceHref, originalHref, element)
+    ? createReaderLinkReference(sourceHref, originalHref, element, getCustomFootnotePatterns())
     : undefined;
+}
+
+function getCustomFootnotePatterns() {
+  return {
+    customFootnoteBacklinkPatterns: parseCustomReaderReferenceRegexRules(
+      customFootnoteBacklinkRegexRules$.getValue()
+    ),
+    customFootnoteTargetPatterns: parseCustomReaderReferenceRegexRules(
+      customFootnoteTargetRegexRules$.getValue()
+    )
+  };
 }
 
 function rubyTagListener(contentEl: HTMLElement, furiganaStyle: FuriganaStyle) {
