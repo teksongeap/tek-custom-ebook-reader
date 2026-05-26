@@ -44,16 +44,40 @@
   :global(.para),
   :global(.reader-paragraph),
   :global(li),
-  :global(blockquote) {
+  :global(blockquote),
+  :global(dd),
+  :global(dt),
+  :global(figcaption),
+  :global(h1),
+  :global(h2),
+  :global(h3),
+  :global(h4),
+  :global(h5),
+  :global(h6),
+  :global(pre),
+  :global(td),
+  :global(th) {
     transition: opacity var(--book-content-hover-focus-exit-duration) ease;
   }
 
-  &.book-content--hover-focus-dim:not(.book-content--reference-target-active) {
+  &.book-content--hover-focus-dim {
     :global(p),
     :global(.para),
     :global(.reader-paragraph),
     :global(li),
-    :global(blockquote) {
+    :global(blockquote),
+    :global(dd),
+    :global(dt),
+    :global(figcaption),
+    :global(h1),
+    :global(h2),
+    :global(h3),
+    :global(h4),
+    :global(h5),
+    :global(h6),
+    :global(pre),
+    :global(td),
+    :global(th) {
       opacity: var(--book-content-hover-focus-dim-opacity, 0.15);
       transition-duration: var(--book-content-hover-focus-enter-duration);
     }

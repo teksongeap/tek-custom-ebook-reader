@@ -587,13 +587,25 @@
   .book-content.book-content--hover-focus-dim li,
   .book-content.book-content--hover-focus-dim blockquote,
   .book-content.book-content--hover-focus-dim dd,
-  .book-content.book-content--hover-focus-dim dt {
+  .book-content.book-content--hover-focus-dim dt,
+  .book-content.book-content--hover-focus-dim figcaption,
+  .book-content.book-content--hover-focus-dim h1,
+  .book-content.book-content--hover-focus-dim h2,
+  .book-content.book-content--hover-focus-dim h3,
+  .book-content.book-content--hover-focus-dim h4,
+  .book-content.book-content--hover-focus-dim h5,
+  .book-content.book-content--hover-focus-dim h6,
+  .book-content.book-content--hover-focus-dim pre,
+  .book-content.book-content--hover-focus-dim td,
+  .book-content.book-content--hover-focus-dim th {
     opacity: var(--book-content-hover-focus-dim-opacity, 0.15);
     transition: opacity 120ms ease;
   }
 
   .book-content.book-content--hover-focus-dim .book-content__hover-focus-active,
-  .book-content.book-content--hover-focus-dim .book-content__hover-focus-active * {
+  .book-content.book-content--hover-focus-dim .book-content__hover-focus-active *,
+  .book-content.book-content--hover-focus-dim .book-content__reference-target-active,
+  .book-content.book-content--hover-focus-dim .book-content__reference-target-active * {
     opacity: 1 !important;
   }
 

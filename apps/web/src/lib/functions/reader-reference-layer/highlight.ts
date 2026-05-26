@@ -6,6 +6,12 @@
 
 const activeReferenceTargetClass = 'book-content__reference-target-active';
 const activeReferenceRootClass = 'book-content--reference-target-active';
+export const referenceTargetHoverFocusEvent = 'ttu-reference-target-hover-focus';
+export const referenceTargetHighlightDuration = 2400;
+export type ReferenceTargetHoverFocusEventDetail = {
+  targetElement: Element;
+  duration: number;
+};
 const referenceTargetBlockSelector = [
   'blockquote',
   'dd',
@@ -28,7 +34,10 @@ const referenceTargetBlockSelector = [
 const activeReferenceTargetTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
 const activeReferenceRootTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
 
-export function highlightReaderTargetElement(element: Element | undefined | null, duration = 2400) {
+export function highlightReaderTargetElement(
+  element: Element | undefined | null,
+  duration = referenceTargetHighlightDuration
+) {
   const targetElement = getReferenceHighlightElement(element);
 
   if (!targetElement) {
@@ -56,6 +65,15 @@ export function highlightReaderTargetElement(element: Element | undefined | null
   // Restart the CSS animation when the same target is selected repeatedly.
   void targetElement.offsetWidth;
   targetElement.classList.add(activeReferenceTargetClass);
+  targetElement.dispatchEvent(
+    new CustomEvent<ReferenceTargetHoverFocusEventDetail>(referenceTargetHoverFocusEvent, {
+      bubbles: true,
+      detail: {
+        targetElement,
+        duration
+      }
+    })
+  );
 
   const timer = setTimeout(() => {
     targetElement.classList.remove(activeReferenceTargetClass);

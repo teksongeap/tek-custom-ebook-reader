@@ -4,7 +4,13 @@
  * All rights reserved.
  */
 
-const hoverFocusBlockSelector = 'p, .para, .reader-paragraph, li, blockquote, dd, dt';
+import {
+  referenceTargetHoverFocusEvent,
+  type ReferenceTargetHoverFocusEventDetail
+} from '$lib/functions/reader-reference-layer/highlight';
+
+const hoverFocusBlockSelector =
+  'blockquote, dd, dt, figcaption, h1, h2, h3, h4, h5, h6, li, p, pre, td, th, .para, .reader-paragraph';
 const hoverFocusFallbackBlockSelector = 'div, section, article';
 const hoverFocusActivateDelay = 120;
 const hoverFocusDeactivateDelay = 240;
@@ -22,6 +28,7 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
   let activeBlock: Element | undefined;
   let activateTimer = 0;
   let deactivateTimer = 0;
+  let referenceDeactivateTimer = 0;
   let lastPointerClientX = Number.NaN;
   let lastPointerClientY = Number.NaN;
 
@@ -75,9 +82,15 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
     deactivateTimer = 0;
   };
 
+  const clearReferenceDeactivateTimer = () => {
+    window.clearTimeout(referenceDeactivateTimer);
+    referenceDeactivateTimer = 0;
+  };
+
   const clear = () => {
     clearActivateTimer();
     clearDeactivateTimer();
+    clearReferenceDeactivateTimer();
 
     const contentEl = activeContentEl || getBookContentEl(node);
 
@@ -149,12 +162,67 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
         return;
       }
 
+      if (referenceDeactivateTimer) {
+        return;
+      }
+
       if (activateAtLastPointerPosition()) {
         return;
       }
 
       clear();
     }, hoverFocusDeactivateDelay);
+  };
+
+  const scheduleReferenceDeactivate = (duration: number) => {
+    clearReferenceDeactivateTimer();
+
+    referenceDeactivateTimer = window.setTimeout(
+      () => {
+        referenceDeactivateTimer = 0;
+
+        if (!currentEnabled || !node.isConnected) {
+          clear();
+          return;
+        }
+
+        if (hasBlockingPopup()) {
+          scheduleReferenceDeactivate(hoverFocusDeactivateDelay);
+          return;
+        }
+
+        if (activateAtLastPointerPosition()) {
+          return;
+        }
+
+        clear();
+      },
+      Math.max(0, duration)
+    );
+  };
+
+  const onReferenceTargetHoverFocus = (event: Event) => {
+    if (!currentEnabled || !node.isConnected) {
+      return;
+    }
+
+    const detail = (event as CustomEvent<ReferenceTargetHoverFocusEventDetail>).detail;
+    const targetElement = detail?.targetElement;
+
+    if (!(targetElement instanceof Element) || !node.contains(targetElement)) {
+      return;
+    }
+
+    const hoverFocusTarget = getHoverFocusTarget(targetElement);
+
+    if (!hoverFocusTarget) {
+      return;
+    }
+
+    clearActivateTimer();
+    clearDeactivateTimer();
+    activate(hoverFocusTarget.contentEl, hoverFocusTarget.block);
+    scheduleReferenceDeactivate(Number.isFinite(detail.duration) ? detail.duration : 0);
   };
 
   const onPointerOver = (event: PointerEvent) => {
@@ -245,6 +313,9 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
   node.addEventListener('pointerover', onPointerOver, { capture: true, passive: true });
   node.addEventListener('pointermove', onPointerMove, { capture: true, passive: true });
   node.addEventListener('pointerleave', onPointerLeave, { passive: true });
+  node.addEventListener(referenceTargetHoverFocusEvent, onReferenceTargetHoverFocus, {
+    capture: true
+  });
   document.addEventListener('pointerover', onDocumentPointerOver, { capture: true, passive: true });
 
   return {
@@ -259,6 +330,9 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
       node.removeEventListener('pointerover', onPointerOver, { capture: true });
       node.removeEventListener('pointermove', onPointerMove, { capture: true });
       node.removeEventListener('pointerleave', onPointerLeave);
+      node.removeEventListener(referenceTargetHoverFocusEvent, onReferenceTargetHoverFocus, {
+        capture: true
+      });
       document.removeEventListener('pointerover', onDocumentPointerOver, { capture: true });
       clear();
     }
