@@ -65,15 +65,7 @@ export function highlightReaderTargetElement(
   // Restart the CSS animation when the same target is selected repeatedly.
   void targetElement.offsetWidth;
   targetElement.classList.add(activeReferenceTargetClass);
-  targetElement.dispatchEvent(
-    new CustomEvent<ReferenceTargetHoverFocusEventDetail>(referenceTargetHoverFocusEvent, {
-      bubbles: true,
-      detail: {
-        targetElement,
-        duration
-      }
-    })
-  );
+  requestReaderTargetHoverFocus(targetElement, duration);
 
   const timer = setTimeout(() => {
     targetElement.classList.remove(activeReferenceTargetClass);
@@ -90,6 +82,25 @@ export function highlightReaderTargetElement(
 
     activeReferenceRootTimers.set(contentElement, rootTimer);
   }
+}
+
+export function requestReaderTargetHoverFocus(
+  element: Element | undefined | null,
+  duration = referenceTargetHighlightDuration
+) {
+  if (!(element instanceof Element)) {
+    return;
+  }
+
+  element.dispatchEvent(
+    new CustomEvent<ReferenceTargetHoverFocusEventDetail>(referenceTargetHoverFocusEvent, {
+      bubbles: true,
+      detail: {
+        targetElement: element,
+        duration
+      }
+    })
+  );
 }
 
 function getReferenceHighlightElement(element: Element | undefined | null) {

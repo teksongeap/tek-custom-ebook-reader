@@ -177,6 +177,10 @@
     readerTargetNavigation$,
     type ReaderTargetNavigation
   } from '$lib/functions/reader-reference-layer/navigation';
+  import {
+    referenceTargetHighlightDuration,
+    requestReaderTargetHoverFocus
+  } from '$lib/functions/reader-reference-layer/highlight';
   import { onKeydownReader } from './on-keydown-reader';
   import { onDestroy, onMount, tick } from 'svelte';
   import Fa from 'svelte-fa';
@@ -1511,16 +1515,15 @@
         await tick();
       }
 
-      const annotationElement = Array.from(
-        document.querySelectorAll<HTMLElement>('[data-ttu-annotation-id]')
-      ).find((element) => element.dataset.ttuAnnotationId === annotationId);
+      const annotationElements = getRenderedAnnotationElements(annotationId);
+      const annotationElement = getAnnotationNavigationElement(annotationElements);
 
       if (!annotationElement) {
         continue;
       }
 
       if (isPaginated) {
-        scrollPaginatedAnnotationIntoView(annotationElement);
+        scrollPaginatedAnnotationIntoView(annotationElements);
       } else {
         annotationElement.scrollIntoView({
           behavior: 'smooth',
@@ -1529,7 +1532,8 @@
         });
       }
 
-      pulseRenderedAnnotation(annotationId);
+      requestReaderTargetHoverFocus(annotationElement, referenceTargetHighlightDuration);
+      pulseRenderedAnnotation(annotationId, referenceTargetHighlightDuration);
       return true;
     }
 
@@ -1542,8 +1546,24 @@
     });
   }
 
-  function scrollPaginatedAnnotationIntoView(annotationElement: HTMLElement) {
+  function getRenderedAnnotationElements(annotationId: string) {
+    return Array.from(document.querySelectorAll<HTMLElement>('[data-ttu-annotation-id]')).filter(
+      (element) => element.dataset.ttuAnnotationId === annotationId
+    );
+  }
+
+  function getAnnotationNavigationElement(annotationElements: HTMLElement[]) {
+    return annotationElements[0];
+  }
+
+  function scrollPaginatedAnnotationIntoView(annotationElements: HTMLElement[]) {
     if (!pageManager) {
+      return;
+    }
+
+    const annotationElement = getAnnotationNavigationElement(annotationElements);
+
+    if (!annotationElement) {
       return;
     }
 
@@ -1554,9 +1574,13 @@
     }
 
     const readerRect = readerElement.getBoundingClientRect();
-    const annotationRect = annotationElement.getBoundingClientRect();
+    const annotationRect = getPaginatedAnnotationTargetRect(annotationElements);
+
+    if (!annotationRect) {
+      return;
+    }
+
     const scrollProperty = $verticalMode$ ? 'scrollTop' : 'scrollLeft';
-    const viewportSize = $verticalMode$ ? readerElement.clientHeight : readerElement.clientWidth;
     const offset = $verticalMode$
       ? annotationRect.top - readerRect.top
       : annotationRect.left - readerRect.left;
@@ -1565,10 +1589,35 @@
     pageManager.scrollTo(targetScroll, false);
   }
 
-  function pulseRenderedAnnotation(annotationId: string) {
-    const annotationElements = Array.from(
-      document.querySelectorAll<HTMLElement>('[data-ttu-annotation-id]')
-    ).filter((element) => element.dataset.ttuAnnotationId === annotationId);
+  function getPaginatedAnnotationTargetRect(annotationElements: HTMLElement[]) {
+    // Inline annotation spans can split across CSS columns, so use the final rendered
+    // fragment instead of the union rect that may start in an earlier column.
+    const rects = annotationElements.flatMap((element) =>
+      Array.from(element.getClientRects()).filter((rect) => rect.width || rect.height)
+    );
+
+    if (!rects.length) {
+      return annotationElements[0]?.getBoundingClientRect();
+    }
+
+    return rects.reduce((bestRect, rect) => {
+      if ($verticalMode$) {
+        return rect.top > bestRect.top ? rect : bestRect;
+      }
+
+      if (Math.abs(rect.left - bestRect.left) > 1) {
+        return rect.left > bestRect.left ? rect : bestRect;
+      }
+
+      return rect.top > bestRect.top ? rect : bestRect;
+    }, rects[0]);
+  }
+
+  function pulseRenderedAnnotation(
+    annotationId: string,
+    duration = referenceTargetHighlightDuration
+  ) {
+    const annotationElements = getRenderedAnnotationElements(annotationId);
 
     annotationElements.forEach((element) =>
       element.classList.add('book-annotation-highlight--active')
@@ -1578,7 +1627,7 @@
       annotationElements.forEach((element) =>
         element.classList.remove('book-annotation-highlight--active')
       );
-    }, 1400);
+    }, duration);
   }
 
   function closeAnnotationsPanel() {

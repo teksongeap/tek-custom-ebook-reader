@@ -87,6 +87,8 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
     referenceDeactivateTimer = 0;
   };
 
+  const isReferenceFocusActive = () => !!referenceDeactivateTimer;
+
   const clear = () => {
     clearActivateTimer();
     clearDeactivateTimer();
@@ -105,6 +107,10 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
       activateTimer = 0;
 
       if (!currentEnabled || !node.isConnected) {
+        return;
+      }
+
+      if (isReferenceFocusActive()) {
         return;
       }
 
@@ -127,6 +133,10 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
       activateTimer = 0;
 
       if (!currentEnabled || !node.isConnected) {
+        return;
+      }
+
+      if (isReferenceFocusActive()) {
         return;
       }
 
@@ -240,6 +250,11 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
 
     clearDeactivateTimer();
 
+    if (isReferenceFocusActive()) {
+      clearActivateTimer();
+      return;
+    }
+
     if (shouldDeferActivationForPopup()) {
       schedulePointerActivate();
       return;
@@ -265,6 +280,12 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
     }
 
     rememberPointerPosition(event);
+
+    if (isReferenceFocusActive()) {
+      clearActivateTimer();
+      clearDeactivateTimer();
+      return;
+    }
 
     const hoverFocusTarget = getHoverFocusTargetAtLastPointerPosition();
     const isOnActiveBlock =
@@ -295,6 +316,12 @@ export function hoverFocus(node: HTMLElement, enabled: boolean) {
     }
 
     rememberPointerPosition(event);
+
+    if (isReferenceFocusActive()) {
+      clearActivateTimer();
+      clearDeactivateTimer();
+      return;
+    }
 
     if (!activeBlock) {
       return;
