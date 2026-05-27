@@ -28,7 +28,12 @@
   import { iffBrowser } from '$lib/functions/rxjs/iff-browser';
   import { reduceToEmptyString } from '$lib/functions/rxjs/reduce-to-empty-string';
   import {
+    createReaderLinkReference,
     findReaderTargetElement,
+    getElementSourceHref,
+    getLegacyHashHref,
+    parseCustomReaderReferenceRegexRules,
+    readReaderLinkReference,
     type ReaderTarget
   } from '$lib/functions/reader-reference-layer/epub-reference';
   import { readerFootnoteRequest$ } from '$lib/functions/reader-reference-layer/footnote';
@@ -43,6 +48,8 @@
   import { hoverFocus } from './hover-focus';
   import {
     bookReaderKeybindMap$,
+    customFootnoteBacklinkRegexRules$,
+    customFootnoteTargetRegexRules$,
     enableReaderWakeLock$,
     enableTapEdgeToFlip$,
     hoverFocusEnabled$
@@ -390,7 +397,7 @@
     const targetElement = findReaderTargetElement(source, target);
     const previewElement = targetElement ? getFootnotePreviewElement(targetElement) : undefined;
 
-    return previewElement ? clonePreviewHtml(previewElement) : '';
+    return previewElement ? clonePreviewHtml(previewElement, target) : '';
   }
 
   function getFootnotePreviewHtmlFromBook(target: ReaderTarget) {
@@ -399,7 +406,7 @@
 
     const targetElement = findReaderTargetElement(tempContainer, target);
     const previewElement = targetElement ? getFootnotePreviewElement(targetElement) : undefined;
-    const previewHtml = previewElement ? clonePreviewHtml(previewElement) : '';
+    const previewHtml = previewElement ? clonePreviewHtml(previewElement, target) : '';
 
     tempContainer.textContent = '';
 
@@ -456,7 +463,7 @@
     return value.replace(/\s+/g, ' ').trim();
   }
 
-  function clonePreviewHtml(element: Element) {
+  function clonePreviewHtml(element: Element, target: ReaderTarget) {
     const clone = element.cloneNode(true) as Element;
     const clonedElements = [clone, ...Array.from(clone.querySelectorAll('*'))];
 
@@ -467,16 +474,142 @@
 
     clonedElements
       .filter((item) => item.tagName.toLowerCase() === 'a')
-      .forEach((item) => {
-        const linkKind = item.getAttribute('data-ttu-link-kind');
-
-        if (linkKind !== 'external') {
-          item.removeAttribute('href');
-          item.setAttribute('aria-disabled', 'true');
-        }
-      });
+      .forEach((item) => normalizePreviewAnchor(item, target));
 
     return clone.outerHTML;
+  }
+
+  function normalizePreviewAnchor(element: Element, target: ReaderTarget) {
+    const reference =
+      readReaderLinkReference(element) || createFootnotePreviewLinkReference(element, target);
+
+    element.removeAttribute('aria-disabled');
+
+    if (!reference) {
+      return;
+    }
+
+    if (reference.kind === 'external') {
+      if (reference.targetHref) {
+        element.setAttribute('href', reference.targetHref);
+        element.setAttribute('target', '_blank');
+        element.setAttribute('rel', 'noopener noreferrer');
+      } else {
+        disablePreviewAnchor(element);
+      }
+
+      return;
+    }
+
+    element.setAttribute('href', getLegacyHashHref(reference));
+    element.removeAttribute('target');
+    element.removeAttribute('rel');
+  }
+
+  function disablePreviewAnchor(element: Element) {
+    element.removeAttribute('href');
+    element.removeAttribute('target');
+    element.removeAttribute('rel');
+    element.setAttribute('aria-disabled', 'true');
+  }
+
+  function createFootnotePreviewLinkReference(element: Element, target: ReaderTarget) {
+    const originalHref =
+      element.getAttribute('data-ttu-original-href') || element.getAttribute('href');
+
+    if (!originalHref) {
+      return undefined;
+    }
+
+    return createReaderLinkReference(
+      getElementSourceHref(element) || target.sourceHref || '',
+      originalHref,
+      element,
+      {
+        ...getCustomFootnotePatterns(),
+        referenceRoot: contentEl
+      }
+    );
+  }
+
+  function handleFootnotePreviewClick(event: MouseEvent) {
+    const currentTarget = event.currentTarget;
+
+    if (!(currentTarget instanceof HTMLElement)) {
+      return;
+    }
+
+    const anchor = getFootnotePreviewAnchor(event.target, currentTarget);
+
+    if (!anchor) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+
+    const reference = getFootnotePreviewLinkReference(anchor);
+
+    if (!reference) {
+      return;
+    }
+
+    if (reference.kind === 'external') {
+      if (reference.targetHref) {
+        window.open(reference.targetHref, '_blank', 'noopener,noreferrer');
+      }
+
+      return;
+    }
+
+    if (reference.kind === 'footnote') {
+      openFootnotePreview(reference.target);
+      return;
+    }
+
+    readerTargetNavigation$.next({ target: reference.target, highlight: true });
+    closeFootnotePreview();
+  }
+
+  function footnotePreviewLinks(node: HTMLElement) {
+    node.addEventListener('click', handleFootnotePreviewClick);
+
+    return {
+      destroy() {
+        node.removeEventListener('click', handleFootnotePreviewClick);
+      }
+    };
+  }
+
+  function getFootnotePreviewAnchor(target: EventTarget | null, root: HTMLElement) {
+    if (!(target instanceof Element)) {
+      return undefined;
+    }
+
+    const anchor = target.closest('a');
+
+    return anchor instanceof HTMLAnchorElement && root.contains(anchor) ? anchor : undefined;
+  }
+
+  function getFootnotePreviewLinkReference(element: Element) {
+    return (
+      readReaderLinkReference(element) ||
+      (footnotePreviewTarget
+        ? createFootnotePreviewLinkReference(element, footnotePreviewTarget)
+        : undefined)
+    );
+  }
+
+  function getCustomFootnotePatterns() {
+    return {
+      customFootnoteBacklinkPatterns: parseCustomReaderReferenceRegexRules(
+        $customFootnoteBacklinkRegexRules$
+      ),
+      customFootnoteTargetPatterns: parseCustomReaderReferenceRegexRules(
+        $customFootnoteTargetRegexRules$
+      )
+    };
   }
 
   function handleFootnoteKeydown(event: KeyboardEvent) {
@@ -645,6 +778,8 @@
   class={pxReader}
   style:padding-top="2.375rem"
   style:padding-bottom={`calc(2rem + ${bottomChromeClearance}px)`}
+  style:--reader-page-text={fontColor || 'var(--font-color)'}
+  style:--reader-page-bg={backgroundColor || 'var(--background-color)'}
   use:hoverFocus={$hoverFocusEnabled$}
 >
   {#if viewMode === ViewMode.Continuous}
@@ -758,6 +893,8 @@
       style:color={fontColor}
       style:background-color={backgroundColor}
       style:border-color={fontColor}
+      style:--reader-page-text={fontColor || 'var(--font-color)'}
+      style:--reader-page-bg={backgroundColor || 'var(--background-color)'}
     >
       <div class="book-footnote-preview-header" style:border-color={fontColor}>
         <div class="book-footnote-preview-title">Footnote</div>
@@ -787,6 +924,7 @@
         style:font-family="var(--font-family-serif, 'Lora', 'Noto Serif JP', serif)"
         style:font-size="{fontSize}px"
         style:line-height={lineHeight}
+        use:footnotePreviewLinks
         on:touchmove|stopPropagation={() => {}}
         on:wheel|stopPropagation={() => {}}
       >
@@ -838,6 +976,16 @@
   }
 
   .book-footnote-preview-card {
+    --book-content-link-color: color-mix(
+      in srgb,
+      var(--app-accent, #1c6ed0) 72%,
+      var(--reader-page-text, currentColor) 28%
+    );
+    --book-content-link-visited-color: color-mix(
+      in srgb,
+      var(--app-accent-strong, var(--app-accent, #1c6ed0)) 54%,
+      var(--reader-page-text, currentColor) 46%
+    );
     pointer-events: auto;
     box-sizing: border-box;
     max-height: min(45vh, 26rem);
@@ -910,7 +1058,25 @@
     padding: 0.85rem 1rem 1rem;
   }
 
+  .book-footnote-preview-content :global(a[href]) {
+    color: var(--book-content-link-color);
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-thickness: from-font;
+    text-underline-offset: 0.12em;
+  }
+
+  .book-footnote-preview-content :global(a[href]:visited) {
+    color: var(--book-content-link-visited-color);
+  }
+
+  .book-footnote-preview-content :global(a[href]):hover,
+  .book-footnote-preview-content :global(a[href]):focus-visible {
+    color: var(--reader-page-text, currentColor);
+  }
+
   .book-footnote-preview-content :global(a[aria-disabled='true']) {
+    color: inherit;
     cursor: default;
     text-decoration: none;
   }

@@ -48,6 +48,7 @@ export interface CreateReaderLinkReferenceOptions {
 }
 
 const externalHrefRegex = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
+const safeExternalHrefProtocols = new Set(['http:', 'https:', 'mailto:', 'tel:']);
 const footnoteIdPatterns = [
   /(?:^|[-_:])(?:fn|ftn|footnotes?|notes?|endnotes?|en)(?:[-_:]|\d|$)/i,
   /(?:^|[-_:])(?:_?id)?(?:footnote|endnote)(?:[-_:]|\d|$)/i,
@@ -109,7 +110,7 @@ export function createReaderLinkReference(
       kind: 'external',
       originalHref,
       sourceHref: normalizedSourceHref,
-      targetHref: href,
+      targetHref: getSafeExternalHref(href),
       target: {}
     };
   }
@@ -265,6 +266,20 @@ export function findReaderTargetElement(source: Document | Element, target: Read
 
 function isExternalHref(href: string) {
   return externalHrefRegex.test(href);
+}
+
+function getSafeExternalHref(href: string) {
+  if (href.startsWith('//')) {
+    return href;
+  }
+
+  try {
+    const url = new URL(href);
+
+    return safeExternalHrefProtocols.has(url.protocol) ? href : undefined;
+  } catch (_) {
+    return undefined;
+  }
 }
 
 function splitHref(href: string) {

@@ -6,6 +6,16 @@
   --book-content-selection-background-color: var(--app-accent-soft);
   --book-content-hover-focus-enter-duration: 140ms;
   --book-content-hover-focus-exit-duration: 300ms;
+  --book-content-link-color: color-mix(
+    in srgb,
+    var(--app-accent, #1c6ed0) 72%,
+    var(--reader-page-text, currentColor) 28%
+  );
+  --book-content-link-visited-color: color-mix(
+    in srgb,
+    var(--app-accent-strong, var(--app-accent, #1c6ed0)) 54%,
+    var(--reader-page-text, currentColor) 46%
+  );
 }
 
 .book-content {
@@ -24,16 +34,21 @@
     margin: auto;
   }
 
-  :global(a) {
-    color: inherit !important;
+  :global(a[href]) {
+    color: var(--book-content-link-color) !important;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-thickness: from-font;
+    text-underline-offset: 0.12em;
   }
 
-  :global(a:link) {
-    opacity: 0.8;
+  :global(a[href]:visited) {
+    color: var(--book-content-link-visited-color) !important;
   }
 
-  :global(a):hover {
-    opacity: 0.95;
+  :global(a[href]):hover,
+  :global(a[href]):focus-visible {
+    color: var(--reader-page-text, currentColor) !important;
   }
 
   :global(ruby > rt) {
