@@ -269,7 +269,7 @@
     color: color-mix(in srgb, var(--reader-page-text) 76%, transparent);
     font-size: 0.875rem;
     font-weight: 400;
-    line-height: 1;
+    line-height: 1.18;
   }
 
   .reader-chapter-card-label {
@@ -277,6 +277,7 @@
     max-width: 100%;
     min-width: 0;
     overflow: hidden;
+    padding-block: 0.08em;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
