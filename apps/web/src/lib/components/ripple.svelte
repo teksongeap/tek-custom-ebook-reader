@@ -92,8 +92,7 @@
     createRipple(touch.clientX, touch.clientY, rect.left, rect.top, rect.width, rect.height);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function animateRipple(node: HTMLElement, params: any) {
+  function animateRipple(_node: HTMLElement, _params?: any) {
     return {
       delay: 0,
       duration: 400,

@@ -12,7 +12,9 @@ const BUILD_CACHE_NAME = `build:${version}`;
 
 const prerenderedSet = new Set(prerendered);
 
-const assetsToCache = build.concat(files).concat(prerendered);
+const allAssets = build.concat(files).concat(prerendered);
+const lazyAssets = new Set(allAssets.filter(isFontAsset));
+const assetsToCache = allAssets.filter((asset) => !lazyAssets.has(asset));
 const cachedAssets = new Set(assetsToCache);
 
 worker.addEventListener('install', (event) => {
@@ -42,6 +44,7 @@ worker.addEventListener('fetch', (event) => {
     url.hostname === worker.location.hostname && url.port !== worker.location.port;
   const isSelfHost = url.host === worker.location.host;
   const isBuildAsset = isSelfHost && cachedAssets.has(url.pathname);
+  const isLazyAsset = isSelfHost && lazyAssets.has(url.pathname);
   const skipBecauseUncached = event.request.cache === 'only-if-cached' && !isBuildAsset;
 
   if (!isHttp || isDevServerRequest || skipBecauseUncached) return;
@@ -64,9 +67,11 @@ worker.addEventListener('fetch', (event) => {
   }
 
   if (isSelfHost) {
-    const response = isBuildAsset
-      ? caches.match(url.pathname).then((r) => r ?? fetch(event.request))
-      : selfHostParameterizedUrlResponse(event.request);
+    const response = isLazyAsset
+      ? cacheLazyBuildAsset(event.request)
+      : isBuildAsset
+        ? caches.match(url.pathname).then((r) => r ?? fetch(event.request))
+        : selfHostParameterizedUrlResponse(event.request);
     if (response) {
       event.respondWith(response);
       return;
@@ -77,6 +82,21 @@ worker.addEventListener('fetch', (event) => {
     event.respondWith(networkFirstRaceCache(event.request));
   }
 });
+
+async function cacheLazyBuildAsset(request: Request) {
+  const url = new URL(request.url);
+  const cache = await caches.open(BUILD_CACHE_NAME);
+  const cachedResponse = await cache.match(url.pathname);
+
+  if (cachedResponse) {
+    return cachedResponse;
+  }
+
+  const response = await fetch(request);
+  cache.put(url.pathname, response.clone());
+
+  return response;
+}
 
 async function networkFirstRaceCache(
   request: Request,
@@ -147,4 +167,8 @@ function createRedirectResponse(location: string) {
       location
     }
   });
+}
+
+function isFontAsset(asset: string) {
+  return /\.(?:otf|ttf|woff2?)$/i.test(asset);
 }

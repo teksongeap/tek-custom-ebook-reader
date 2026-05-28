@@ -20,7 +20,7 @@ import { storageSource$ } from '$lib/data/storage/storage-view';
 const saltByteLength = 16;
 const ivByteLength = 12;
 
-async function generateKey(window: Window, salt: Uint8Array, secret: string) {
+async function generateKey(window: Window, salt: BufferSource, secret: string) {
   return window.crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',

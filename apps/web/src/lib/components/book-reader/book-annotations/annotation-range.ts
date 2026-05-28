@@ -256,7 +256,12 @@ function wrapRangeWithAnnotation(document: Document, range: Range, annotation: B
     span.tabIndex = 0;
     span.style.setProperty('--book-annotation-base', getAnnotationColorValue(annotation.color));
 
-    annotationTextNode.parentNode.insertBefore(span, annotationTextNode);
+    const parentNode = annotationTextNode.parentNode;
+    if (!parentNode) {
+      continue;
+    }
+
+    parentNode.insertBefore(span, annotationTextNode);
     span.appendChild(annotationTextNode);
     spans.push(span);
   }
