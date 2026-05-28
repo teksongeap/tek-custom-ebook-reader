@@ -1118,6 +1118,11 @@
     box-shadow: var(--app-focus-ring);
   }
 
+  .book-annotation-card-textarea::selection {
+    background: var(--app-accent);
+    color: #ffffff;
+  }
+
   .book-annotation-card-editor-actions {
     display: flex;
     align-items: center;
