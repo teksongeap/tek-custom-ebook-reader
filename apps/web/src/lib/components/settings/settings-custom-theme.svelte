@@ -3,7 +3,7 @@
   import DialogTemplate from '$lib/components/dialog-template.svelte';
   import Ripple from '$lib/components/ripple.svelte';
   import SettingsCustomThemeInput from '$lib/components/settings/settings-custom-theme-input.svelte';
-  import { buttonClasses } from '$lib/css-classes';
+  import { buttonClasses, inputClasses } from '$lib/css-classes';
   import { customThemes$, theme$ } from '$lib/data/store';
   import { availableThemes, type CustomThemeValue, type ThemeOption } from '$lib/data/theme-option';
   import { createEventDispatcher, onMount } from 'svelte';
@@ -193,7 +193,7 @@
     <div
       class="grid grid-cols-1 gap-2 items-center overflow-auto max-h-[60vh] sm:grid-cols-[auto_auto_5rem] sm:gap-4"
     >
-      <select class="sm:col-span-2" bind:value={themeToCopy}>
+      <select class={`${inputClasses} sm:col-span-2`} bind:value={themeToCopy}>
         {#each existingThemes as theme (theme.id)}
           <option value={theme.id}>
             {theme.id}
@@ -243,7 +243,7 @@
         on:alpha={handleAlphaValueChange}
       />
       <input
-        class="sm:col-span-2"
+        class={`${inputClasses} sm:col-span-2`}
         type="text"
         placeholder="Theme Name"
         bind:value={themeName}
