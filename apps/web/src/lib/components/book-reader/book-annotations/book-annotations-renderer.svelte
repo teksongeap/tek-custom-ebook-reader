@@ -11,7 +11,12 @@
     faPen,
     faTrash,
     faUpRightAndDownLeftFromCenter,
-    faXmark
+    faXmark,
+    faCircleCheck,
+    faSquareCheck,
+    faCheck,
+    faCheckDouble,
+    faReply  
   } from '@fortawesome/free-solid-svg-icons';
   import {
     clearAnnotationHighlights,
@@ -910,7 +915,7 @@
               aria-keyshortcuts="Enter"
               on:click|stopPropagation={() => saveActiveAnnotation(true)}
             >
-              <span>Save</span>
+              <span>Save(⏎)</span>
               <Fa icon={faFloppyDisk} />
             </button>
           </span>
