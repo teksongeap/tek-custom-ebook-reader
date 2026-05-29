@@ -5,9 +5,9 @@
   import { createEventDispatcher, onDestroy, tick } from 'svelte';
   import Fa from 'svelte-fa';
   import {
-    faCheck,
     faChevronDown,
     faChevronUp,
+    faFloppyDisk,
     faPen,
     faTrash,
     faUpRightAndDownLeftFromCenter,
@@ -277,7 +277,8 @@
       isEditing && editingPopoverHeight
         ? limitToRange(minHeight, maxHeight, editingPopoverHeight)
         : undefined;
-    const width = nextEditingWidth || Math.min(maxWidth, popoverRect.width || maxWidth);
+    const measuredWidth = Math.min(maxWidth, popoverRect.width || maxWidth);
+    const width = nextEditingWidth || (isCommentExpanded && !isEditing ? maxWidth : measuredWidth);
     const fallbackHeight = isEditing && isEditingPopoverManuallySized ? minHeight : 140;
     const height = Math.max(
       nextEditingHeight || popoverRect.height || fallbackHeight,
@@ -537,6 +538,11 @@
     }
 
     if (event.key !== 'Enter' || event.shiftKey || event.isComposing) {
+      if (event.key === 'Escape' && !event.isComposing) {
+        event.preventDefault();
+        cancelActiveEdit();
+      }
+
       return;
     }
 
@@ -557,6 +563,13 @@
       }
 
       closeAnnotationCard();
+      return;
+    }
+
+    if (isEditing && event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelActiveEdit();
       return;
     }
 
@@ -847,7 +860,7 @@
             aria-keyshortcuts="E"
             on:click|stopPropagation={editActiveAnnotation}
           >
-            <span>Edit</span>
+            <span>Edit (E)</span>
             <Fa icon={faPen} />
           </button>
         </span>
@@ -858,6 +871,7 @@
             class="book-annotation-card-action"
             title="Cancel editing"
             aria-label="Cancel editing"
+            aria-keyshortcuts="Escape"
             on:click|stopPropagation={cancelActiveEdit}
           >
             <Fa icon={faXmark} />
@@ -893,10 +907,11 @@
               class="book-annotation-card-editor-action book-annotation-card-editor-action--primary"
               title="Save annotation"
               aria-label="Save annotation"
+              aria-keyshortcuts="Enter"
               on:click|stopPropagation={() => saveActiveAnnotation(true)}
             >
               <span>Save</span>
-              <Fa icon={faCheck} />
+              <Fa icon={faFloppyDisk} />
             </button>
           </span>
           <span class="book-annotation-card-editor-resize-actions">
@@ -931,7 +946,7 @@
           on:click|stopPropagation={toggleCommentExpanded}
         >
           <span class="book-annotation-card-expand-label">
-            {isCommentExpanded ? 'Show less' : 'Show more'}
+            {isCommentExpanded ? 'Show less (S)' : 'Show more (S)'}
           </span>
           <span class="book-annotation-card-expand-icon" aria-hidden="true">
             <Fa icon={isCommentExpanded ? faChevronUp : faChevronDown} />
@@ -1092,11 +1107,12 @@
     color: color-mix(in srgb, var(--reader-page-text) 64%, transparent);
     font: inherit;
     outline: none;
+    white-space: nowrap;
   }
 
   .book-annotation-card-action--labeled {
     width: auto;
-    min-width: 3.85rem;
+    min-width: 5rem;
     padding: 0 0.55rem;
   }
 
@@ -1156,6 +1172,7 @@
     font-weight: 500;
     outline: none;
     padding: 0.44rem 0.65rem;
+    white-space: nowrap;
     transition:
       background-color 140ms ease,
       border-color 140ms ease,
@@ -1285,6 +1302,7 @@
     font: inherit;
     outline: none;
     padding: 0 0.55rem;
+    white-space: nowrap;
   }
 
   .book-annotation-card-editor-action:hover,
@@ -1306,14 +1324,14 @@
   }
 
   .book-annotation-card-editor-action--primary {
-    min-width: 4.4rem;
-    background: color-mix(in srgb, var(--app-accent) 18%, transparent);
-    color: var(--app-accent);
+    min-width: 7rem;
+    background: transparent;
+    color: color-mix(in srgb, var(--reader-page-text) 68%, transparent);
   }
 
   .book-annotation-card-editor-action--primary:hover,
   .book-annotation-card-editor-action--primary:focus-visible {
-    background: color-mix(in srgb, var(--app-accent) 26%, transparent);
+    background: color-mix(in srgb, var(--app-accent) 18%, transparent);
     color: var(--app-accent);
   }
 
