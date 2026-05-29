@@ -281,6 +281,10 @@ function getTextNodesInRange(document: Document, range: Range) {
 
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
+      if (isRubyAnnotationTextNode(node)) {
+        return NodeFilter.FILTER_REJECT;
+      }
+
       return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
     }
   });
@@ -296,6 +300,10 @@ function getTextNodesInRange(document: Document, range: Range) {
   }
 
   return textNodes;
+}
+
+function isRubyAnnotationTextNode(node: Node) {
+  return !!node.parentElement?.closest('rt, rp, rtc');
 }
 
 function getUnionRect(rects: DOMRect[]) {
