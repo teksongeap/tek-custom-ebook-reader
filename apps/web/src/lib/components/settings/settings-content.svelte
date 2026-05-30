@@ -107,6 +107,8 @@
 
   export let hoverFocusEnabled: boolean;
 
+  export let annotationHoverDelay: number;
+
   export let textMarginMode: TextMarginMode;
 
   export let enableReaderWakeLock: boolean;
@@ -631,6 +633,28 @@
       tooltip={'When enabled hovering a paragraph dims surrounding paragraphs. The reader pauses focus changes while dictionary popups are visible and Alt+H toggles it while reading'}
     >
       <ButtonToggleGroup options={optionsForToggle} bind:selectedOptionId={hoverFocusEnabled} />
+    </SettingsItemGroup>
+    <SettingsItemGroup
+      title="Annotation Hover Delay"
+      tooltip="Time in milliseconds before an annotation comment appears on hover. Click and edit still open immediately"
+    >
+      <input
+        type="number"
+        class={inputClasses}
+        step="10"
+        min="0"
+        max="2000"
+        bind:value={annotationHoverDelay}
+        on:blur={() => {
+          const newValue = Number.parseFloat(`${annotationHoverDelay ?? 120}`);
+
+          if (isNaN(newValue) || newValue < 0) {
+            annotationHoverDelay = 120;
+          } else {
+            annotationHoverDelay = Math.min(Math.round(newValue), 2000);
+          }
+        }}
+      />
     </SettingsItemGroup>
     <SettingsItemGroup
       title="Paragraph Margin Mode"

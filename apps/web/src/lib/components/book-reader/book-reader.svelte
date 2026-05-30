@@ -166,6 +166,8 @@
 
   export let annotationPopoverResetKey = 0;
 
+  export let annotationHoverDelay = 120;
+
   let showBlurMessage = false;
 
   let wakeLock: WakeLockSentinel | undefined;
@@ -939,6 +941,7 @@
   {activeAnnotationId}
   editAnnotationId={activeAnnotationEditId}
   {annotationPopoverResetKey}
+  {annotationHoverDelay}
   {fontColor}
   {backgroundColor}
   renderRevision={annotationRenderRevision}

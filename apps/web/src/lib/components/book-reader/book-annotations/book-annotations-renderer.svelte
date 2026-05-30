@@ -36,6 +36,7 @@
   export let backgroundColor = '';
   export let renderRevision = 0;
   export let annotationPopoverResetKey = 0;
+  export let annotationHoverDelay = 120;
 
   const dispatch = createEventDispatcher<{
     activate: string;
@@ -47,6 +48,7 @@
   let activeAnnotation: BooksDbAnnotation | undefined;
   let popoverEl: HTMLElement | undefined;
   let closeTimer: number | undefined;
+  let hoverOpenTimer: number | undefined;
   let isPinned = false;
   let popoverStyle = '';
   let handledActiveAnnotationId = '';
@@ -68,6 +70,7 @@
   let commentEl: HTMLElement | undefined;
   let commentCanExpand = false;
   let isCommentExpanded = false;
+  let hoveredAnnotationId = '';
   const cleanupBySpan = new WeakMap<HTMLSpanElement, () => void>();
   const draftTextAreaMinHeight = 38;
   const editingPopoverMinHeight = 164;
@@ -133,6 +136,7 @@
   }
 
   onDestroy(() => {
+    window.clearTimeout(hoverOpenTimer);
     detachSpanListeners();
     document.removeEventListener('pointerdown', closePinnedPopover, true);
 
@@ -170,8 +174,8 @@
   }
 
   function attachSpanListeners(annotation: BooksDbAnnotation, span: HTMLSpanElement) {
-    const pointerEnter = () => openAnnotation(annotation, false);
-    const pointerLeave = () => scheduleClose();
+    const pointerEnter = () => queueHoverOpen(annotation);
+    const pointerLeave = () => clearHoverOpen(annotation);
     const click = (event: MouseEvent) => {
       event.preventDefault();
       event.stopPropagation();
@@ -212,6 +216,8 @@
   }
 
   async function openAnnotation(annotation: BooksDbAnnotation, pinned: boolean) {
+    window.clearTimeout(hoverOpenTimer);
+
     if (!pinned && isPinned) {
       window.clearTimeout(closeTimer);
       return;
@@ -248,6 +254,39 @@
       document.removeEventListener('pointerdown', closePinnedPopover, true);
       document.addEventListener('pointerdown', closePinnedPopover, true);
     }
+  }
+
+  function queueHoverOpen(annotation: BooksDbAnnotation) {
+    hoveredAnnotationId = annotation.id;
+    updateActiveHighlight();
+
+    window.clearTimeout(closeTimer);
+    window.clearTimeout(hoverOpenTimer);
+
+    if (isPinned || editingAnnotationId) {
+      return;
+    }
+
+    hoverOpenTimer = window.setTimeout(() => {
+      hoverOpenTimer = undefined;
+
+      if (hoveredAnnotationId !== annotation.id) {
+        return;
+      }
+
+      void openAnnotation(annotation, false);
+    }, getAnnotationHoverDelay());
+  }
+
+  function clearHoverOpen(annotation: BooksDbAnnotation) {
+    window.clearTimeout(hoverOpenTimer);
+
+    if (hoveredAnnotationId === annotation.id) {
+      hoveredAnnotationId = '';
+      updateActiveHighlight();
+    }
+
+    scheduleClose();
   }
 
   async function openAnnotationForEditing(annotation: BooksDbAnnotation) {
@@ -385,6 +424,7 @@
   }
 
   function closeAnnotationCard() {
+    window.clearTimeout(hoverOpenTimer);
     activeAnnotation = undefined;
     isPinned = false;
     popoverReady = false;
@@ -397,6 +437,7 @@
     isEditingPopoverManuallySized = false;
     isCommentExpanded = false;
     commentCanExpand = false;
+    hoveredAnnotationId = '';
     updateActiveHighlight();
     document.removeEventListener('pointerdown', closePinnedPopover, true);
   }
@@ -626,9 +667,16 @@
 
   function updateActiveHighlight() {
     renderedSpans.forEach(({ annotation, span }) => {
+      const isActive = annotation.id === activeAnnotation?.id;
+      const isHovered = annotation.id === hoveredAnnotationId;
+
       span.classList.toggle(
         'book-annotation-highlight--active',
-        annotation.id === activeAnnotation?.id
+        isActive
+      );
+      span.classList.toggle(
+        'book-annotation-highlight--hovered',
+        isHovered && !isActive && !isPinned && !editingAnnotationId
       );
     });
   }
@@ -655,6 +703,16 @@
 
   function limitToRange(min: number, max: number, value: number) {
     return Math.min(Math.max(value, min), Math.max(min, max));
+  }
+
+  function getAnnotationHoverDelay() {
+    const delay = Number(annotationHoverDelay);
+
+    if (!Number.isFinite(delay)) {
+      return 120;
+    }
+
+    return limitToRange(0, 2000, Math.round(delay));
   }
 
   function getEditingPopoverSizeBounds(
@@ -999,7 +1057,8 @@
     background: color-mix(in srgb, var(--book-annotation-base) 64%, transparent);
   }
 
-  :global(.book-annotation-highlight--active) {
+  :global(.book-annotation-highlight--active),
+  :global(.book-annotation-highlight--hovered) {
     box-shadow:
       0 0 0 2px color-mix(in srgb, var(--book-annotation-base) 72%, transparent),
       0 8px 24px color-mix(in srgb, var(--book-annotation-base) 22%, transparent);

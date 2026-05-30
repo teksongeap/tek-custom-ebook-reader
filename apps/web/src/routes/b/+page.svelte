@@ -38,6 +38,7 @@
   import MessageDialog from '$lib/components/message-dialog.svelte';
   import StyleSheetRenderer from '$lib/components/style-sheet-renderer.svelte';
   import {
+    annotationHoverDelay$,
     autoBookmark$,
     autoBookmarkTime$,
     autoPositionOnResize$,
@@ -2305,6 +2306,7 @@
     {activeAnnotationId}
     {activeAnnotationEditId}
     {annotationPopoverResetKey}
+    annotationHoverDelay={$annotationHoverDelay$}
     on:annotationActivate={({ detail }) => (activeAnnotationId = detail)}
     on:annotationUpdate={updateAnnotationComment}
     on:annotationDelete={({ detail }) => deleteAnnotation(detail)}

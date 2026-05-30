@@ -8,6 +8,7 @@
   import {
     addCharactersOnCompletion$,
     adjustStatisticsAfterIdleTime$,
+    annotationHoverDelay$,
     autoBookmark$,
     autoBookmarkTime$,
     autoPositionOnResize$,
@@ -167,6 +168,7 @@
       bind:enableTextJustification={$enableTextJustification$}
       bind:enableTextWrapPretty={$enableTextWrapPretty$}
       bind:hoverFocusEnabled={$hoverFocusEnabled$}
+      bind:annotationHoverDelay={$annotationHoverDelay$}
       bind:textMarginMode={$textMarginMode$}
       bind:enableReaderWakeLock={$enableReaderWakeLock$}
       bind:showCharacterCounter={$showCharacterCounter$}
