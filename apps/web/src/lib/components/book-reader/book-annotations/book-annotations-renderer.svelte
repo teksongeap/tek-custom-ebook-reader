@@ -285,10 +285,7 @@
     const measuredWidth = Math.min(maxWidth, popoverRect.width || maxWidth);
     const width = nextEditingWidth || (isCommentExpanded && !isEditing ? maxWidth : measuredWidth);
     const fallbackHeight = isEditing && isEditingPopoverManuallySized ? minHeight : 140;
-    const height = Math.max(
-      nextEditingHeight || popoverRect.height || fallbackHeight,
-      fallbackHeight
-    );
+    const height = nextEditingHeight || popoverRect.height || fallbackHeight;
     const anchorCenterX = rect.left + rect.width / 2;
     const hasRoomAbove = rect.top - viewportTop > height + gap + 12;
     const anchoredTop = hasRoomAbove
