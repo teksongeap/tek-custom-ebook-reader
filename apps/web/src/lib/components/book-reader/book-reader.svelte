@@ -25,6 +25,7 @@
   import type { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
   import { BookReaderAvailableKeybind } from '$lib/data/book-reader-keybind';
   import { ViewMode } from '$lib/data/view-mode';
+  import { getReaderChromeStyle } from '$lib/functions/reader-typography';
   import { iffBrowser } from '$lib/functions/rxjs/iff-browser';
   import { reduceToEmptyString } from '$lib/functions/rxjs/reduce-to-empty-string';
   import {
@@ -212,6 +213,12 @@
     firstDimensionMargin && ViewMode.Paginated === viewMode && !verticalMode
       ? firstDimensionMargin * 2
       : 0;
+  $: readerChromeStyle = getReaderChromeStyle({ fontSize, fontColor, backgroundColor });
+  $: readerContainerStyle = [
+    readerChromeStyle,
+    'padding-top: 2.375rem',
+    `padding-bottom: calc(2rem + ${bottomChromeClearance}px)`
+  ].join('; ');
 
   $: syncWakeLock($enableReaderWakeLock$, visibilityState);
 
@@ -778,10 +785,7 @@
 <div
   bind:this={$containerEl$}
   class={pxReader}
-  style:padding-top="2.375rem"
-  style:padding-bottom={`calc(2rem + ${bottomChromeClearance}px)`}
-  style:--reader-page-text={fontColor || 'var(--font-color)'}
-  style:--reader-page-bg={backgroundColor || 'var(--background-color)'}
+  style={readerContainerStyle}
   use:hoverFocus={$hoverFocusEnabled$}
 >
   {#if viewMode === ViewMode.Continuous}
@@ -892,11 +896,7 @@
       class="book-footnote-preview-card"
       role="dialog"
       aria-label="Footnote"
-      style:color={fontColor}
-      style:background-color={backgroundColor}
-      style:border-color={fontColor}
-      style:--reader-page-text={fontColor || 'var(--font-color)'}
-      style:--reader-page-bg={backgroundColor || 'var(--background-color)'}
+      style={`${readerChromeStyle}; color: ${fontColor || 'var(--font-color)'}; background-color: ${backgroundColor || 'var(--background-color)'}; border-color: ${fontColor || 'var(--font-color)'}`}
     >
       <div class="book-footnote-preview-header" style:border-color={fontColor}>
         <div class="book-footnote-preview-title">Footnote</div>
@@ -924,7 +924,7 @@
       <div
         class="book-footnote-preview-content"
         style:font-family="var(--font-family-serif, 'Lora', 'Noto Serif JP', serif)"
-        style:font-size="{fontSize}px"
+        style:font-size="var(--reader-content-font-size)"
         style:line-height={lineHeight}
         use:footnotePreviewLinks
         on:touchmove|stopPropagation={() => {}}
@@ -943,6 +943,7 @@
   {annotationPopoverResetKey}
   {annotationHoverDelay}
   {fontColor}
+  {fontSize}
   {backgroundColor}
   renderRevision={annotationRenderRevision}
   on:activate={({ detail }) => dispatch('annotationActivate', detail)}
@@ -998,6 +999,7 @@
     border: 1px solid;
     border-radius: 0.75rem 0.75rem 0 0;
     box-shadow: 0 20px 52px rgba(5, 7, 10, 0.3);
+    font-size: var(--reader-ui-font-size);
   }
 
   .book-footnote-preview-root--vertical .book-footnote-preview-card {
@@ -1018,7 +1020,7 @@
   .book-footnote-preview-title {
     min-width: 0;
     overflow: hidden;
-    font-size: 0.9rem;
+    font-size: var(--reader-ui-font-size);
     font-weight: 760;
     line-height: 1.2;
     text-overflow: ellipsis;

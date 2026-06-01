@@ -156,6 +156,7 @@
   import { ViewMode } from '$lib/data/view-mode';
   import loadBookData from '$lib/functions/book-data-loader/load-book-data';
   import { formatPageTitle } from '$lib/functions/format-page-title';
+  import { getReaderChromeStyle, getReaderSurfaceStyle } from '$lib/functions/reader-typography';
   import { iffBrowser } from '$lib/functions/rxjs/iff-browser';
   import {
     AutoReplicationType,
@@ -637,9 +638,16 @@
 
   $: footerChapterTicks = getChapterTicks($sectionData$, bookCharCount);
 
-  $: readerChromeStyle = `--reader-page-bg: ${
-    $backgroundColor$ || 'var(--background-color)'
-  }; --reader-page-text: ${$themeOption$?.fontColor || 'var(--font-color)'};`;
+  $: readerChromeStyle = getReaderChromeStyle({
+    fontSize: $fontSize$,
+    fontColor: $themeOption$?.fontColor ?? '',
+    backgroundColor: $backgroundColor$ ?? ''
+  });
+  $: readerSurfaceStyle = getReaderSurfaceStyle({
+    fontSize: $fontSize$,
+    fontColor: $themeOption$?.fontColor ?? '',
+    backgroundColor: $backgroundColor$ ?? ''
+  });
 
   $: upSyncEnabled =
     externalStorageHandler &&
@@ -2137,6 +2145,7 @@
   >
     <BookReaderHeader
       bookTitle={$rawBookData$?.title ?? ''}
+      fontSize={$fontSize$}
       fontColor={$themeOption$?.fontColor ?? ''}
       backgroundColor={$backgroundColor$ ?? ''}
       hasChapterData={!!$sectionData$?.length}
@@ -2223,6 +2232,7 @@
   {#if $statisticsEnabled$}
     <BookReadingTracker
       fontColor={$themeOption$.fontColor}
+      fontSize={$fontSize$}
       backgroundColor={$backgroundColor$}
       bookTitle={$rawBookData$.title}
       sectionData={$sectionData$}
@@ -2317,6 +2327,7 @@
     selectionRect={annotationSelectionRect}
     anchorRect={annotationSelectionAnchorRect}
     verticalMode={$verticalMode$}
+    fontSize={$fontSize$}
     fontColor={$themeOption$?.fontColor ?? ''}
     backgroundColor={$backgroundColor$ ?? ''}
     on:save={createAnnotation}
@@ -2336,8 +2347,7 @@
 {#if $tocIsOpen$ && $sectionData$}
   <div
     class="reader-side-panel-shell writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
-    style:color={$themeOption$?.fontColor}
-    style:background-color={$backgroundColor$}
+    style={readerSurfaceStyle}
     in:fly|local={{ x: -100, duration: 100, easing: quintInOut }}
     use:clickOutside={() => {
       if ($statisticsEnabled$ && !wasTrackerPaused) {
@@ -2352,6 +2362,7 @@
       verticalMode={$verticalMode$}
       {exploredCharCount}
       {wasTrackerPaused}
+      fontSize={$fontSize$}
       fontColor={$themeOption$?.fontColor ?? ''}
       backgroundColor={$backgroundColor$ ?? ''}
     />
@@ -2361,13 +2372,13 @@
 {#if showSearchPanel && $bookData$}
   <div
     class="reader-side-panel-shell writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
-    style:color={$themeOption$?.fontColor}
-    style:background-color={$backgroundColor$}
+    style={readerSurfaceStyle}
     in:fly|local={{ x: -100, duration: 100, easing: quintInOut }}
     use:clickOutside={closeSearchPanel}
   >
     <BookSearchPanel
       htmlContent={$bookData$.htmlContent}
+      fontSize={$fontSize$}
       fontColor={$themeOption$?.fontColor ?? ''}
       backgroundColor={$backgroundColor$ ?? ''}
       on:close={closeSearchPanel}
@@ -2379,14 +2390,14 @@
 {#if showAnnotationsPanel}
   <div
     class="reader-side-panel-shell writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
-    style:color={$themeOption$?.fontColor}
-    style:background-color={$backgroundColor$}
+    style={readerSurfaceStyle}
     in:fly|local={{ x: -100, duration: 100, easing: quintInOut }}
     use:clickOutside={closeAnnotationsPanel}
   >
     <BookAnnotationsPanel
       {annotations}
       sectionData={$sectionData$ ?? []}
+      fontSize={$fontSize$}
       fontColor={$themeOption$?.fontColor ?? ''}
       backgroundColor={$backgroundColor$ ?? ''}
       on:close={closeAnnotationsPanel}
@@ -2400,6 +2411,7 @@
 {#if showReaderImageGallery}
   <BookReaderImageGallery
     fontColor={$themeOption$.fontColor}
+    fontSize={$fontSize$}
     backgroundColor={$backgroundColor$}
     on:close={() => (showReaderImageGallery = false)}
   />
@@ -2445,7 +2457,7 @@
 
 <div
   id="ttu-page-footer"
-  class="reader-footer writing-horizontal-tb fixed bottom-0 left-0 z-10 flex h-12 w-full items-end gap-2 px-3 pb-1.5 text-xs leading-none sm:px-4"
+  class="reader-footer writing-horizontal-tb fixed bottom-0 left-0 z-10 flex h-12 w-full items-end gap-2 px-3 pb-1.5 leading-none sm:px-4"
   style={readerChromeStyle}
 >
   <button
@@ -2470,7 +2482,7 @@
         type="button"
         title="Click to open Tracker Menu or Double Click to toggle Tracker"
         aria-label="Open or toggle reading tracker"
-        class="reader-footer-pill flex h-9 w-9 items-center justify-center text-sm sm:h-10 sm:w-10 sm:text-base"
+        class="reader-footer-pill flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
         class:reader-footer-pill--active={$isTrackerPaused$}
         class:animate-pulse={frozenPosition > -1}
         use:multiClickHandler={[trackerSingleClickHandler, trackerDblClickHandler]}
@@ -2482,7 +2494,7 @@
       <button
         type="button"
         aria-label="Sync reader data"
-        class="reader-footer-pill flex h-9 w-9 items-center justify-center text-sm sm:h-10 sm:w-10 sm:text-base"
+        class="reader-footer-pill flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
         class:reader-footer-pill--danger={externalStorageErrors > 1}
         class:animate-pulse={externalStorageErrors > 1 || isReplicating}
         on:click|stopPropagation={() => {
@@ -2507,7 +2519,7 @@
       .filter(Boolean)
       .join(' - ')}
     <div
-      class="reader-progress-card writing-horizontal-tb relative z-10 px-3 py-1.5 text-left text-xs leading-none select-none sm:px-4"
+      class="reader-progress-card writing-horizontal-tb relative z-10 px-3 py-1.5 text-left leading-none select-none sm:px-4"
       class:reader-progress-card--with-counter={$showCharacterCounter$}
     >
       <span class="reader-progress-layout">

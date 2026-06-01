@@ -9,8 +9,10 @@
     type ReaderSearchResult
   } from '$lib/functions/reader-reference-layer/search';
   import type { ReaderTargetNavigation } from '$lib/functions/reader-reference-layer/navigation';
+  import { getReaderChromeStyle } from '$lib/functions/reader-typography';
 
   export let htmlContent = '';
+  export let fontSize = 20;
   export let fontColor = '';
   export let backgroundColor = '';
 
@@ -22,9 +24,7 @@
   let searchInputEl: HTMLInputElement | undefined;
   let searchQuery = '';
 
-  $: panelStyle = `--reader-page-text: ${
-    fontColor || 'var(--font-color)'
-  }; --reader-page-bg: ${backgroundColor || 'var(--background-color)'};`;
+  $: panelStyle = getReaderChromeStyle({ fontSize, fontColor, backgroundColor });
   $: searchIndex = buildReaderSearchIndex(htmlContent);
   $: searchResults = searchReaderIndex(searchIndex, searchQuery);
   $: hasLegacyReferenceMarkers =
@@ -169,6 +169,7 @@
       ),
       var(--reader-page-bg);
     color: var(--reader-page-text);
+    font-size: var(--reader-ui-font-size);
   }
 
   .book-search-panel-header {
@@ -204,7 +205,7 @@
   }
 
   .book-search-panel-title-main {
-    font-size: 1rem;
+    font-size: var(--reader-ui-title-font-size);
     font-weight: 850;
     line-height: 1.1;
   }
@@ -212,7 +213,7 @@
   .book-search-panel-title-sub {
     margin-top: 0.15rem;
     color: color-mix(in srgb, var(--reader-page-text) 58%, transparent);
-    font-size: 0.78rem;
+    font-size: var(--reader-ui-small-font-size);
     line-height: 1.1;
   }
 
@@ -262,7 +263,7 @@
 
   .book-search-panel-notice-title {
     color: var(--reader-page-text);
-    font-size: 0.78rem;
+    font-size: var(--reader-ui-small-font-size);
     font-weight: 850;
     line-height: 1.2;
   }
@@ -270,7 +271,7 @@
   .book-search-panel-notice-copy {
     margin-top: 0.2rem;
     color: color-mix(in srgb, var(--reader-page-text) 68%, transparent);
-    font-size: 0.78rem;
+    font-size: var(--reader-ui-small-font-size);
     line-height: 1.4;
   }
 
@@ -295,7 +296,7 @@
   .book-search-panel-control-icon {
     display: inline-flex;
     flex: 0 0 auto;
-    font-size: 0.82rem;
+    font-size: var(--reader-ui-small-font-size);
   }
 
   .book-search-panel-search input {
@@ -305,7 +306,7 @@
     background: transparent;
     color: var(--reader-page-text);
     font: inherit;
-    font-size: 0.84rem;
+    font-size: var(--reader-ui-small-font-size);
     font-weight: 720;
     outline: none;
   }
@@ -350,7 +351,7 @@
 
   .book-search-result-copy {
     color: color-mix(in srgb, var(--reader-page-text) 86%, transparent);
-    font-size: 0.92rem;
+    font-size: var(--reader-reading-font-size);
     line-height: 1.5;
   }
 
@@ -368,7 +369,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     color: color-mix(in srgb, var(--reader-page-text) 52%, transparent);
-    font-size: 0.74rem;
+    font-size: var(--reader-ui-small-font-size);
     font-weight: 740;
   }
 
@@ -402,7 +403,7 @@
   }
 
   .book-search-panel-empty-title {
-    font-size: 0.96rem;
+    font-size: var(--reader-ui-title-font-size);
     font-weight: 850;
   }
 
@@ -410,7 +411,7 @@
     margin-top: 0.35rem;
     max-width: 18rem;
     color: color-mix(in srgb, var(--reader-page-text) 56%, transparent);
-    font-size: 0.84rem;
+    font-size: var(--reader-ui-small-font-size);
     line-height: 1.45;
   }
 </style>

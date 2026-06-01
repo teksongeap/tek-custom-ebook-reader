@@ -155,7 +155,7 @@
 {#if isOpen}
   <div
     data-popover
-    class="app-popover-panel max-w-60vw absolute z-10 text-sm font-medium md:max-w-lg"
+    class="app-popover-panel max-w-60vw absolute z-10 font-medium md:max-w-lg"
     class:whitespace-pre-wrap={contentText}
     bind:this={popoverElement}
   >

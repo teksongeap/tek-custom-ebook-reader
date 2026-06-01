@@ -29,6 +29,7 @@
   } from '$lib/data/annotation-sort';
   import { SortDirection } from '$lib/data/sort-types';
   import { lastAnnotationSortDirection$, lastAnnotationSortMode$ } from '$lib/data/store';
+  import { getReaderChromeStyle } from '$lib/functions/reader-typography';
   import {
     annotationColorOptions,
     getAnnotationColorLabel,
@@ -42,6 +43,7 @@
 
   export let annotations: BooksDbAnnotation[] = [];
   export let sectionData: SectionWithProgress[] = [];
+  export let fontSize = 20;
   export let fontColor = '';
   export let backgroundColor = '';
 
@@ -59,9 +61,7 @@
   let selectedAnnotationColor: AnnotationColorFilter = 'all';
   let expandedCommentIds = new Set<string>();
 
-  $: panelStyle = `--reader-page-text: ${
-    fontColor || 'var(--font-color)'
-  }; --reader-page-bg: ${backgroundColor || 'var(--background-color)'};`;
+  $: panelStyle = getReaderChromeStyle({ fontSize, fontColor, backgroundColor });
   $: activeSortMode = getAnnotationSortMode($lastAnnotationSortMode$);
   $: activeSortDirection = getAnnotationSortDirection(
     $lastAnnotationSortDirection$,
@@ -586,6 +586,7 @@
       ),
       var(--reader-page-bg);
     color: var(--reader-page-text);
+    font-size: var(--reader-ui-font-size);
   }
 
   .annotations-panel-header {
@@ -621,7 +622,7 @@
   }
 
   .annotations-panel-title-main {
-    font-size: 1rem;
+    font-size: var(--reader-ui-title-font-size);
     font-weight: 850;
     line-height: 1.1;
   }
@@ -629,7 +630,7 @@
   .annotations-panel-title-sub {
     margin-top: 0.15rem;
     color: color-mix(in srgb, var(--reader-page-text) 58%, transparent);
-    font-size: 0.78rem;
+    font-size: var(--reader-ui-small-font-size);
     line-height: 1.1;
   }
 
@@ -686,7 +687,7 @@
   .annotations-panel-control-icon {
     display: inline-flex;
     flex: 0 0 auto;
-    font-size: 0.82rem;
+    font-size: var(--reader-ui-small-font-size);
   }
 
   .annotations-panel-search input,
@@ -698,7 +699,7 @@
     background: transparent;
     color: var(--reader-page-text);
     font: inherit;
-    font-size: 0.84rem;
+    font-size: var(--reader-ui-small-font-size);
     font-weight: 720;
     outline: none;
   }
@@ -821,7 +822,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     color: color-mix(in srgb, var(--reader-page-text) 54%, transparent);
-    font-size: 0.72rem;
+    font-size: var(--reader-ui-small-font-size);
     font-weight: 760;
     line-height: 1.25;
   }
@@ -848,7 +849,7 @@
     min-width: 0;
     overflow: hidden;
     color: color-mix(in srgb, var(--reader-page-text) 46%, transparent);
-    font-size: 0.68rem;
+    font-size: var(--reader-ui-xsmall-font-size);
     font-weight: 650;
     line-height: 1;
     text-overflow: ellipsis;
@@ -859,7 +860,7 @@
     display: -webkit-box;
     overflow: hidden;
     overflow-wrap: anywhere;
-    font-size: 1.1rem;
+    font-size: var(--reader-reading-font-size);
     font-weight: 500;
     line-height: 1.3;
     -webkit-box-orient: vertical;
@@ -881,7 +882,7 @@
   .annotation-item-comment {
     color: color-mix(in srgb, var(--reader-page-text) 68%, transparent);
     overflow-wrap: anywhere;
-    font-size: 1rem;
+    font-size: var(--reader-reading-font-size);
     font-weight: 250;
     line-height: 1.35;
     white-space: pre-wrap;
@@ -917,7 +918,7 @@
       color-mix(in srgb, var(--reader-page-bg) 78%, transparent);
     color: color-mix(in srgb, var(--reader-page-text) 76%, var(--book-annotation-base));
     font: inherit;
-    font-size: 0.76rem;
+    font-size: var(--reader-ui-small-font-size);
     font-weight: 820;
     outline: none;
     padding: 0.36rem 0.55rem;
@@ -951,7 +952,7 @@
     display: inline-flex;
     align-items: center;
     color: var(--book-annotation-base);
-    font-size: 0.68rem;
+    font-size: var(--reader-ui-xsmall-font-size);
   }
 
   .annotation-item-actions {
@@ -1007,7 +1008,7 @@
     background: color-mix(in srgb, var(--reader-page-bg) 86%, transparent);
     color: var(--reader-page-text);
     font: inherit;
-    font-size: 0.86rem;
+    font-size: var(--reader-reading-font-size);
     line-height: 1.35;
     outline: none;
     padding: 0.55rem 0.65rem;
@@ -1079,7 +1080,7 @@
 
   .annotations-panel-empty-title {
     margin-top: 1rem;
-    font-size: 1rem;
+    font-size: var(--reader-ui-title-font-size);
     font-weight: 820;
   }
 
@@ -1087,7 +1088,7 @@
     margin-top: 0.35rem;
     max-width: 15rem;
     color: color-mix(in srgb, var(--reader-page-text) 58%, transparent);
-    font-size: 0.86rem;
+    font-size: var(--reader-ui-small-font-size);
     line-height: 1.35;
   }
 

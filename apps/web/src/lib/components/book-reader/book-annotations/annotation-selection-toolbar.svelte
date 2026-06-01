@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, tick } from 'svelte';
+  import { getReaderChromeStyle } from '$lib/functions/reader-typography';
   import Fa from 'svelte-fa';
   import { faHighlighter } from '@fortawesome/free-solid-svg-icons';
   import { annotationColorOptions, type AnnotationColor } from './annotation-colors';
@@ -7,6 +8,7 @@
   export let selectionRect: DOMRect | undefined;
   export let anchorRect: DOMRect | undefined;
   export let verticalMode = false;
+  export let fontSize = 20;
   export let fontColor = '';
   export let backgroundColor = '';
 
@@ -18,9 +20,7 @@
   let toolbarEl: HTMLElement | undefined;
   let toolbarStyle = '';
 
-  $: chromeStyle = `--reader-page-text: ${
-    fontColor || 'var(--font-color)'
-  }; --reader-page-bg: ${backgroundColor || 'var(--background-color)'};`;
+  $: chromeStyle = getReaderChromeStyle({ fontSize, fontColor, backgroundColor });
 
   $: if (selectionRect) {
     updatePosition();
@@ -242,6 +242,7 @@
       0 18px 42px rgba(5, 7, 10, 0.32),
       inset 0 1px 0 color-mix(in srgb, #ffffff 12%, transparent);
     color: var(--reader-page-text);
+    font-size: var(--reader-ui-font-size);
     padding: 0.42rem;
     backdrop-filter: blur(20px) saturate(140%);
     transition:
@@ -266,7 +267,7 @@
     align-items: center;
     gap: 0.45rem;
     color: color-mix(in srgb, var(--reader-page-text) 78%, transparent);
-    font-size: 0.8rem;
+    font-size: var(--reader-ui-small-font-size);
     font-weight: 800;
     line-height: 1;
     text-transform: uppercase;
@@ -355,7 +356,7 @@
     justify-content: center;
     border-radius: 999px;
     color: rgba(0, 0, 0, 0.84);
-    font-size: 0.65rem;
+    font-size: var(--reader-ui-xsmall-font-size);
     font-weight: 900;
     line-height: 1;
     pointer-events: none;

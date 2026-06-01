@@ -25,6 +25,13 @@
   --app-focus-ring: 0 0 0 3px rgba(28, 110, 208, 0.34);
   --reader-page-bg: var(--background-color);
   --reader-page-text: var(--font-color);
+  --reader-content-font-size: 20px;
+  --reader-reading-font-size: 1rem;
+  --reader-ui-title-font-size: 1rem;
+  --reader-ui-font-size: 0.875rem;
+  --reader-ui-control-font-size: 0.875rem;
+  --reader-ui-small-font-size: 0.75rem;
+  --reader-ui-xsmall-font-size: 0.6875rem;
   --reader-progress-start: var(--app-accent);
   --reader-progress-end: #25a7a0;
   --reader-control-alert: var(--app-danger);
@@ -102,6 +109,7 @@
     border-radius: 0.5rem;
     background: var(--app-chrome-bg-strong);
     color: var(--app-chrome-text);
+    font-size: var(--reader-ui-font-size);
     box-shadow: var(--app-chrome-shadow);
   }
 
@@ -134,7 +142,7 @@
     padding: 0.625rem 0.875rem;
     color: var(--app-chrome-text);
     text-align: left;
-    font-size: 0.875rem;
+    font-size: var(--reader-ui-font-size);
     line-height: 1.2;
     outline: none;
     transition:
@@ -181,10 +189,12 @@
 
   .reader-header-title {
     color: color-mix(in srgb, var(--reader-page-text) 74%, transparent);
+    font-size: var(--reader-ui-small-font-size);
   }
 
   .reader-header-status {
     color: color-mix(in srgb, var(--reader-page-text) 62%, transparent);
+    font-size: var(--reader-ui-small-font-size);
   }
 
   .reader-header .app-icon-button {
@@ -200,6 +210,7 @@
   .reader-side-panel-shell {
     box-sizing: border-box;
     border-right: 1px solid color-mix(in srgb, var(--reader-page-text) 20%, transparent);
+    font-size: var(--reader-ui-font-size);
     box-shadow:
       20px 0 48px rgba(5, 7, 10, 0.34),
       inset -1px 0 0 color-mix(in srgb, var(--reader-page-text) 10%, transparent);
@@ -213,6 +224,7 @@
       color-mix(in srgb, var(--reader-page-bg) 56%, transparent) 52%,
       transparent
     );
+    font-size: var(--reader-ui-small-font-size);
     pointer-events: auto;
   }
 
@@ -254,6 +266,7 @@
 
   .reader-footer-pill {
     border-radius: 999px;
+    font-size: var(--reader-ui-control-font-size);
   }
 
   .reader-chapter-card {
@@ -267,7 +280,7 @@
     border-radius: 0.5rem;
     padding: 0 0.85rem;
     color: color-mix(in srgb, var(--reader-page-text) 76%, transparent);
-    font-size: 0.875rem;
+    font-size: var(--reader-ui-font-size);
     font-weight: 400;
     line-height: 1.18;
   }
@@ -292,6 +305,7 @@
     max-width: calc(100vw - 1.5rem);
     align-items: center;
     border-radius: 0.5rem;
+    font-size: var(--reader-ui-small-font-size);
   }
 
   .reader-progress-card--with-counter {
@@ -445,7 +459,7 @@
     background: color-mix(in srgb, var(--reader-page-bg) 94%, transparent);
     box-shadow: 0 12px 26px rgba(5, 7, 10, 0.18);
     color: var(--reader-page-text);
-    font-size: 0.8125rem;
+    font-size: var(--reader-ui-small-font-size);
     font-weight: 400;
     line-height: 1;
     opacity: 0;

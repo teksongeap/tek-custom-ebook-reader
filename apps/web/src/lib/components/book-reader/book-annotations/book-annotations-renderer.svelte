@@ -2,6 +2,7 @@
   import { BookReaderAvailableKeybind } from '$lib/data/book-reader-keybind';
   import type { BooksDbAnnotation } from '$lib/data/database/books-db/versions/books-db';
   import { bookReaderKeybindMap$ } from '$lib/data/store';
+  import { getReaderChromeStyle } from '$lib/functions/reader-typography';
   import { createEventDispatcher, onDestroy, tick } from 'svelte';
   import Fa from 'svelte-fa';
   import {
@@ -16,7 +17,7 @@
     faSquareCheck,
     faCheck,
     faCheckDouble,
-    faReply  
+    faReply
   } from '@fortawesome/free-solid-svg-icons';
   import {
     clearAnnotationHighlights,
@@ -32,6 +33,7 @@
   export let annotations: BooksDbAnnotation[] = [];
   export let activeAnnotationId = '';
   export let editAnnotationId = '';
+  export let fontSize = 20;
   export let fontColor = '';
   export let backgroundColor = '';
   export let renderRevision = 0;
@@ -670,10 +672,7 @@
       const isActive = annotation.id === activeAnnotation?.id;
       const isHovered = annotation.id === hoveredAnnotationId;
 
-      span.classList.toggle(
-        'book-annotation-highlight--active',
-        isActive
-      );
+      span.classList.toggle('book-annotation-highlight--active', isActive);
       span.classList.toggle(
         'book-annotation-highlight--hovered',
         isHovered && !isActive && !isPinned && !editingAnnotationId
@@ -691,8 +690,7 @@
   function getBasePopoverStyle(annotation: BooksDbAnnotation, hidden: boolean) {
     return [
       `--book-annotation-base: ${getAnnotationColorValue(annotation.color)}`,
-      `--reader-page-text: ${fontColor || 'var(--font-color)'}`,
-      `--reader-page-bg: ${backgroundColor || 'var(--background-color)'}`,
+      getReaderChromeStyle({ fontSize, fontColor, backgroundColor }),
       hidden ? 'visibility: hidden' : 'visibility: visible',
       hidden ? 'top: 0' : '',
       hidden ? 'left: 0' : ''
@@ -1083,6 +1081,7 @@
       0 20px 48px rgba(5, 7, 10, 0.28),
       inset 0 1px 0 color-mix(in srgb, #ffffff 18%, transparent);
     color: var(--reader-page-text);
+    font-size: var(--reader-ui-font-size);
     padding: 0.875rem;
     backdrop-filter: blur(18px) saturate(135%);
   }
@@ -1116,7 +1115,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     color: color-mix(in srgb, var(--reader-page-text) 72%, transparent);
-    font-size: 0.75rem;
+    font-size: var(--reader-ui-xsmall-font-size);
     font-weight: 500;
     letter-spacing: 0;
     line-height: 1.25;
@@ -1146,7 +1145,7 @@
 
   .book-annotation-card-edited {
     color: color-mix(in srgb, var(--reader-page-text) 54%, transparent);
-    font-size: 0.68rem;
+    font-size: var(--reader-ui-xsmall-font-size);
     font-weight: 500;
   }
 
@@ -1187,7 +1186,7 @@
     margin-top: 0.75rem;
     overflow-wrap: anywhere;
     white-space: pre-wrap;
-    font-size: 0.95rem;
+    font-size: var(--reader-reading-font-size);
     font-weight: 400;
     line-height: 1.45;
   }
@@ -1229,7 +1228,7 @@
       0 0 0 0 color-mix(in srgb, var(--book-annotation-base) 0%, transparent);
     color: color-mix(in srgb, var(--reader-page-text) 78%, var(--book-annotation-base));
     font: inherit;
-    font-size: 0.8rem;
+    font-size: var(--reader-ui-small-font-size);
     font-weight: 500;
     outline: none;
     padding: 0.44rem 0.65rem;
@@ -1266,7 +1265,7 @@
     display: inline-flex;
     align-items: center;
     color: var(--book-annotation-base);
-    font-size: 0.72rem;
+    font-size: var(--reader-ui-xsmall-font-size);
   }
 
   .book-annotation-card-editor {
@@ -1299,7 +1298,7 @@
     background: color-mix(in srgb, var(--reader-page-bg) 86%, transparent);
     color: var(--reader-page-text);
     font: inherit;
-    font-size: 0.9rem;
+    font-size: var(--reader-reading-font-size);
     line-height: 1.35;
     outline: none;
     overflow-y: auto;

@@ -22,6 +22,7 @@
   import { skipKeyDownListener$, statisticsEnabled$ } from '$lib/data/store';
   import type { BooksDbTocEntry } from '$lib/data/database/books-db/versions/books-db';
   import { readerTargetNavigation$ } from '$lib/functions/reader-reference-layer/navigation';
+  import { getReaderChromeStyle } from '$lib/functions/reader-typography';
   import { getWeightedAverage } from '$lib/functions/utils';
   import { debounceTime, fromEvent, Subject, take, takeUntil } from 'rxjs';
   import { onMount } from 'svelte';
@@ -66,6 +67,7 @@
   export let exploredCharCount = 0;
   export let verticalMode: boolean;
   export let wasTrackerPaused: boolean;
+  export let fontSize = 20;
   export let fontColor = '';
   export let backgroundColor = '';
 
@@ -86,9 +88,7 @@
 
   const destroy$ = new Subject<void>();
 
-  $: panelStyle = `--reader-page-text: ${
-    fontColor || 'var(--font-color)'
-  }; --reader-page-bg: ${backgroundColor || 'var(--background-color)'};`;
+  $: panelStyle = getReaderChromeStyle({ fontSize, fontColor, backgroundColor });
   $: prevChapterAvailable = verticalMode
     ? currentChapterIndex < chapters.length - 1
     : currentChapterIndex > 0;
@@ -578,6 +578,7 @@
       ),
       var(--reader-page-bg);
     color: var(--reader-page-text);
+    font-size: var(--reader-ui-font-size);
   }
 
   .book-toc-panel-header {
@@ -613,7 +614,7 @@
   }
 
   .book-toc-panel-title-main {
-    font-size: 1rem;
+    font-size: var(--reader-ui-title-font-size);
     font-weight: 850;
     line-height: 1.1;
   }
@@ -621,7 +622,7 @@
   .book-toc-panel-title-sub {
     margin-top: 0.15rem;
     color: color-mix(in srgb, var(--reader-page-text) 58%, transparent);
-    font-size: 0.78rem;
+    font-size: var(--reader-ui-small-font-size);
     line-height: 1.1;
   }
 
@@ -675,7 +676,7 @@
   .book-toc-panel-progress-label {
     overflow: hidden;
     color: var(--reader-page-text);
-    font-size: 0.88rem;
+    font-size: var(--reader-ui-font-size);
     font-weight: 760;
     line-height: 1.2;
     text-overflow: ellipsis;
@@ -684,7 +685,7 @@
 
   .book-toc-panel-progress-value {
     color: color-mix(in srgb, var(--reader-page-text) 58%, transparent);
-    font-size: 0.76rem;
+    font-size: var(--reader-ui-small-font-size);
     font-variant-numeric: tabular-nums;
     line-height: 1.2;
   }
@@ -716,7 +717,7 @@
     min-height: 2.35rem;
     border-radius: 0.45rem;
     color: color-mix(in srgb, var(--reader-page-text) 54%, transparent);
-    font-size: 0.72rem;
+    font-size: var(--reader-ui-xsmall-font-size);
   }
 
   .book-toc-item-disclosure--placeholder {
@@ -750,8 +751,8 @@
     min-width: 0;
     overflow: hidden;
     color: color-mix(in srgb, var(--reader-page-text) 86%, transparent);
-    font-size: 0.9rem;
-    font-weight: 650;
+    font-size: var(--reader-reading-font-size);
+    font-weight: 200;
     line-height: 1.25;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -759,12 +760,12 @@
 
   .book-toc-item-row--current .book-toc-item-label {
     color: var(--reader-page-text);
-    font-weight: 820;
+    font-weight: 400;
   }
 
   .book-toc-item-meta {
     color: color-mix(in srgb, var(--reader-page-text) 42%, transparent);
-    font-size: 0.7rem;
+    font-size: var(--reader-ui-xsmall-font-size);
     font-variant-numeric: tabular-nums;
     line-height: 1;
   }
@@ -806,7 +807,7 @@
   .book-toc-panel-empty-title {
     margin-top: 0.85rem;
     color: var(--reader-page-text);
-    font-size: 1rem;
+    font-size: var(--reader-ui-title-font-size);
     font-weight: 820;
   }
 </style>

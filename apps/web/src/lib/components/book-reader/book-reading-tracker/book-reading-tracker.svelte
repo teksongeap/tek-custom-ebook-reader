@@ -33,6 +33,7 @@
   } from '$lib/data/store';
   import { ReplicationSaveBehavior } from '$lib/functions/replication/replication-options';
   import { reduceToEmptyString } from '$lib/functions/rxjs/reduce-to-empty-string';
+  import { getReaderSurfaceStyle } from '$lib/functions/reader-typography';
   import {
     getDate,
     getDateKey,
@@ -59,6 +60,7 @@
   import { fly } from 'svelte/transition';
 
   export let fontColor: string;
+  export let fontSize = 20;
   export let backgroundColor: string;
   export let bookTitle: string;
   export let wasTrackerPaused: boolean;
@@ -329,6 +331,7 @@
   $: handleVisibilityChange(visibilityState);
 
   $: updateReadingGoalWindowForPausedState($isTrackerMenuOpen$);
+  $: readerSurfaceStyle = getReaderSurfaceStyle({ fontSize, fontColor, backgroundColor });
 
   $: if (!$isTrackerPaused$) {
     updateLastExploredCharCount();
@@ -770,9 +773,8 @@
 
 {#if $isTrackerMenuOpen$}
   <div
-    class="writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
-    style:color={fontColor}
-    style:background-color={backgroundColor}
+    class="reader-side-panel-shell writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
+    style={readerSurfaceStyle}
     in:fly|local={{ x: -100, duration: 100, easing: quintInOut }}
     use:clickOutside={() => {
       if (!actionInProgress) {

@@ -7,12 +7,14 @@
     readerImageGalleryKeybindMap$,
     skipKeyDownListener$
   } from '$lib/data/store';
+  import { getReaderSurfaceStyle } from '$lib/functions/reader-typography';
   import { createEventDispatcher, onMount } from 'svelte';
   import { quintInOut } from 'svelte/easing';
   import Fa from 'svelte-fa';
   import { fly } from 'svelte/transition';
 
   export let fontColor: string;
+  export let fontSize = 20;
   export let backgroundColor: string;
 
   const dispatch = createEventDispatcher<{
@@ -24,6 +26,7 @@
   let selectedImageIndex = window.matchMedia('(min-width: 1024px)').matches ? 0 : -1;
 
   $: selectedImage = $readerImageGalleryPictures$[selectedImageIndex];
+  $: readerSurfaceStyle = getReaderSurfaceStyle({ fontSize, fontColor, backgroundColor });
 
   $: if (imageContainer && selectedImage) {
     imageContainer.focus();
@@ -123,7 +126,7 @@
 <svelte:window on:keydown={onKeyDown} on:wheel|nonpassive={onWheel} />
 <div
   class="flex h-full w-full writing-horizontal-tb fixed top-0 left-0 z-[60]"
-  style:color={fontColor}
+  style={readerSurfaceStyle}
 >
   <div
     tabindex="-1"
@@ -237,7 +240,7 @@
     display: inline-block;
     padding: 12px 8px;
     border-radius: 20px;
-    font-size: 15px;
+    font-size: var(--reader-ui-small-font-size, 15px);
     font-family: 'Noto Sans JP', sans-serif;
     text-transform: uppercase;
     font-weight: 700;

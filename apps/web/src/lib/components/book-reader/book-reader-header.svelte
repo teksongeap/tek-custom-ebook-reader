@@ -24,6 +24,7 @@
   } from '$lib/css-classes';
   import { customReadingPointEnabled$, viewMode$ } from '$lib/data/store';
   import { ViewMode } from '$lib/data/view-mode';
+  import { getReaderChromeStyle } from '$lib/functions/reader-typography';
   import { isMobile$, isOnOldUrl } from '$lib/functions/utils';
   import { createEventDispatcher } from 'svelte';
   import Fa from 'svelte-fa';
@@ -36,6 +37,7 @@
   export let isBookmarkScreen: boolean;
   export let hasBookmarkData: boolean;
   export let bookTitle = '';
+  export let fontSize = 20;
   export let fontColor = '';
   export let backgroundColor = '';
   export let annotationCount = 0;
@@ -81,9 +83,7 @@
     ...(hasCustomReadingPoint ? [{ label: 'Reset Point', action: 'resetCustomReadingPoint' }] : [])
   ];
 
-  $: readerHeaderStyle = `--reader-page-text: ${
-    fontColor || 'var(--font-color)'
-  }; --reader-page-bg: ${backgroundColor || 'var(--background-color)'};`;
+  $: readerHeaderStyle = getReaderChromeStyle({ fontSize, fontColor, backgroundColor });
 
   $: {
     const items = [];
@@ -171,7 +171,7 @@
     {/if}
     {#if $viewMode$ === ViewMode.Continuous && !$isMobile$}
       <div
-        class="reader-header-status flex items-center px-3 text-sm font-semibold xl:px-2"
+        class="reader-header-status flex items-center px-3 font-semibold xl:px-2"
         title="Current Autoscroll Speed"
       >
         {autoScrollMultiplier}x
@@ -180,7 +180,7 @@
   </div>
 
   <div
-    class="reader-header-title hidden max-w-[42vw] truncate px-3 text-center text-sm font-normal sm:block"
+    class="reader-header-title hidden max-w-[42vw] truncate px-3 text-center font-normal sm:block"
   >
     {bookTitle}
   </div>
