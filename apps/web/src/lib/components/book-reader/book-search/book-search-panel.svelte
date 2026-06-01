@@ -9,9 +9,11 @@
     type ReaderSearchResult
   } from '$lib/functions/reader-reference-layer/search';
   import type { ReaderTargetNavigation } from '$lib/functions/reader-reference-layer/navigation';
+  import type { SectionWithProgress } from '$lib/components/book-reader/book-toc/book-toc';
   import { getReaderChromeStyle } from '$lib/functions/reader-typography';
 
   export let htmlContent = '';
+  export let sectionData: SectionWithProgress[] = [];
   export let fontSize = 20;
   export let fontColor = '';
   export let backgroundColor = '';
@@ -55,6 +57,58 @@
       target: result.target,
       highlight: result.preciseTarget
     });
+  }
+
+  function getSearchResultLocationLabel(result: ReaderSearchResult) {
+    return (
+      getNearestLabeledSection(getSearchResultSection(result))?.label ||
+      result.sourceHref ||
+      'Current book'
+    );
+  }
+
+  function getSearchResultSection(result: ReaderSearchResult) {
+    if (result.target.sectionId) {
+      const section = sectionData.find((item) => item.reference === result.target.sectionId);
+
+      if (section) {
+        return section;
+      }
+    }
+
+    if (result.sourceHref && result.target.fragment) {
+      const fragmentSection = sectionData.find(
+        (section) =>
+          section.sourceHref === result.sourceHref &&
+          section.targetFragment === result.target.fragment
+      );
+
+      if (fragmentSection) {
+        return fragmentSection;
+      }
+    }
+
+    if (result.sourceHref) {
+      return sectionData.find((section) => section.sourceHref === result.sourceHref);
+    }
+
+    return undefined;
+  }
+
+  function getNearestLabeledSection(section: SectionWithProgress | undefined) {
+    let currentSection = section;
+
+    while (currentSection) {
+      if (currentSection.label) {
+        return currentSection;
+      }
+
+      currentSection = currentSection.parentChapter
+        ? sectionData.find((item) => item.reference === currentSection?.parentChapter)
+        : undefined;
+    }
+
+    return undefined;
   }
 </script>
 
@@ -125,12 +179,13 @@
     {#if searchResults.length}
       {#each searchResults as result (result.id)}
         {@const excerpt = getReaderSearchExcerpt(result)}
+        {@const locationLabel = getSearchResultLocationLabel(result)}
         <button type="button" class="book-search-result" on:click={() => jumpToResult(result)}>
           <span class="book-search-result-copy">
             <span>{excerpt.before}</span><mark>{excerpt.match}</mark><span>{excerpt.after}</span>
           </span>
           <span class="book-search-result-meta">
-            <span>{result.sourceHref || 'Current book'}</span>
+            <span title={locationLabel}>{locationLabel}</span>
             {#if !result.preciseTarget}
               <span class="book-search-result-quality">Approximate</span>
             {/if}

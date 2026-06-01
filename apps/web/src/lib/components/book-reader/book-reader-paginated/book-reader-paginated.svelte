@@ -30,7 +30,7 @@
     findReaderTargetElement,
     type ReaderTarget
   } from '$lib/functions/reader-reference-layer/epub-reference';
-  import { highlightReaderTargetElement } from '$lib/functions/reader-reference-layer/highlight';
+  import { highlightReaderTargetElementAfterPaint } from '$lib/functions/reader-reference-layer/highlight';
   import { readerTargetNavigation$ } from '$lib/functions/reader-reference-layer/navigation';
   import { iffBrowser } from '$lib/functions/rxjs/iff-browser';
   import { getExternalTargetElement, isMobile$ } from '$lib/functions/utils';
@@ -855,7 +855,7 @@
     updatedCalculator.updateParagraphPos();
 
     if (highlight) {
-      highlightReaderTargetElement(targetElement);
+      highlightReaderTargetElementAfterPaint(targetElement);
     }
 
     return true;
@@ -1051,9 +1051,7 @@
       return;
     }
 
-    const activeTarget = getActivePaginatedTocTarget(
-      tocTargetsBySourceHref.get(sourceHref) || []
-    );
+    const activeTarget = getActivePaginatedTocTarget(tocTargetsBySourceHref.get(sourceHref) || []);
 
     if (!activeTarget) {
       return;

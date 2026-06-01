@@ -3,7 +3,7 @@
   import Fa from 'svelte-fa';
   import {
     faArrowDownWideShort,
-    faArrowUpRightFromSquare,
+    faArrowRight,
     faArrowUpShortWide,
     faBookOpen,
     faChevronDown,
@@ -616,7 +616,9 @@
               on:click|stopPropagation={() => dispatch('jump', annotation)}
               on:keydown|stopPropagation={() => {}}
             >
-              <Fa icon={faArrowUpRightFromSquare} />
+              <span class="annotation-item-jump-icon" aria-hidden="true">
+                <Fa icon={faArrowRight} />
+              </span>
             </button>
             <button
               type="button"
@@ -1073,11 +1075,12 @@
       calc(var(--reader-ui-control-font-size) + 0.9rem),
       2.55rem
     );
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    min-height: 100%;
+    grid-template-rows: auto minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: center;
-    gap: 0.32rem;
+    justify-items: center;
+    gap: 0.55rem;
     color: color-mix(in srgb, var(--reader-page-text) 48%, transparent);
   }
 
@@ -1106,7 +1109,24 @@
   }
 
   .annotation-item-jump {
-    font-size: var(--reader-ui-font-size);
+    align-self: start;
+  }
+
+  .annotation-item-edit {
+    align-self: center;
+  }
+
+  .annotation-item-delete {
+    align-self: end;
+  }
+
+  .annotation-item-jump-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--reader-ui-control-font-size) + 0.1rem);
+    transform: rotate(-45deg);
+    transform-origin: center;
   }
 
   .annotation-item-jump:hover,

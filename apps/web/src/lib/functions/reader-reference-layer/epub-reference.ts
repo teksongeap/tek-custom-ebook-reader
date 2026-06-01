@@ -231,6 +231,8 @@ export function findReaderTargetElement(source: Document | Element, target: Read
     if (blockElement) {
       return blockElement;
     }
+
+    return undefined;
   }
 
   if (target.sourceHref) {

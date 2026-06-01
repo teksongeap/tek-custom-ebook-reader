@@ -84,6 +84,26 @@ export function highlightReaderTargetElement(
   }
 }
 
+export function highlightReaderTargetElementAfterPaint(
+  element: Element | undefined | null,
+  duration = referenceTargetHighlightDuration
+) {
+  if (typeof requestAnimationFrame !== 'function') {
+    highlightReaderTargetElement(element, duration);
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (!element?.isConnected) {
+        return;
+      }
+
+      highlightReaderTargetElement(element, duration);
+    });
+  });
+}
+
 export function requestReaderTargetHoverFocus(
   element: Element | undefined | null,
   duration = referenceTargetHighlightDuration

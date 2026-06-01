@@ -2378,6 +2378,7 @@
   >
     <BookSearchPanel
       htmlContent={$bookData$.htmlContent}
+      sectionData={$sectionData$ ?? []}
       fontSize={$fontSize$}
       fontColor={$themeOption$?.fontColor ?? ''}
       backgroundColor={$backgroundColor$ ?? ''}

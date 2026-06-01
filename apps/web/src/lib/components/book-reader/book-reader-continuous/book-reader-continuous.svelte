@@ -28,7 +28,7 @@
     findReaderTargetElement,
     type ReaderTarget
   } from '$lib/functions/reader-reference-layer/epub-reference';
-  import { highlightReaderTargetElement } from '$lib/functions/reader-reference-layer/highlight';
+  import { highlightReaderTargetElementAfterPaint } from '$lib/functions/reader-reference-layer/highlight';
   import { readerTargetNavigation$ } from '$lib/functions/reader-reference-layer/navigation';
   import { getExternalTargetElement } from '$lib/functions/utils';
   import { faBookmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
@@ -607,9 +607,7 @@
       return;
     }
 
-    const activeTarget = getActiveContinuousTocTarget(
-      tocTargetsBySourceHref.get(sourceHref) || []
-    );
+    const activeTarget = getActiveContinuousTocTarget(tocTargetsBySourceHref.get(sourceHref) || []);
 
     if (!activeTarget) {
       return;
@@ -889,7 +887,7 @@
     scrollToTargetElement(targetElement);
 
     if (highlight) {
-      highlightReaderTargetElement(targetElement);
+      highlightReaderTargetElementAfterPaint(targetElement);
     }
 
     return true;
