@@ -4,6 +4,7 @@
   import {
     faBookmark as fasBookmark,
     faCrosshairs,
+    faEllipsisVertical,
     faExpand,
     faFlag,
     faHighlighter,
@@ -67,12 +68,20 @@
   }[] = [];
 
   let customReadingPointMenuElm: Popover;
+  let mobileMenuElm: Popover;
 
   let menuItems: {
     routeId: string;
     label: string;
     icon: IconDefinition;
     title: string;
+  }[] = [];
+
+  let mobileMenuItems: {
+    label: string;
+    icon: IconDefinition;
+    title: string;
+    action: string;
   }[] = [];
 
   $: isOldUrl = browser && isOnOldUrl(window);
@@ -107,14 +116,162 @@
     menuItems = items;
   }
 
+  $: mobileMenuItems = [
+    ...(hasText
+      ? [
+          {
+            label: annotationCount ? `Annotations (${annotationCount})` : 'Annotations',
+            icon: faHighlighter,
+            title: annotationCount ? `Open Annotations (${annotationCount})` : 'Open Annotations',
+            action: 'annotationsClick'
+          }
+        ]
+      : []),
+    ...(hasBookmarkData
+      ? [
+          {
+            label: 'Return to Bookmark',
+            icon: faRotateLeft,
+            title: 'Return to Bookmark',
+            action: 'scrollToBookmarkClick'
+          }
+        ]
+      : []),
+    {
+      label: 'Complete Book',
+      icon: faFlag,
+      title: 'Complete Book',
+      action: 'completeBook'
+    },
+    ...($customReadingPointEnabled$ || $viewMode$ === ViewMode.Paginated
+      ? customReadingPointMenuItems.map((item) => ({
+          label: item.label,
+          icon: faCrosshairs,
+          title: `${item.label} Reading Point`,
+          action: item.action
+        }))
+      : []),
+    ...(showFullscreenButton
+      ? [
+          {
+            label: 'Fullscreen',
+            icon: faExpand,
+            title: 'Toggle Fullscreen',
+            action: 'fullscreenClick'
+          }
+        ]
+      : []),
+    ...menuItems.map((item) => ({
+      label: item.label,
+      icon: item.icon,
+      title: item.title,
+      action: item.label
+    }))
+  ];
+
   function dispatchCustomReadingPointAction(action: any) {
     dispatch(action);
     customReadingPointMenuElm.toggleOpen();
   }
+
+  function dispatchMergedAction(action: string) {
+    if (action === mergeEntries.STATISTICS.label) {
+      dispatch('statisticsClick');
+    } else if (action === mergeEntries.JUMP_TO_POSITION.label) {
+      dispatch('jumpClick');
+    } else if (action === mergeEntries.READER_IMAGE_GALLERY.label) {
+      dispatch('readerImageGalleryClick');
+    } else if (action === mergeEntries.SETTINGS.label) {
+      dispatch('settingsClick');
+    } else if (action === mergeEntries.DOMAIN_HINT.label) {
+      dispatch('domainHintClick');
+    } else if (action === mergeEntries.MANAGE.label) {
+      dispatch('bookManagerClick');
+    }
+  }
+
+  function dispatchMobileMenuAction(action: string) {
+    mobileMenuElm.toggleOpen();
+
+    if (menuItems.some((item) => item.label === action)) {
+      dispatchMergedAction(action);
+    } else {
+      dispatch(action as any);
+    }
+  }
 </script>
 
 <div
-  class="reader-header grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-4 md:px-8 {baseHeaderClasses}"
+  class="reader-header reader-header--mobile flex items-center justify-between px-2.5 md:hidden {baseHeaderClasses}"
+  style={readerHeaderStyle}
+>
+  <div class="flex min-w-0 items-center">
+    {#if hasChapterData}
+      <button
+        type="button"
+        title="Open Table of Contents"
+        aria-label="Open Table of Contents"
+        class={baseIconClasses}
+        on:click={() => dispatch('tocClick')}
+      >
+        <Fa icon={faList} />
+      </button>
+    {/if}
+    {#if hasText}
+      <button
+        type="button"
+        title="Search Book"
+        aria-label="Search Book"
+        class={baseIconClasses}
+        on:click={() => dispatch('searchClick')}
+      >
+        <Fa icon={faMagnifyingGlass} />
+      </button>
+    {/if}
+    <button
+      type="button"
+      title="Create Bookmark"
+      aria-label="Create Bookmark"
+      class={baseIconClasses}
+      on:click={() => dispatch('bookmarkClick')}
+    >
+      <Fa icon={isBookmarkScreen ? fasBookmark : farBookmark} />
+    </button>
+  </div>
+
+  <Popover
+    placement="bottom-end"
+    fallbackPlacements={['bottom-end', 'bottom-start']}
+    yOffset={0}
+    bind:this={mobileMenuElm}
+  >
+    <button
+      type="button"
+      slot="icon"
+      title="Open Reader Actions"
+      aria-label="Open Reader Actions"
+      class={baseIconClasses}
+    >
+      <Fa icon={faEllipsisVertical} />
+    </button>
+    <div class="app-menu reader-header-mobile-menu w-56" slot="content">
+      {#each mobileMenuItems as actionItem (actionItem.label)}
+        <button
+          type="button"
+          class="app-menu-item"
+          title={actionItem.title}
+          on:click={() => dispatchMobileMenuAction(actionItem.action)}
+        >
+          <Fa class="reader-header-mobile-menu-icon" icon={actionItem.icon} />
+          <span>{actionItem.label}</span>
+        </button>
+      {/each}
+    </div>
+  </Popover>
+</div>
+
+<div
+  class="reader-header hidden items-center justify-between px-4 md:flex md:px-8 {baseHeaderClasses}"
   style={readerHeaderStyle}
 >
   <div class="flex min-w-0 transform-gpu {nTranslateXHeaderFa}">
@@ -180,7 +337,7 @@
   </div>
 
   <div
-    class="reader-header-title hidden max-w-[42vw] truncate px-3 text-center font-normal sm:block"
+    class="reader-header-title pointer-events-none absolute left-1/2 max-w-[42vw] -translate-x-1/2 truncate px-3 text-center font-normal"
   >
     {bookTitle}
   </div>
@@ -240,21 +397,7 @@
     <MergedHeaderIcon
       disableRouteNavigation
       items={menuItems}
-      on:action={({ detail }) => {
-        if (detail === mergeEntries.STATISTICS.label) {
-          dispatch('statisticsClick');
-        } else if (detail === mergeEntries.JUMP_TO_POSITION.label) {
-          dispatch('jumpClick');
-        } else if (detail === mergeEntries.READER_IMAGE_GALLERY.label) {
-          dispatch('readerImageGalleryClick');
-        } else if (detail === mergeEntries.SETTINGS.label) {
-          dispatch('settingsClick');
-        } else if (detail === mergeEntries.DOMAIN_HINT.label) {
-          dispatch('domainHintClick');
-        } else if (detail === mergeEntries.MANAGE.label) {
-          dispatch('bookManagerClick');
-        }
-      }}
+      on:action={({ detail }) => dispatchMergedAction(detail)}
     />
   </div>
 </div>
