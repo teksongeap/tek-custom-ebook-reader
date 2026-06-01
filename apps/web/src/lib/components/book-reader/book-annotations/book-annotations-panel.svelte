@@ -428,6 +428,7 @@
   <div class="annotations-panel-list">
     {#if sortedAnnotations.length}
       {#each sortedAnnotations as annotation (annotation.id)}
+        {@const chapterLabel = getChapterLabel(annotation)}
         <div
           role="button"
           tabindex="0"
@@ -440,16 +441,18 @@
           <span class="annotation-item-swatch" aria-hidden="true"></span>
           <span class="annotation-item-content">
             <span class="annotation-item-meta">
-              <span class="annotation-item-location">{getChapterLabel(annotation)}</span>
-              <span class="annotation-item-created-time">
-                Added {formatAnnotationTimestamp(annotation.createdAt)}
+              <span class="annotation-item-location" title={chapterLabel}>{chapterLabel}</span>
+              <span class="annotation-item-time-stack">
+                <span class="annotation-item-created-time">
+                  Added {formatAnnotationTimestamp(annotation.createdAt)}
+                </span>
+                {#if getAnnotationEditedAt(annotation)}
+                  <span class="annotation-item-edited-time">
+                    Edited {formatAnnotationTimestamp(getAnnotationEditedAt(annotation))}
+                  </span>
+                {/if}
               </span>
             </span>
-            {#if getAnnotationEditedAt(annotation)}
-              <span class="annotation-item-edited-time">
-                Edited {formatAnnotationTimestamp(getAnnotationEditedAt(annotation))}
-              </span>
-            {/if}
             <span class="annotation-item-quote">{annotation.selectedText}</span>
             {#if annotation.comment && editingAnnotationId !== annotation.id}
               <span class="annotation-item-comment-shell">
@@ -630,7 +633,7 @@
   .annotations-panel-title-sub {
     margin-top: 0.15rem;
     color: color-mix(in srgb, var(--reader-page-text) 58%, transparent);
-    font-size: var(--reader-ui-small-font-size);
+    font-size: var(--reader-ui-xsmall-font-size);
     line-height: 1.1;
   }
 
@@ -818,40 +821,56 @@
   .annotation-item-meta {
     display: flex;
     min-width: 0;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
     color: color-mix(in srgb, var(--reader-page-text) 54%, transparent);
     font-size: var(--reader-ui-small-font-size);
-    font-weight: 760;
+    font-weight: 620;
     line-height: 1.25;
+  }
+
+  .annotation-item-time-stack {
+    display: inline-flex;
+    max-width: 100%;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.14rem;
   }
 
   .annotation-item-location {
+    display: -webkit-box;
     min-width: 0;
+    max-width: 100%;
+    color: color-mix(in srgb, var(--reader-page-text) 48%, transparent);
+    font-weight: 500;
     line-height: 1.25;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   .annotation-item-created-time {
-    flex: 0 1 auto;
+    display: block;
     min-width: 0;
+    max-width: 100%;
     overflow: hidden;
-    text-align: right;
+    text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .annotation-item-edited-time {
-    align-self: flex-end;
+    display: block;
     min-width: 0;
+    max-width: 100%;
     overflow: hidden;
     color: color-mix(in srgb, var(--reader-page-text) 46%, transparent);
-    font-size: var(--reader-ui-xsmall-font-size);
-    font-weight: 650;
+    font-weight: 500;
     line-height: 1;
+    text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -1095,21 +1114,6 @@
   @media (max-width: 28rem) {
     .annotations-panel-controls {
       grid-template-columns: minmax(0, 1fr);
-    }
-
-    .annotation-item-meta {
-      align-items: flex-start;
-      flex-direction: column;
-      gap: 0.3rem;
-    }
-
-    .annotation-item-created-time {
-      text-align: left;
-    }
-
-    .annotation-item-edited-time {
-      align-self: flex-start;
-      text-align: left;
     }
 
     .annotation-item {
