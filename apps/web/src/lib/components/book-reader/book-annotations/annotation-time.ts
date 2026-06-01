@@ -6,20 +6,25 @@
 
 import type { BooksDbAnnotation } from '$lib/data/database/books-db/versions/books-db';
 
-const annotationTimestampFormatter = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit'
-});
-
 export function formatAnnotationTimestamp(timestamp: number) {
   if (!Number.isFinite(timestamp) || timestamp <= 0) {
     return 'Unknown time';
   }
 
-  return annotationTimestampFormatter.format(new Date(timestamp));
+  const date = new Date(timestamp);
+  const month = padDatePart(date.getMonth() + 1);
+  const day = padDatePart(date.getDate());
+  const year = date.getFullYear();
+  const hours = date.getHours();
+  const amPm = hours >= 12 ? 'PM' : 'AM';
+  const hour = padDatePart(hours % 12 || 12);
+  const minute = padDatePart(date.getMinutes());
+
+  return `${month}/${day}/${year}, ${hour}:${minute} ${amPm}`;
+}
+
+function padDatePart(value: number) {
+  return value.toString().padStart(2, '0');
 }
 
 export function getAnnotationEditedAt(annotation: BooksDbAnnotation) {
