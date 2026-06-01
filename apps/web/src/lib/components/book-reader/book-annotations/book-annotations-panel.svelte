@@ -3,9 +3,10 @@
   import Fa from 'svelte-fa';
   import {
     faArrowDownWideShort,
+    faArrowUpRightFromSquare,
     faArrowUpShortWide,
+    faBookOpen,
     faChevronDown,
-    faChevronRight,
     faChevronUp,
     faFilter,
     faFloppyDisk,
@@ -40,6 +41,12 @@
   import AnnotationLinkifiedText from './annotation-linkified-text.svelte';
 
   type AnnotationColorFilter = AnnotationColor | 'all';
+  type AnnotationSectionFilter = string | 'all';
+  type AnnotationSectionOption = {
+    id: string;
+    label: string;
+    order: number;
+  };
 
   export let annotations: BooksDbAnnotation[] = [];
   export let sectionData: SectionWithProgress[] = [];
@@ -59,6 +66,7 @@
   let draftTextAreaEl: HTMLTextAreaElement | undefined;
   let searchQuery = '';
   let selectedAnnotationColor: AnnotationColorFilter = 'all';
+  let selectedAnnotationSection: AnnotationSectionFilter = 'all';
   let expandedCommentIds = new Set<string>();
 
   $: panelStyle = getReaderChromeStyle({ fontSize, fontColor, backgroundColor });
@@ -73,20 +81,45 @@
     activeSortDirection === SortDirection.ASC ? 'descending' : 'ascending';
   $: chapterSections = getChapterSections(sectionData);
   $: sectionOrder = new Map(sectionData.map((section, index) => [section.reference, index]));
+  $: annotationSectionOptions = getAnnotationSectionOptions(
+    annotations,
+    sectionData,
+    chapterSections,
+    sectionOrder
+  );
+  $: if (
+    selectedAnnotationSection !== 'all' &&
+    !annotationSectionOptions.some(
+      (sectionOption) => sectionOption.id === selectedAnnotationSection
+    )
+  ) {
+    selectedAnnotationSection = 'all';
+  }
   $: searchTerms = normalizeForSearch(searchQuery).split(/\s+/).filter(Boolean);
   $: colorFilteredAnnotations =
     selectedAnnotationColor === 'all'
       ? annotations
       : annotations.filter((annotation) => annotation.color === selectedAnnotationColor);
+  $: sectionFilteredAnnotations =
+    selectedAnnotationSection === 'all'
+      ? colorFilteredAnnotations
+      : colorFilteredAnnotations.filter(
+          (annotation) =>
+            getAnnotationSectionFilterKey(annotation, sectionData, chapterSections) ===
+            selectedAnnotationSection
+        );
   $: filteredAnnotations = searchTerms.length
-    ? colorFilteredAnnotations.filter((annotation) =>
-        matchesAnnotationSearch(annotation, searchTerms)
+    ? sectionFilteredAnnotations.filter((annotation) =>
+        matchesAnnotationSearch(annotation, searchTerms, sectionData, chapterSections)
       )
-    : colorFilteredAnnotations;
+    : sectionFilteredAnnotations;
   $: sortedAnnotations = filteredAnnotations
     .slice()
     .sort((a, b) => compareAnnotationsForPanel(a, b, activeSortMode, activeSortDirection));
-  $: isFilteringAnnotations = searchTerms.length > 0 || selectedAnnotationColor !== 'all';
+  $: isFilteringAnnotations =
+    searchTerms.length > 0 ||
+    selectedAnnotationColor !== 'all' ||
+    selectedAnnotationSection !== 'all';
   $: panelSubtitle = isFilteringAnnotations
     ? `${sortedAnnotations.length} of ${annotations.length} shown`
     : `${annotations.length} saved`;
@@ -150,27 +183,83 @@
     return !!annotation.comment.trim();
   }
 
-  function getAnnotationSectionOrder(annotation: BooksDbAnnotation) {
-    return (
-      sectionOrder.get(annotation.anchor.sectionId) ??
-      sectionData.length + annotation.exploredCharCount
-    );
+  function getAnnotationSectionOrder(
+    annotation: BooksDbAnnotation,
+    orderMap = sectionOrder,
+    sectionCount = sectionData.length
+  ) {
+    return orderMap.get(annotation.anchor.sectionId) ?? sectionCount + annotation.exploredCharCount;
   }
 
-  function getChapterLabel(annotation: BooksDbAnnotation) {
-    const annotationSection = sectionData.find(
+  function getChapterLabel(
+    annotation: BooksDbAnnotation,
+    sections = sectionData,
+    chapters = chapterSections
+  ) {
+    return getAnnotationChapterSection(annotation, sections, chapters)?.label || 'Current Book';
+  }
+
+  function getAnnotationChapterSection(
+    annotation: BooksDbAnnotation,
+    sections = sectionData,
+    chapters = chapterSections
+  ) {
+    const annotationSection = sections.find(
       (section) => section.reference === annotation.anchor.sectionId
     );
-    const anchorChapter = getNearestLabeledSection(annotationSection);
-    const fallbackChapter = chapterSections
+    const anchorChapter = getNearestLabeledSection(annotationSection, sections);
+    const fallbackChapter = chapters
       .slice()
       .reverse()
       .find((section) => (section.startCharacter || 0) <= annotation.exploredCharCount);
 
-    return anchorChapter?.label || fallbackChapter?.label || 'Current Book';
+    return anchorChapter || fallbackChapter;
   }
 
-  function getNearestLabeledSection(section: SectionWithProgress | undefined) {
+  function getAnnotationSectionFilterKey(
+    annotation: BooksDbAnnotation,
+    sections = sectionData,
+    chapters = chapterSections
+  ) {
+    return (
+      getAnnotationChapterSection(annotation, sections, chapters)?.reference ||
+      annotation.anchor.sectionId
+    );
+  }
+
+  function getAnnotationSectionOptions(
+    annotationList: BooksDbAnnotation[],
+    sections: SectionWithProgress[],
+    chapters: SectionWithProgress[],
+    orderMap: Map<string, number>
+  ) {
+    const sectionOptions = new Map<string, AnnotationSectionOption>();
+
+    for (const annotation of annotationList) {
+      const section = getAnnotationChapterSection(annotation, sections, chapters);
+      const id = section?.reference || annotation.anchor.sectionId;
+
+      if (!sectionOptions.has(id)) {
+        sectionOptions.set(id, {
+          id,
+          label: section?.label || 'Current Book',
+          order:
+            (section ? orderMap.get(section.reference) : undefined) ??
+            getAnnotationSectionOrder(annotation, orderMap, sections.length)
+        });
+      }
+    }
+
+    return Array.from(sectionOptions.values()).sort(
+      (sectionA, sectionB) =>
+        sectionA.order - sectionB.order || sectionA.label.localeCompare(sectionB.label)
+    );
+  }
+
+  function getNearestLabeledSection(
+    section: SectionWithProgress | undefined,
+    sections = sectionData
+  ) {
     let currentSection = section;
 
     while (currentSection) {
@@ -179,20 +268,25 @@
       }
 
       currentSection = currentSection.parentChapter
-        ? sectionData.find((item) => item.reference === currentSection?.parentChapter)
+        ? sections.find((item) => item.reference === currentSection?.parentChapter)
         : undefined;
     }
 
     return undefined;
   }
 
-  function matchesAnnotationSearch(annotation: BooksDbAnnotation, terms: string[]) {
+  function matchesAnnotationSearch(
+    annotation: BooksDbAnnotation,
+    terms: string[],
+    sections = sectionData,
+    chapters = chapterSections
+  ) {
     const searchableText = normalizeForSearch(
       [
         annotation.comment,
         annotation.selectedText,
         annotation.anchor.text,
-        getChapterLabel(annotation),
+        getChapterLabel(annotation, sections, chapters),
         formatAnnotationTimestamp(annotation.createdAt),
         getAnnotationEditedAt(annotation)
           ? formatAnnotationTimestamp(getAnnotationEditedAt(annotation))
@@ -231,31 +325,21 @@
     selectedAnnotationColor = isAnnotationColor(nextColor) ? nextColor : 'all';
   }
 
+  function setAnnotationSectionFilter(event: Event) {
+    if (!(event.currentTarget instanceof HTMLSelectElement)) {
+      return;
+    }
+
+    const nextSection = event.currentTarget.value;
+    selectedAnnotationSection = annotationSectionOptions.some(
+      (sectionOption) => sectionOption.id === nextSection
+    )
+      ? nextSection
+      : 'all';
+  }
+
   function isAnnotationColor(value: string): value is AnnotationColor {
     return annotationColorOptions.some((colorOption) => colorOption.id === value);
-  }
-
-  function handleAnnotationClick(event: MouseEvent, annotation: BooksDbAnnotation) {
-    if (editingAnnotationId === annotation.id) {
-      return;
-    }
-
-    if (isAnnotationPanelControl(event.target)) {
-      return;
-    }
-
-    dispatch('jump', annotation);
-  }
-
-  function handleAnnotationKeydown(event: KeyboardEvent, annotation: BooksDbAnnotation) {
-    if (editingAnnotationId === annotation.id) {
-      return;
-    }
-
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      dispatch('jump', annotation);
-    }
   }
 
   function editAnnotation(annotation: BooksDbAnnotation) {
@@ -299,13 +383,6 @@
     }
 
     expandedCommentIds = nextExpandedCommentIds;
-  }
-
-  function isAnnotationPanelControl(target: EventTarget | null) {
-    return (
-      target instanceof Element &&
-      !!target.closest('a, button, input, select, textarea, [data-annotation-panel-control]')
-    );
   }
 
   async function resizeDraftTextArea(
@@ -378,6 +455,22 @@
         </button>
       {/if}
     </div>
+    <label class="annotations-panel-filter annotations-panel-section-filter">
+      <span class="annotations-panel-control-icon" aria-hidden="true">
+        <Fa icon={faBookOpen} />
+      </span>
+      <select
+        value={selectedAnnotationSection}
+        aria-label="Filter annotations by section"
+        on:change={setAnnotationSectionFilter}
+        on:keydown|stopPropagation={() => {}}
+      >
+        <option value="all">All sections</option>
+        {#each annotationSectionOptions as sectionOption (sectionOption.id)}
+          <option value={sectionOption.id}>{sectionOption.label}</option>
+        {/each}
+      </select>
+    </label>
     <label class="annotations-panel-filter">
       <span class="annotations-panel-control-icon" aria-hidden="true">
         <Fa icon={faFilter} />
@@ -430,13 +523,9 @@
       {#each sortedAnnotations as annotation (annotation.id)}
         {@const chapterLabel = getChapterLabel(annotation)}
         <div
-          role="button"
-          tabindex="0"
           class="annotation-item"
           class:annotation-item--editing={editingAnnotationId === annotation.id}
           style:--book-annotation-base={getAnnotationColorValue(annotation.color)}
-          on:click={(event) => handleAnnotationClick(event, annotation)}
-          on:keydown={(event) => handleAnnotationKeydown(event, annotation)}
         >
           <span class="annotation-item-swatch" aria-hidden="true"></span>
           <span class="annotation-item-content">
@@ -467,7 +556,6 @@
                   <button
                     type="button"
                     class="annotation-item-comment-expand"
-                    data-annotation-panel-control
                     aria-expanded={expandedCommentIds.has(annotation.id)}
                     on:pointerdown|stopPropagation={() => {}}
                     on:click|stopPropagation={() => toggleCommentExpanded(annotation.id)}
@@ -520,21 +608,23 @@
             {/if}
           </span>
           <span class="annotation-item-actions">
-            <span class="annotation-item-go" aria-hidden="true">
-              <Fa icon={faChevronRight} />
-            </span>
+            <button
+              type="button"
+              class="annotation-item-jump"
+              title="Go to annotation"
+              aria-label="Go to annotation"
+              on:click|stopPropagation={() => dispatch('jump', annotation)}
+              on:keydown|stopPropagation={() => {}}
+            >
+              <Fa icon={faArrowUpRightFromSquare} />
+            </button>
             <button
               type="button"
               class="annotation-item-edit"
               title="Edit annotation"
               aria-label="Edit annotation"
               on:click|stopPropagation={() => editAnnotation(annotation)}
-              on:keydown|stopPropagation={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  editAnnotation(annotation);
-                }
-              }}
+              on:keydown|stopPropagation={() => {}}
             >
               <Fa icon={faPen} />
             </button>
@@ -544,12 +634,7 @@
               title="Delete annotation"
               aria-label="Delete annotation"
               on:click|stopPropagation={() => dispatch('delete', annotation)}
-              on:keydown|stopPropagation={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  dispatch('delete', annotation);
-                }
-              }}
+              on:keydown|stopPropagation={() => {}}
             >
               <Fa icon={faTrash} />
             </button>
@@ -560,7 +645,7 @@
       <div class="annotations-panel-empty">
         <div class="annotations-panel-empty-icon"><Fa icon={faMagnifyingGlass} /></div>
         <div class="annotations-panel-empty-title">No matches</div>
-        <div class="annotations-panel-empty-copy">Try another word, chapter, note, or color.</div>
+        <div class="annotations-panel-empty-copy">Try another word, section, note, or color.</div>
       </div>
     {:else}
       <div class="annotations-panel-empty">
@@ -659,10 +744,14 @@
 
   .annotations-panel-controls {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(8.5rem, auto) minmax(9.25rem, auto);
+    grid-template-columns: minmax(0, 1.25fr) minmax(7.75rem, 0.75fr) minmax(9rem, 1fr);
     gap: 0.625rem;
     border-bottom: 1px solid color-mix(in srgb, var(--reader-page-text) 9%, transparent);
     padding: 0.75rem 1rem;
+  }
+
+  .annotations-panel-search {
+    grid-column: 1 / -1;
   }
 
   .annotations-panel-search,
@@ -770,7 +859,6 @@
     grid-template-columns: 0.45rem minmax(0, 1fr) auto;
     gap: 0.75rem;
     margin-bottom: 0.625rem;
-    cursor: pointer;
     border: 1px solid color-mix(in srgb, var(--reader-page-text) 11%, transparent);
     border-radius: 0.75rem;
     background:
@@ -791,7 +879,7 @@
   }
 
   .annotation-item:hover,
-  .annotation-item:focus-visible {
+  .annotation-item:focus-within {
     border-color: color-mix(in srgb, var(--book-annotation-base) 52%, transparent);
     box-shadow: 0 16px 34px rgba(5, 7, 10, 0.16);
     transform: translateY(-1px);
@@ -975,40 +1063,78 @@
   }
 
   .annotation-item-actions {
+    --annotation-action-size: clamp(
+      1.85rem,
+      calc(var(--reader-ui-control-font-size) + 0.9rem),
+      2.55rem
+    );
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 0.25rem;
+    justify-content: center;
+    gap: 0.32rem;
     color: color-mix(in srgb, var(--reader-page-text) 48%, transparent);
   }
 
-  .annotation-item-go,
+  .annotation-item-jump,
   .annotation-item-edit,
   .annotation-item-delete {
     display: inline-flex;
-    height: 1.8rem;
-    width: 1.8rem;
+    height: var(--annotation-action-size);
+    width: var(--annotation-action-size);
     align-items: center;
     justify-content: center;
-    border: 0;
+    border: 1px solid transparent;
     border-radius: 0.4rem;
     background: transparent;
     color: inherit;
     cursor: pointer;
     font: inherit;
+    font-size: var(--reader-ui-control-font-size);
+    outline: none;
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      box-shadow 140ms ease,
+      color 140ms ease,
+      transform 140ms ease;
+  }
+
+  .annotation-item-jump {
+    font-size: var(--reader-ui-font-size);
+  }
+
+  .annotation-item-jump:hover,
+  .annotation-item-jump:focus-visible {
+    border-color: color-mix(in srgb, var(--book-annotation-base) 44%, transparent);
+    background: color-mix(in srgb, var(--book-annotation-base) 16%, transparent);
+    color: color-mix(in srgb, var(--reader-page-text) 82%, var(--book-annotation-base));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--book-annotation-base) 14%, transparent);
+    transform: translateY(-1px);
   }
 
   .annotation-item-edit:hover,
   .annotation-item-edit:focus-visible {
+    border-color: color-mix(in srgb, var(--app-accent) 32%, transparent);
     background: color-mix(in srgb, var(--app-accent) 14%, transparent);
     color: var(--app-accent);
-    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-accent) 12%, transparent);
+    transform: translateY(-1px);
   }
 
   .annotation-item-delete:hover,
   .annotation-item-delete:focus-visible {
+    border-color: color-mix(in srgb, var(--app-danger) 32%, transparent);
     background: color-mix(in srgb, var(--app-danger) 14%, transparent);
     color: var(--app-danger);
-    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-danger) 12%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .annotation-item-jump:active,
+  .annotation-item-edit:active,
+  .annotation-item-delete:active {
+    transform: translateY(0);
   }
 
   .annotation-item-editor {
@@ -1137,18 +1263,20 @@
     line-height: 1.35;
   }
 
-  @media (max-width: 28rem) {
+  @media (max-width: 36rem) {
     .annotations-panel-controls {
       grid-template-columns: minmax(0, 1fr);
     }
 
-    .annotation-item {
-      grid-template-columns: 0.4rem minmax(0, 1fr);
+    .annotations-panel-search {
+      grid-column: auto;
     }
+  }
 
-    .annotation-item-actions {
-      grid-column: 2;
-      justify-content: flex-end;
+  @media (max-width: 28rem) {
+    .annotation-item {
+      grid-template-columns: 0.4rem minmax(0, 1fr) auto;
+      gap: 0.6rem;
     }
   }
 </style>
