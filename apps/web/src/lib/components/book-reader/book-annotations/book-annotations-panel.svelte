@@ -4,11 +4,11 @@
   import {
     faArrowDownWideShort,
     faArrowUpShortWide,
-    faCheck,
     faChevronDown,
     faChevronRight,
     faChevronUp,
     faFilter,
+    faFloppyDisk,
     faHighlighter,
     faMagnifyingGlass,
     faPen,
@@ -512,8 +512,8 @@
                     class="annotation-item-editor-save"
                     on:click|stopPropagation={() => saveAnnotation(annotation)}
                   >
-                    <Fa icon={faCheck} />
                     <span>Save</span>
+                    <Fa icon={faFloppyDisk} />
                   </button>
                 </span>
               </span>
@@ -1055,31 +1055,57 @@
     gap: 0.4rem;
     border-radius: 0.5rem;
     font: inherit;
-    font-weight: 800;
+    font-weight: 760;
     outline: none;
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      box-shadow 140ms ease,
+      color 140ms ease,
+      transform 140ms ease;
   }
 
   .annotation-item-editor-save {
-    border: 1px solid color-mix(in srgb, var(--app-accent) 44%, transparent);
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--app-accent) 86%, #ffffff),
-      color-mix(in srgb, #25a7a0 78%, var(--app-accent))
-    );
+    border: 1px solid color-mix(in srgb, var(--app-accent) 68%, transparent);
+    background: var(--app-accent);
     color: #ffffff;
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--app-accent) 18%, transparent);
   }
 
   .annotation-item-editor-secondary {
-    border: 1px solid color-mix(in srgb, var(--reader-page-text) 14%, transparent);
-    background: color-mix(in srgb, var(--reader-page-text) 8%, transparent);
-    color: color-mix(in srgb, var(--reader-page-text) 76%, transparent);
+    border: 1px solid color-mix(in srgb, var(--reader-page-text) 16%, transparent);
+    background: color-mix(in srgb, var(--reader-page-bg) 82%, var(--reader-page-text) 8%);
+    color: color-mix(in srgb, var(--reader-page-text) 72%, transparent);
   }
 
   .annotation-item-editor-save:hover,
-  .annotation-item-editor-save:focus-visible,
+  .annotation-item-editor-save:focus-visible {
+    border-color: color-mix(in srgb, var(--app-accent) 82%, #ffffff 18%);
+    background: color-mix(in srgb, var(--app-accent-strong) 82%, var(--app-accent));
+    box-shadow: 0 12px 24px color-mix(in srgb, var(--app-accent) 24%, transparent);
+    transform: translateY(-1px);
+  }
+
   .annotation-item-editor-secondary:hover,
   .annotation-item-editor-secondary:focus-visible {
-    box-shadow: 0 14px 28px color-mix(in srgb, var(--app-accent) 24%, transparent);
+    border-color: color-mix(in srgb, var(--reader-page-text) 26%, transparent);
+    background: color-mix(in srgb, var(--reader-page-bg) 76%, var(--reader-page-text) 12%);
+    color: color-mix(in srgb, var(--reader-page-text) 86%, transparent);
+  }
+
+  .annotation-item-editor-save:focus-visible {
+    box-shadow:
+      var(--app-focus-ring),
+      0 12px 24px color-mix(in srgb, var(--app-accent) 24%, transparent);
+  }
+
+  .annotation-item-editor-secondary:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--reader-page-text) 18%, transparent);
+  }
+
+  .annotation-item-editor-save:active,
+  .annotation-item-editor-secondary:active {
+    transform: translateY(0);
   }
 
   .annotations-panel-empty {
