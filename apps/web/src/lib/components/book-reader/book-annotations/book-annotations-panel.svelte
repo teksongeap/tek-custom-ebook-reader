@@ -744,7 +744,8 @@
 
   .annotations-panel-controls {
     display: grid;
-    grid-template-columns: minmax(0, 1.25fr) minmax(7.75rem, 0.75fr) minmax(9rem, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    align-items: stretch;
     gap: 0.625rem;
     border-bottom: 1px solid color-mix(in srgb, var(--reader-page-text) 9%, transparent);
     padding: 0.75rem 1rem;
@@ -758,7 +759,7 @@
   .annotations-panel-filter,
   .annotations-panel-sort {
     display: flex;
-    min-width: 0;
+    min-width: min(100%, 12rem);
     align-items: center;
     gap: 0.5rem;
     border: 1px solid color-mix(in srgb, var(--reader-page-text) 12%, transparent);
@@ -767,6 +768,10 @@
     color: color-mix(in srgb, var(--reader-page-text) 74%, transparent);
     min-height: 2.25rem;
     padding: 0 0.65rem;
+  }
+
+  .annotations-panel-sort {
+    min-width: min(100%, 13.5rem);
   }
 
   .annotations-panel-search:focus-within,
@@ -1261,16 +1266,6 @@
     color: color-mix(in srgb, var(--reader-page-text) 58%, transparent);
     font-size: var(--reader-ui-small-font-size);
     line-height: 1.35;
-  }
-
-  @media (max-width: 36rem) {
-    .annotations-panel-controls {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .annotations-panel-search {
-      grid-column: auto;
-    }
   }
 
   @media (max-width: 28rem) {

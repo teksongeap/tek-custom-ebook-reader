@@ -11,7 +11,6 @@
     faFloppyDisk,
     faPen,
     faTrash,
-    faUpRightAndDownLeftFromCenter,
     faXmark,
     faCircleCheck,
     faSquareCheck,
@@ -981,7 +980,7 @@
               on:pointerdown={beginEditingPopoverResize}
               on:keydown|stopPropagation={handleEditingPopoverResizeKeydown}
             >
-              <Fa icon={faUpRightAndDownLeftFromCenter} />
+              <span class="book-annotation-card-editor-resize-grip" aria-hidden="true"></span>
             </button>
           </span>
         </div>
@@ -1375,12 +1374,30 @@
     cursor: nwse-resize;
     background: transparent;
     color: color-mix(in srgb, var(--reader-page-text) 58%, transparent);
+    padding: 0;
   }
 
   .book-annotation-card-editor-action--resize:hover,
   .book-annotation-card-editor-action--resize:focus-visible {
     background: color-mix(in srgb, var(--reader-page-text) 10%, transparent);
     color: var(--reader-page-text);
+  }
+
+  .book-annotation-card-editor-resize-grip {
+    display: block;
+    width: calc(var(--reader-ui-control-font-size) + 0.22rem);
+    height: calc(var(--reader-ui-control-font-size) + 0.22rem);
+    opacity: 0.52;
+    background:
+      linear-gradient(135deg, transparent 0 52%, currentColor 52% 59%, transparent 59%),
+      linear-gradient(135deg, transparent 0 68%, currentColor 68% 75%, transparent 75%),
+      linear-gradient(135deg, transparent 0 84%, currentColor 84% 91%, transparent 91%);
+  }
+
+  .book-annotation-card-editor-action--resize:hover .book-annotation-card-editor-resize-grip,
+  .book-annotation-card-editor-action--resize:focus-visible
+    .book-annotation-card-editor-resize-grip {
+    opacity: 0.78;
   }
 
   .book-annotation-card-editor-action--primary {
