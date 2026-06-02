@@ -72,13 +72,20 @@
   let commentCanExpand = false;
   let isCommentExpanded = false;
   let hoveredAnnotationId = '';
+  let commentMeasurementCanvas: HTMLCanvasElement | undefined;
   const cleanupBySpan = new WeakMap<HTMLSpanElement, () => void>();
   const draftTextAreaMinHeight = 38;
   const editingPopoverMinHeight = 164;
+  const collapsedCommentLineCount = 2;
+  const collapsedCommentLatinCharacterLimit = 64;
+  const collapsedCommentWideCharacterLimit = 36;
 
   $: annotationKey = annotations
     .map((annotation) => `${annotation.id}:${annotation.updatedAt}`)
     .join('|');
+  $: commentCanExpandByText = activeAnnotation?.comment
+    ? canOfferCommentExpansion(activeAnnotation.comment)
+    : false;
 
   $: if (contentEl && annotationKey !== undefined && renderRevision >= 0) {
     redrawAnnotations();
@@ -237,7 +244,7 @@
     activeAnnotation = annotation;
     isPinned = pinned;
     isCommentExpanded = false;
-    commentCanExpand = false;
+    commentCanExpand = canOfferCommentExpansion(annotation.comment);
     popoverReady = false;
     popoverStyle = getBasePopoverStyle(annotation, true);
 
@@ -451,7 +458,7 @@
     window.clearTimeout(closeTimer);
 
     const annotationId = activeAnnotation.id;
-    const preserveExpandedLayout = isCommentExpanded || commentCanExpand;
+    const preserveExpandedLayout = isCommentExpanded || commentCanExpand || commentCanExpandByText;
 
     if (preserveExpandedLayout && !isCommentExpanded) {
       isCommentExpanded = true;
@@ -537,13 +544,166 @@
       return;
     }
 
-    const nextCanExpand = commentEl.scrollHeight > commentEl.clientHeight + 1;
+    const nextCanExpand =
+      canOfferCommentExpansion(activeAnnotation.comment) || isCommentVisiblyTruncated(commentEl);
 
     if (commentCanExpand !== nextCanExpand) {
       commentCanExpand = nextCanExpand;
       await tick();
       await updatePopoverPosition();
     }
+  }
+
+  function isCommentVisiblyTruncated(element: HTMLElement) {
+    const rect = element.getBoundingClientRect();
+    const collapsedHeight = getCollapsedCommentHeight(element);
+
+    if (
+      element.scrollHeight > collapsedHeight + 1 ||
+      element.scrollWidth > element.clientWidth + 1
+    ) {
+      return true;
+    }
+
+    if (rect.width <= 0 || rect.height <= 0) {
+      return false;
+    }
+
+    const clone = element.cloneNode(true) as HTMLElement;
+    clone.classList.remove(
+      'book-annotation-card-comment--clamped',
+      'book-annotation-card-comment--expanded'
+    );
+    clone.setAttribute('aria-hidden', 'true');
+    clone.style.position = 'absolute';
+    clone.style.visibility = 'hidden';
+    clone.style.pointerEvents = 'none';
+    clone.style.left = '-10000px';
+    clone.style.top = '0';
+    clone.style.width = `${rect.width}px`;
+    clone.style.height = 'auto';
+    clone.style.maxHeight = 'none';
+    clone.style.overflow = 'visible';
+    clone.style.display = 'block';
+    clone.style.setProperty('-webkit-line-clamp', 'unset');
+    clone.style.setProperty('line-clamp', 'unset');
+    clone.style.setProperty('-webkit-box-orient', 'initial');
+
+    const host = element.parentElement ?? document.body;
+    host.appendChild(clone);
+    const naturalHeight = Math.max(clone.scrollHeight, clone.getBoundingClientRect().height);
+    clone.remove();
+
+    return naturalHeight > collapsedHeight + 1 || isCommentLikelyWrappedPastClamp(element);
+  }
+
+  function canOfferCommentExpansion(comment: string) {
+    const trimmedComment = comment.trim();
+
+    if (!trimmedComment) {
+      return false;
+    }
+
+    if (trimmedComment.split(/\r?\n/).length > collapsedCommentLineCount) {
+      return true;
+    }
+
+    const characterLimit = hasWideCommentText(trimmedComment)
+      ? collapsedCommentWideCharacterLimit
+      : collapsedCommentLatinCharacterLimit;
+
+    return Array.from(trimmedComment).length > characterLimit;
+  }
+
+  function hasWideCommentText(comment: string) {
+    return /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff\uac00-\ud7af]/u.test(comment);
+  }
+
+  function getCollapsedCommentHeight(element: HTMLElement) {
+    const style = window.getComputedStyle(element);
+    const lineHeight = Number.parseFloat(style.lineHeight);
+    const fontSize = Number.parseFloat(style.fontSize);
+    const fallbackLineHeight = Number.isFinite(fontSize) ? fontSize * 1.45 : 29;
+
+    return (Number.isFinite(lineHeight) ? lineHeight : fallbackLineHeight) * collapsedCommentLineCount;
+  }
+
+  function isCommentLikelyWrappedPastClamp(element: HTMLElement) {
+    const text = element.textContent?.trim();
+    const width = element.clientWidth || element.getBoundingClientRect().width;
+
+    if (!text || width <= 0) {
+      return false;
+    }
+
+    const context = getCommentMeasurementContext(element);
+    if (!context) {
+      return false;
+    }
+
+    return getEstimatedWrappedLineCount(text, context, width) > collapsedCommentLineCount;
+  }
+
+  function getCommentMeasurementContext(element: HTMLElement) {
+    commentMeasurementCanvas ??= document.createElement('canvas');
+    const context = commentMeasurementCanvas.getContext('2d');
+
+    if (!context) {
+      return undefined;
+    }
+
+    const style = window.getComputedStyle(element);
+    context.font = [
+      style.fontStyle,
+      style.fontVariant,
+      style.fontWeight,
+      style.fontSize,
+      style.fontFamily
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    return context;
+  }
+
+  function getEstimatedWrappedLineCount(
+    text: string,
+    context: CanvasRenderingContext2D,
+    width: number
+  ) {
+    return text
+      .split(/\r?\n/)
+      .reduce(
+        (lineCount, paragraph) =>
+          lineCount + getEstimatedWrappedParagraphLineCount(paragraph, context, width),
+        0
+      );
+  }
+
+  function getEstimatedWrappedParagraphLineCount(
+    paragraph: string,
+    context: CanvasRenderingContext2D,
+    width: number
+  ) {
+    if (!paragraph) {
+      return 1;
+    }
+
+    let lineCount = 1;
+    let currentLineWidth = 0;
+
+    for (const character of Array.from(paragraph)) {
+      const characterWidth = context.measureText(character).width;
+
+      if (currentLineWidth > 0 && currentLineWidth + characterWidth > width) {
+        lineCount += 1;
+        currentLineWidth = characterWidth;
+      } else {
+        currentLineWidth += characterWidth;
+      }
+    }
+
+    return lineCount;
   }
 
   async function toggleCommentExpanded() {
@@ -637,7 +797,7 @@
       return;
     }
 
-    if (key === 's' && (commentCanExpand || isCommentExpanded)) {
+    if (key === 's' && (commentCanExpand || commentCanExpandByText || isCommentExpanded)) {
       event.preventDefault();
       event.stopPropagation();
       void toggleCommentExpanded();
@@ -991,10 +1151,11 @@
         class="book-annotation-card-comment"
         class:book-annotation-card-comment--clamped={!isCommentExpanded}
         class:book-annotation-card-comment--expanded={isCommentExpanded}
+        style:--book-annotation-card-comment-line-clamp={collapsedCommentLineCount}
       >
         <AnnotationLinkifiedText text={activeAnnotation.comment} />
       </div>
-      {#if commentCanExpand}
+      {#if commentCanExpand || commentCanExpandByText}
         <button
           type="button"
           class="book-annotation-card-expand"
@@ -1194,8 +1355,8 @@
     display: -webkit-box;
     overflow: hidden;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
+    -webkit-line-clamp: var(--book-annotation-card-comment-line-clamp, 2);
+    line-clamp: var(--book-annotation-card-comment-line-clamp, 2);
   }
 
   .book-annotation-card-comment--expanded {
