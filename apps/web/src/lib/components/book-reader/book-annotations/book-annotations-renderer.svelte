@@ -246,9 +246,12 @@
 
     window.clearTimeout(closeTimer);
 
+    const preserveExpandedState =
+      pinned && activeAnnotation?.id === annotation.id && isCommentExpanded;
+
     activeAnnotation = annotation;
     isPinned = pinned;
-    isCommentExpanded = false;
+    isCommentExpanded = preserveExpandedState;
     commentCanExpand = shouldOfferAnnotationCommentExpansionBeforeMeasurement(
       annotation.comment,
       collapsedCommentLineCount
@@ -400,7 +403,7 @@
   }
 
   function scheduleClose() {
-    if ((isPinned && !isCommentExpanded) || editingAnnotationId) {
+    if (isPinned || editingAnnotationId) {
       return;
     }
 
@@ -573,8 +576,7 @@
 
     isCommentExpanded = !isCommentExpanded;
 
-    if (isCommentExpanded) {
-      isPinned = true;
+    if (isCommentExpanded && isPinned) {
       activateAnnotation(activeAnnotation.id);
       document.removeEventListener('pointerdown', closePinnedPopover, true);
       document.addEventListener('pointerdown', closePinnedPopover, true);
