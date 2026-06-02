@@ -39,6 +39,11 @@
   } from './annotation-colors';
   import { formatAnnotationTimestamp, getAnnotationEditedAt } from './annotation-time';
   import AnnotationLinkifiedText from './annotation-linkified-text.svelte';
+  import {
+    annotationCommentCollapsedLineCount,
+    hasAnnotationCommentOverflow,
+    shouldOfferAnnotationCommentExpansionBeforeMeasurement
+  } from './annotation-comment-expansion';
 
   type AnnotationColorFilter = AnnotationColor | 'all';
   type AnnotationSectionFilter = string | 'all';
@@ -46,6 +51,10 @@
     id: string;
     label: string;
     order: number;
+  };
+  type CommentExpansionMeasurement = {
+    id: string;
+    comment: string;
   };
 
   export let annotations: BooksDbAnnotation[] = [];
@@ -68,6 +77,8 @@
   let selectedAnnotationColor: AnnotationColorFilter = 'all';
   let selectedAnnotationSection: AnnotationSectionFilter = 'all';
   let expandedCommentIds = new Set<string>();
+  let expandableCommentIds = new Set<string>();
+  const collapsedCommentLineCount = annotationCommentCollapsedLineCount;
 
   $: panelStyle = getReaderChromeStyle({ fontSize, fontColor, backgroundColor });
   $: activeSortMode = getAnnotationSortMode($lastAnnotationSortMode$);
@@ -129,6 +140,7 @@
   ) {
     cancelEditing();
   }
+  $: pruneCommentExpansionState(annotations);
   $: void resizeDraftTextArea(draftTextAreaEl, editingAnnotationId, draftComment);
 
   function compareAnnotationsForPanel(
@@ -367,12 +379,6 @@
     cancelEditing();
   }
 
-  function canExpandComment(comment: string) {
-    const trimmedComment = comment.trim();
-
-    return trimmedComment.split(/\r?\n/).length > 2 || trimmedComment.length > 150;
-  }
-
   function toggleCommentExpanded(annotationId: string) {
     const nextExpandedCommentIds = new Set(expandedCommentIds);
 
@@ -383,6 +389,102 @@
     }
 
     expandedCommentIds = nextExpandedCommentIds;
+  }
+
+  function measureCommentExpansion(node: HTMLElement, measurement: CommentExpansionMeasurement) {
+    let currentMeasurement = measurement;
+    let animationFrameId = 0;
+
+    const measure = () => {
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+
+      animationFrameId = window.requestAnimationFrame(() => {
+        animationFrameId = 0;
+        setCommentExpandable(
+          currentMeasurement.id,
+          shouldOfferAnnotationCommentExpansionBeforeMeasurement(
+            currentMeasurement.comment,
+            collapsedCommentLineCount
+          ) || hasAnnotationCommentOverflow(node, collapsedCommentLineCount)
+        );
+      });
+    };
+
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure);
+
+    resizeObserver?.observe(node);
+    window.addEventListener('resize', measure);
+    measure();
+
+    return {
+      update(nextMeasurement: CommentExpansionMeasurement) {
+        const previousId = currentMeasurement.id;
+
+        currentMeasurement = nextMeasurement;
+
+        if (previousId !== nextMeasurement.id) {
+          setCommentExpandable(previousId, false);
+        }
+
+        measure();
+      },
+      destroy() {
+        if (animationFrameId) {
+          window.cancelAnimationFrame(animationFrameId);
+        }
+
+        resizeObserver?.disconnect();
+        window.removeEventListener('resize', measure);
+        setCommentExpandable(currentMeasurement.id, false);
+      }
+    };
+  }
+
+  function setCommentExpandable(annotationId: string, canExpand: boolean) {
+    const isCurrentlyExpandable = expandableCommentIds.has(annotationId);
+
+    if (isCurrentlyExpandable === canExpand) {
+      return;
+    }
+
+    const nextExpandableCommentIds = new Set(expandableCommentIds);
+
+    if (canExpand) {
+      nextExpandableCommentIds.add(annotationId);
+    } else {
+      nextExpandableCommentIds.delete(annotationId);
+    }
+
+    expandableCommentIds = nextExpandableCommentIds;
+  }
+
+  function pruneCommentExpansionState(annotationList: BooksDbAnnotation[]) {
+    const annotationIds = new Set(
+      annotationList
+        .filter((annotation) => annotation.comment.trim())
+        .map((annotation) => annotation.id)
+    );
+
+    expandedCommentIds = pruneCommentIdSet(expandedCommentIds, annotationIds);
+    expandableCommentIds = pruneCommentIdSet(expandableCommentIds, annotationIds);
+  }
+
+  function pruneCommentIdSet(commentIds: Set<string>, annotationIds: Set<string>) {
+    let hasStaleCommentId = false;
+    const nextCommentIds = new Set<string>();
+
+    for (const commentId of commentIds) {
+      if (annotationIds.has(commentId)) {
+        nextCommentIds.add(commentId);
+      } else {
+        hasStaleCommentId = true;
+      }
+    }
+
+    return hasStaleCommentId ? nextCommentIds : commentIds;
   }
 
   async function resizeDraftTextArea(
@@ -522,6 +624,13 @@
     {#if sortedAnnotations.length}
       {#each sortedAnnotations as annotation (annotation.id)}
         {@const chapterLabel = getChapterLabel(annotation)}
+        {@const isCommentExpanded = expandedCommentIds.has(annotation.id)}
+        {@const canExpandAnnotationComment =
+          expandableCommentIds.has(annotation.id) ||
+          shouldOfferAnnotationCommentExpansionBeforeMeasurement(
+            annotation.comment,
+            collapsedCommentLineCount
+          )}
         <div
           class="annotation-item"
           class:annotation-item--editing={editingAnnotationId === annotation.id}
@@ -546,17 +655,19 @@
             {#if annotation.comment && editingAnnotationId !== annotation.id}
               <span class="annotation-item-comment-shell">
                 <span
+                  use:measureCommentExpansion={{ id: annotation.id, comment: annotation.comment }}
                   class="annotation-item-comment"
-                  class:annotation-item-comment--clamped={!expandedCommentIds.has(annotation.id)}
-                  class:annotation-item-comment--expanded={expandedCommentIds.has(annotation.id)}
+                  class:annotation-item-comment--clamped={!isCommentExpanded}
+                  class:annotation-item-comment--expanded={isCommentExpanded}
+                  style:--annotation-item-comment-line-clamp={collapsedCommentLineCount}
                 >
                   <AnnotationLinkifiedText text={annotation.comment} />
                 </span>
-                {#if canExpandComment(annotation.comment)}
+                {#if canExpandAnnotationComment}
                   <button
                     type="button"
                     class="annotation-item-comment-expand"
-                    aria-expanded={expandedCommentIds.has(annotation.id)}
+                    aria-expanded={isCommentExpanded}
                     on:pointerdown|stopPropagation={() => {}}
                     on:click|stopPropagation={() => toggleCommentExpanded(annotation.id)}
                     on:keydown|stopPropagation={(event) => {
@@ -566,11 +677,9 @@
                       }
                     }}
                   >
-                    <span>{expandedCommentIds.has(annotation.id) ? 'Show less' : 'Show more'}</span>
+                    <span>{isCommentExpanded ? 'Show less' : 'Show more'}</span>
                     <span class="annotation-item-comment-expand-icon" aria-hidden="true">
-                      <Fa
-                        icon={expandedCommentIds.has(annotation.id) ? faChevronUp : faChevronDown}
-                      />
+                      <Fa icon={isCommentExpanded ? faChevronUp : faChevronDown} />
                     </span>
                   </button>
                 {/if}
@@ -582,7 +691,7 @@
                   bind:this={draftTextAreaEl}
                   class="annotation-item-textarea"
                   bind:value={draftComment}
-                  rows={canExpandComment(annotation.comment) ? 6 : 3}
+                  rows={canExpandAnnotationComment ? 6 : 3}
                   placeholder="Add an optional comment"
                   on:click|stopPropagation={() => {}}
                   on:keydown|stopPropagation={() => {}}
@@ -1006,8 +1115,8 @@
     display: -webkit-box;
     overflow: hidden;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    -webkit-line-clamp: var(--annotation-item-comment-line-clamp, 2);
+    line-clamp: var(--annotation-item-comment-line-clamp, 2);
   }
 
   .annotation-item-comment--expanded {

@@ -27,6 +27,11 @@
   import { getAnnotationColorValue } from './annotation-colors';
   import { formatAnnotationTimestamp, getAnnotationEditedAt } from './annotation-time';
   import AnnotationLinkifiedText from './annotation-linkified-text.svelte';
+  import {
+    annotationCommentCollapsedLineCount,
+    hasAnnotationCommentOverflow,
+    shouldOfferAnnotationCommentExpansionBeforeMeasurement
+  } from './annotation-comment-expansion';
 
   export let contentEl: HTMLElement | undefined;
   export let annotations: BooksDbAnnotation[] = [];
@@ -75,10 +80,17 @@
   const cleanupBySpan = new WeakMap<HTMLSpanElement, () => void>();
   const draftTextAreaMinHeight = 38;
   const editingPopoverMinHeight = 164;
+  const collapsedCommentLineCount = annotationCommentCollapsedLineCount;
 
   $: annotationKey = annotations
     .map((annotation) => `${annotation.id}:${annotation.updatedAt}`)
     .join('|');
+  $: commentCanExpandBeforeMeasurement = activeAnnotation?.comment
+    ? shouldOfferAnnotationCommentExpansionBeforeMeasurement(
+        activeAnnotation.comment,
+        collapsedCommentLineCount
+      )
+    : false;
 
   $: if (contentEl && annotationKey !== undefined && renderRevision >= 0) {
     redrawAnnotations();
@@ -237,7 +249,10 @@
     activeAnnotation = annotation;
     isPinned = pinned;
     isCommentExpanded = false;
-    commentCanExpand = false;
+    commentCanExpand = shouldOfferAnnotationCommentExpansionBeforeMeasurement(
+      annotation.comment,
+      collapsedCommentLineCount
+    );
     popoverReady = false;
     popoverStyle = getBasePopoverStyle(annotation, true);
 
@@ -451,7 +466,8 @@
     window.clearTimeout(closeTimer);
 
     const annotationId = activeAnnotation.id;
-    const preserveExpandedLayout = isCommentExpanded || commentCanExpand;
+    const preserveExpandedLayout =
+      isCommentExpanded || commentCanExpand || commentCanExpandBeforeMeasurement;
 
     if (preserveExpandedLayout && !isCommentExpanded) {
       isCommentExpanded = true;
@@ -537,7 +553,11 @@
       return;
     }
 
-    const nextCanExpand = commentEl.scrollHeight > commentEl.clientHeight + 1;
+    const nextCanExpand =
+      shouldOfferAnnotationCommentExpansionBeforeMeasurement(
+        activeAnnotation.comment,
+        collapsedCommentLineCount
+      ) || hasAnnotationCommentOverflow(commentEl, collapsedCommentLineCount);
 
     if (commentCanExpand !== nextCanExpand) {
       commentCanExpand = nextCanExpand;
@@ -637,7 +657,10 @@
       return;
     }
 
-    if (key === 's' && (commentCanExpand || isCommentExpanded)) {
+    if (
+      key === 's' &&
+      (commentCanExpand || commentCanExpandBeforeMeasurement || isCommentExpanded)
+    ) {
       event.preventDefault();
       event.stopPropagation();
       void toggleCommentExpanded();
@@ -991,10 +1014,11 @@
         class="book-annotation-card-comment"
         class:book-annotation-card-comment--clamped={!isCommentExpanded}
         class:book-annotation-card-comment--expanded={isCommentExpanded}
+        style:--book-annotation-card-comment-line-clamp={collapsedCommentLineCount}
       >
         <AnnotationLinkifiedText text={activeAnnotation.comment} />
       </div>
-      {#if commentCanExpand}
+      {#if commentCanExpand || commentCanExpandBeforeMeasurement}
         <button
           type="button"
           class="book-annotation-card-expand"
@@ -1194,8 +1218,8 @@
     display: -webkit-box;
     overflow: hidden;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
+    -webkit-line-clamp: var(--book-annotation-card-comment-line-clamp, 2);
+    line-clamp: var(--book-annotation-card-comment-line-clamp, 2);
   }
 
   .book-annotation-card-comment--expanded {
