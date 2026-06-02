@@ -150,6 +150,7 @@
 
   onDestroy(() => {
     window.clearTimeout(hoverOpenTimer);
+    window.clearTimeout(closeTimer);
     detachSpanListeners();
     document.removeEventListener('pointerdown', closePinnedPopover, true);
 
@@ -248,14 +249,16 @@
 
     const preserveExpandedState =
       pinned && activeAnnotation?.id === annotation.id && isCommentExpanded;
+    const preserveCommentCanExpand = preserveExpandedState && commentCanExpand;
 
     activeAnnotation = annotation;
     isPinned = pinned;
     isCommentExpanded = preserveExpandedState;
-    commentCanExpand = shouldOfferAnnotationCommentExpansionBeforeMeasurement(
-      annotation.comment,
-      collapsedCommentLineCount
-    );
+    commentCanExpand =
+      shouldOfferAnnotationCommentExpansionBeforeMeasurement(
+        annotation.comment,
+        collapsedCommentLineCount
+      ) || preserveCommentCanExpand;
     popoverReady = false;
     popoverStyle = getBasePopoverStyle(annotation, true);
 
@@ -444,6 +447,7 @@
 
   function closeAnnotationCard() {
     window.clearTimeout(hoverOpenTimer);
+    window.clearTimeout(closeTimer);
     activeAnnotation = undefined;
     isPinned = false;
     popoverReady = false;

@@ -402,6 +402,11 @@
 
       animationFrameId = window.requestAnimationFrame(() => {
         animationFrameId = 0;
+
+        if (!node.isConnected) {
+          return;
+        }
+
         setCommentExpandable(
           currentMeasurement.id,
           shouldOfferAnnotationCommentExpansionBeforeMeasurement(
