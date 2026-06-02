@@ -31,6 +31,10 @@ export class PageManagerContinuous implements PageManager {
     });
   }
 
+  scrollToColumn(pos: number) {
+    this.scrollTo(pos);
+  }
+
   private scrollByPercent(value: number) {
     let windowSize = this.window.innerHeight;
     let scrollSide: 'left' | 'top' = 'top';

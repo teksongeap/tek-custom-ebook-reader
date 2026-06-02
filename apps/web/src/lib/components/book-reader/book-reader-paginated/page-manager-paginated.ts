@@ -109,6 +109,10 @@ export class PageManagerPaginated implements PageManager {
   }
 
   scrollToBookmarkPosition(scrollPos: number, isUser: boolean) {
+    this.scrollToColumn(scrollPos, isUser);
+  }
+
+  scrollToColumn(scrollPos: number, isUser: boolean) {
     const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
     const viewportSize = this.verticalMode ? this.height : this.width;
     this.moveToPos(

@@ -1595,7 +1595,7 @@
       : annotationRect.left - readerRect.left;
     const targetScroll = Math.max(0, readerElement[scrollProperty] + offset);
 
-    pageManager.scrollTo(targetScroll, false);
+    pageManager.scrollToColumn(targetScroll, false);
   }
 
   function getPaginatedAnnotationTargetRect(annotationElements: HTMLElement[]) {
