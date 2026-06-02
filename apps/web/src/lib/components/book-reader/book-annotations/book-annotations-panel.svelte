@@ -17,10 +17,7 @@
     faXmark
   } from '@fortawesome/free-solid-svg-icons';
   import type { BooksDbAnnotation } from '$lib/data/database/books-db/versions/books-db';
-  import {
-    getChapterSections,
-    type SectionWithProgress
-  } from '$lib/components/book-reader/book-toc/book-toc';
+  import type { SectionWithProgress } from '$lib/components/book-reader/book-toc/book-toc';
   import {
     AnnotationSortMode,
     annotationSortOptions,
@@ -31,6 +28,11 @@
   import { SortDirection } from '$lib/data/sort-types';
   import { lastAnnotationSortDirection$, lastAnnotationSortMode$ } from '$lib/data/store';
   import { getReaderChromeStyle } from '$lib/functions/reader-typography';
+  import {
+    buildReaderSectionLookup,
+    getLabeledSectionForCharacter,
+    getNearestLabeledSection
+  } from '$lib/functions/reader-section-lookup';
   import {
     annotationColorOptions,
     getAnnotationColorLabel,
@@ -79,14 +81,8 @@
     activeSortDirection === SortDirection.ASC ? 'Ascending' : 'Descending';
   $: nextSortDirectionLabel =
     activeSortDirection === SortDirection.ASC ? 'descending' : 'ascending';
-  $: chapterSections = getChapterSections(sectionData);
-  $: sectionOrder = new Map(sectionData.map((section, index) => [section.reference, index]));
-  $: annotationSectionOptions = getAnnotationSectionOptions(
-    annotations,
-    sectionData,
-    chapterSections,
-    sectionOrder
-  );
+  $: sectionLookup = buildReaderSectionLookup(sectionData);
+  $: annotationSectionOptions = getAnnotationSectionOptions(annotations, sectionLookup);
   $: if (
     selectedAnnotationSection !== 'all' &&
     !annotationSectionOptions.some(
@@ -105,12 +101,11 @@
       ? colorFilteredAnnotations
       : colorFilteredAnnotations.filter(
           (annotation) =>
-            getAnnotationSectionFilterKey(annotation, sectionData, chapterSections) ===
-            selectedAnnotationSection
+            getAnnotationSectionFilterKey(annotation, sectionLookup) === selectedAnnotationSection
         );
   $: filteredAnnotations = searchTerms.length
     ? sectionFilteredAnnotations.filter((annotation) =>
-        matchesAnnotationSearch(annotation, searchTerms, sectionData, chapterSections)
+        matchesAnnotationSearch(annotation, searchTerms, sectionLookup)
       )
     : sectionFilteredAnnotations;
   $: sortedAnnotations = filteredAnnotations
@@ -183,60 +178,39 @@
     return !!annotation.comment.trim();
   }
 
-  function getAnnotationSectionOrder(
-    annotation: BooksDbAnnotation,
-    orderMap = sectionOrder,
-    sectionCount = sectionData.length
-  ) {
-    return orderMap.get(annotation.anchor.sectionId) ?? sectionCount + annotation.exploredCharCount;
-  }
-
-  function getChapterLabel(
-    annotation: BooksDbAnnotation,
-    sections = sectionData,
-    chapters = chapterSections
-  ) {
-    return getAnnotationChapterSection(annotation, sections, chapters)?.label || 'Current Book';
-  }
-
-  function getAnnotationChapterSection(
-    annotation: BooksDbAnnotation,
-    sections = sectionData,
-    chapters = chapterSections
-  ) {
-    const annotationSection = sections.find(
-      (section) => section.reference === annotation.anchor.sectionId
+  function getAnnotationSectionOrder(annotation: BooksDbAnnotation, lookup = sectionLookup) {
+    return (
+      lookup.sectionOrder.get(annotation.anchor.sectionId) ??
+      lookup.sections.length + annotation.exploredCharCount
     );
-    const anchorChapter = getNearestLabeledSection(annotationSection, sections);
-    const fallbackChapter = chapters
-      .slice()
-      .reverse()
-      .find((section) => (section.startCharacter || 0) <= annotation.exploredCharCount);
+  }
+
+  function getChapterLabel(annotation: BooksDbAnnotation, lookup = sectionLookup) {
+    return getAnnotationChapterSection(annotation, lookup)?.label || 'Current Book';
+  }
+
+  function getAnnotationChapterSection(annotation: BooksDbAnnotation, lookup = sectionLookup) {
+    const annotationSection = lookup.sectionsByReference.get(annotation.anchor.sectionId);
+    const anchorChapter = getNearestLabeledSection(lookup, annotationSection);
+    const fallbackChapter = getLabeledSectionForCharacter(lookup, annotation.exploredCharCount);
 
     return anchorChapter || fallbackChapter;
   }
 
-  function getAnnotationSectionFilterKey(
-    annotation: BooksDbAnnotation,
-    sections = sectionData,
-    chapters = chapterSections
-  ) {
+  function getAnnotationSectionFilterKey(annotation: BooksDbAnnotation, lookup = sectionLookup) {
     return (
-      getAnnotationChapterSection(annotation, sections, chapters)?.reference ||
-      annotation.anchor.sectionId
+      getAnnotationChapterSection(annotation, lookup)?.reference || annotation.anchor.sectionId
     );
   }
 
   function getAnnotationSectionOptions(
     annotationList: BooksDbAnnotation[],
-    sections: SectionWithProgress[],
-    chapters: SectionWithProgress[],
-    orderMap: Map<string, number>
+    lookup = sectionLookup
   ) {
     const sectionOptions = new Map<string, AnnotationSectionOption>();
 
     for (const annotation of annotationList) {
-      const section = getAnnotationChapterSection(annotation, sections, chapters);
+      const section = getAnnotationChapterSection(annotation, lookup);
       const id = section?.reference || annotation.anchor.sectionId;
 
       if (!sectionOptions.has(id)) {
@@ -244,8 +218,8 @@
           id,
           label: section?.label || 'Current Book',
           order:
-            (section ? orderMap.get(section.reference) : undefined) ??
-            getAnnotationSectionOrder(annotation, orderMap, sections.length)
+            (section ? lookup.sectionOrder.get(section.reference) : undefined) ??
+            getAnnotationSectionOrder(annotation, lookup)
         });
       }
     }
@@ -256,37 +230,17 @@
     );
   }
 
-  function getNearestLabeledSection(
-    section: SectionWithProgress | undefined,
-    sections = sectionData
-  ) {
-    let currentSection = section;
-
-    while (currentSection) {
-      if (currentSection.label) {
-        return currentSection;
-      }
-
-      currentSection = currentSection.parentChapter
-        ? sections.find((item) => item.reference === currentSection?.parentChapter)
-        : undefined;
-    }
-
-    return undefined;
-  }
-
   function matchesAnnotationSearch(
     annotation: BooksDbAnnotation,
     terms: string[],
-    sections = sectionData,
-    chapters = chapterSections
+    lookup = sectionLookup
   ) {
     const searchableText = normalizeForSearch(
       [
         annotation.comment,
         annotation.selectedText,
         annotation.anchor.text,
-        getChapterLabel(annotation, sections, chapters),
+        getChapterLabel(annotation, lookup),
         formatAnnotationTimestamp(annotation.createdAt),
         getAnnotationEditedAt(annotation)
           ? formatAnnotationTimestamp(getAnnotationEditedAt(annotation))
@@ -406,6 +360,8 @@
 </script>
 
 <div
+  role="region"
+  aria-label="Annotations"
   class="annotations-panel"
   style={panelStyle}
   on:touchmove|stopPropagation={() => {}}

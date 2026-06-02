@@ -67,8 +67,8 @@
     action: any;
   }[] = [];
 
-  let customReadingPointMenuElm: Popover;
-  let mobileMenuElm: Popover;
+  let customReadingPointMenuElm: Popover | undefined;
+  let mobileMenuElm: Popover | undefined;
 
   let menuItems: {
     routeId: string;
@@ -171,7 +171,7 @@
 
   function dispatchCustomReadingPointAction(action: any) {
     dispatch(action);
-    customReadingPointMenuElm.toggleOpen();
+    customReadingPointMenuElm?.close();
   }
 
   function dispatchMergedAction(action: string) {
@@ -191,7 +191,7 @@
   }
 
   function dispatchMobileMenuAction(action: string) {
-    mobileMenuElm.toggleOpen();
+    mobileMenuElm?.close();
 
     if (menuItems.some((item) => item.label === action)) {
       dispatchMergedAction(action);

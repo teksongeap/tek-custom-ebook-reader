@@ -41,7 +41,8 @@
 
   export async function toggleOpen(referenceElement?: HTMLElement | Event) {
     if (isOpen) {
-      popovers.remove(id);
+      await close();
+      return;
     } else if (singlePopover) {
       popovers.replace(id);
     } else {
@@ -85,6 +86,16 @@
     }
   }
 
+  export async function close() {
+    if (!isOpen) {
+      return;
+    }
+
+    popovers.remove(id);
+    isOpen = false;
+    await tick();
+  }
+
   function conditionalClickHandlerAndClass(node: HTMLElement, conditionFulfilled: boolean) {
     if (conditionFulfilled) {
       node.classList.add('cursor-pointer');
@@ -117,11 +128,15 @@
   }
 
   function externalClose(node: HTMLElement) {
-    node.addEventListener(CLOSE_POPOVER, toggleOpen, false);
+    const handleClose = () => {
+      void close();
+    };
+
+    node.addEventListener(CLOSE_POPOVER, handleClose, false);
 
     return {
       destroy() {
-        node.removeEventListener(CLOSE_POPOVER, toggleOpen, false);
+        node.removeEventListener(CLOSE_POPOVER, handleClose, false);
       }
     };
   }
@@ -164,7 +179,7 @@
       use:externalClose
       use:clickOutside={({ target }) => {
         if (!(target instanceof Element && target.closest('[data-popover]'))) {
-          toggleOpen();
+          void close();
         }
       }}
     >

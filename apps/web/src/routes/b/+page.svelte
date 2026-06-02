@@ -373,7 +373,7 @@
 
       return bookData;
     }),
-    share()
+    shareReplay({ refCount: true, bufferSize: 1 })
   );
 
   const leaveIfBookMissing$ = rawBookData$.pipe(

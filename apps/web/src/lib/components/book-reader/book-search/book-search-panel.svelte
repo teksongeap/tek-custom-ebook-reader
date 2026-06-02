@@ -11,6 +11,11 @@
   import type { ReaderTargetNavigation } from '$lib/functions/reader-reference-layer/navigation';
   import type { SectionWithProgress } from '$lib/components/book-reader/book-toc/book-toc';
   import { getReaderChromeStyle } from '$lib/functions/reader-typography';
+  import {
+    buildReaderSectionLookup,
+    getNearestLabeledSection,
+    getSectionForReaderTarget
+  } from '$lib/functions/reader-section-lookup';
 
   export let htmlContent = '';
   export let sectionData: SectionWithProgress[] = [];
@@ -27,8 +32,14 @@
   let searchQuery = '';
 
   $: panelStyle = getReaderChromeStyle({ fontSize, fontColor, backgroundColor });
+  $: sectionLookup = buildReaderSectionLookup(sectionData);
   $: searchIndex = buildReaderSearchIndex(htmlContent);
   $: searchResults = searchReaderIndex(searchIndex, searchQuery);
+  $: searchResultItems = searchResults.map((result) => ({
+    result,
+    excerpt: getReaderSearchExcerpt(result),
+    locationLabel: getSearchResultLocationLabel(result)
+  }));
   $: hasLegacyReferenceMarkers =
     !!htmlContent &&
     !htmlContent.includes('data-ttu-search-block-id') &&
@@ -60,59 +71,17 @@
   }
 
   function getSearchResultLocationLabel(result: ReaderSearchResult) {
+    const section = getSectionForReaderTarget(sectionLookup, result.target, result.sourceHref);
+
     return (
-      getNearestLabeledSection(getSearchResultSection(result))?.label ||
-      result.sourceHref ||
-      'Current book'
+      getNearestLabeledSection(sectionLookup, section)?.label || result.sourceHref || 'Current book'
     );
-  }
-
-  function getSearchResultSection(result: ReaderSearchResult) {
-    if (result.target.sectionId) {
-      const section = sectionData.find((item) => item.reference === result.target.sectionId);
-
-      if (section) {
-        return section;
-      }
-    }
-
-    if (result.sourceHref && result.target.fragment) {
-      const fragmentSection = sectionData.find(
-        (section) =>
-          section.sourceHref === result.sourceHref &&
-          section.targetFragment === result.target.fragment
-      );
-
-      if (fragmentSection) {
-        return fragmentSection;
-      }
-    }
-
-    if (result.sourceHref) {
-      return sectionData.find((section) => section.sourceHref === result.sourceHref);
-    }
-
-    return undefined;
-  }
-
-  function getNearestLabeledSection(section: SectionWithProgress | undefined) {
-    let currentSection = section;
-
-    while (currentSection) {
-      if (currentSection.label) {
-        return currentSection;
-      }
-
-      currentSection = currentSection.parentChapter
-        ? sectionData.find((item) => item.reference === currentSection?.parentChapter)
-        : undefined;
-    }
-
-    return undefined;
   }
 </script>
 
 <div
+  role="region"
+  aria-label="Search"
   class="book-search-panel"
   style={panelStyle}
   on:touchmove|stopPropagation={() => {}}
@@ -176,10 +145,8 @@
   {/if}
 
   <div class="book-search-panel-list">
-    {#if searchResults.length}
-      {#each searchResults as result (result.id)}
-        {@const excerpt = getReaderSearchExcerpt(result)}
-        {@const locationLabel = getSearchResultLocationLabel(result)}
+    {#if searchResultItems.length}
+      {#each searchResultItems as { result, excerpt, locationLabel } (result.id)}
         <button type="button" class="book-search-result" on:click={() => jumpToResult(result)}>
           <span class="book-search-result-copy">
             <span>{excerpt.before}</span><mark>{excerpt.match}</mark><span>{excerpt.after}</span>
