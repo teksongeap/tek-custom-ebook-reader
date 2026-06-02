@@ -4,7 +4,7 @@
 
 とく Ebook Reader is a customized browser ebook reader for multilanguage reading, progress tracking, and dictionary lookup workflows. It is based on [TTU Reader](https://github.com/ttu-ttu/ebook-reader) and keeps compatibility with TTU-style book data and the default `ttu-reader-data` storage root.
 
-The app runs fully in the browser (can be used offline), can be installed as a PWA, and is designed to work well with extensions such as Yomitan, DeepL, and Read Aloud. Now with reader reference layer, so that you have functioning search and a Table of Contents that fully respects the hierarchy of the EPUB's original table of contents, so this isn't just some fancy light novel slop funnel. Enjoy, king.
+The app runs fully in the browser (can be used offline), can be installed as a PWA, and is designed to work well with extensions such as Yomitan, DeepL, and Read Aloud. Now with reader reference layer, so that you have functioning search and a Table of Contents that fully respects the hierarchy of the EPUB's original table of contents, so this isn't just some fancy light novel slop funnel. Enjoy, king. Please don't attempt to upgrade to Svelte 5.
 
 ## Features
 
@@ -86,6 +86,7 @@ Browser storage can still be evicted by the browser or operating system. Enable 
 
 Requirements: Node.js and pnpm.
 cd into the main folder and run:
+
 ```sh
 pnpm install
 pnpm dev
@@ -136,10 +137,13 @@ pnpm build
 ```
 
 Serve `apps/web/build` with any static HTTP server. Then cd into apps/web and run:
+
 ```sh
 pnpm preview
 ```
+
 Alternatively you can also use:
+
 ```sh
 npx serve apps/web/build
 ```
