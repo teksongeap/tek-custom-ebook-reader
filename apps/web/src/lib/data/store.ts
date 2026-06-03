@@ -200,7 +200,7 @@ export const requestPersistentStorage$ = writableBooleanLocalStorageSubject()(
 
 export const importHTMLFixMode$ = writableStringLocalStorageSubject<ImportHTMLFixMode>()(
   'importHTMLFixMode',
-  ImportHTMLFixMode.OFF
+  ImportHTMLFixMode.STANDARD
 );
 
 export const restrictImportFixToAnchor$ = writableBooleanLocalStorageSubject()(
