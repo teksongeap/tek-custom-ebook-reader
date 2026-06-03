@@ -35,6 +35,9 @@ export interface ReaderSearchExcerpt {
   after: string;
 }
 
+let cachedReaderSearchKey: string | number | undefined;
+let cachedReaderSearchIndex: ReaderSearchBlock[] = [];
+
 const searchableBlockSelector = [
   `[${ReaderReferenceAttribute.searchBlockId}]`,
   'blockquote',
@@ -86,6 +89,21 @@ export function buildReaderSearchIndex(htmlContent: string) {
         sourceHref
       };
     });
+}
+
+export function getCachedReaderSearchIndex(htmlContent: string, cacheKey?: string | number) {
+  if (cacheKey !== undefined && cacheKey === cachedReaderSearchKey) {
+    return cachedReaderSearchIndex;
+  }
+
+  const searchIndex = buildReaderSearchIndex(htmlContent);
+
+  if (cacheKey !== undefined) {
+    cachedReaderSearchIndex = searchIndex;
+    cachedReaderSearchKey = cacheKey;
+  }
+
+  return searchIndex;
 }
 
 export function annotateReaderSearchBlocks(root: Element, blockIdPrefix: string) {

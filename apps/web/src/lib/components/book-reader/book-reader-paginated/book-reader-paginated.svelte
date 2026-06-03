@@ -10,6 +10,7 @@
   } from '$lib/components/book-reader/book-toc/book-toc';
   import HtmlRenderer from '$lib/components/html-renderer.svelte';
   import type { BooksDbBookmarkData } from '$lib/data/database/books-db/versions/books-db';
+  import type { Section } from '$lib/data/database/books-db/versions/v3/books-db-v3';
   import { SECTION_CHANGE } from '$lib/data/events';
   import { isStoredFont } from '$lib/data/fonts';
   import { FuriganaStyle } from '$lib/data/furigana-style';
@@ -60,6 +61,8 @@
   import { getParagraphNodes } from '../get-paragraph-nodes';
 
   export let htmlContent: string;
+
+  export let bookSections: Section[] = [];
 
   export let width: number;
 
@@ -292,7 +295,7 @@
 
   $: {
     if (browser) {
-      sections = createReaderSections(htmlContent);
+      sections = createReaderSections(htmlContent, bookSections);
       sectionIndex$.next(0);
     }
   }
@@ -479,20 +482,48 @@
     );
   }
 
-  function createReaderSections(bookHtmlContent: string): ReaderSection[] {
+  function createReaderSections(
+    bookHtmlContent: string,
+    knownSections: ReadonlyArray<Section>
+  ): ReaderSection[] {
     const tempContainer = document.createElement('div');
+    const characterCountsByReference = createCharacterCountsByReference(knownSections);
+
     tempContainer.innerHTML = bookHtmlContent;
 
     const readerSections = Array.from(tempContainer.children).map((section) => ({
       id: section.id,
       sourceHref: section.getAttribute(ReaderReferenceAttribute.sourceHref) || undefined,
       html: section.innerHTML,
-      characterCount: getSectionCharacterCount(section)
+      characterCount: getKnownSectionCharacterCount(section, characterCountsByReference)
     }));
 
     tempContainer.textContent = '';
 
     return readerSections;
+  }
+
+  function createCharacterCountsByReference(knownSections: ReadonlyArray<Section>) {
+    const characterCountsByReference = new Map<string, number>();
+
+    knownSections.forEach((section) => {
+      if (typeof section.characters === 'number') {
+        characterCountsByReference.set(section.reference, Math.max(0, section.characters));
+      }
+    });
+
+    return characterCountsByReference;
+  }
+
+  function getKnownSectionCharacterCount(
+    section: Element,
+    characterCountsByReference: Map<string, number>
+  ) {
+    if (characterCountsByReference.has(section.id)) {
+      return characterCountsByReference.get(section.id) as number;
+    }
+
+    return getSectionCharacterCount(section);
   }
 
   function getSectionCharacterCount(section: Element) {

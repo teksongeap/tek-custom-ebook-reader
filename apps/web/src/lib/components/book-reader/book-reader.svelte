@@ -21,6 +21,7 @@
     BooksDbAnnotation,
     BooksDbBookmarkData
   } from '$lib/data/database/books-db/versions/books-db';
+  import type { Section } from '$lib/data/database/books-db/versions/v3/books-db-v3';
   import type { FuriganaStyle } from '$lib/data/furigana-style';
   import type { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
   import { BookReaderAvailableKeybind } from '$lib/data/book-reader-keybind';
@@ -62,6 +63,8 @@
   import { clickOutside } from '$lib/functions/use-click-outside';
 
   export let htmlContent: string;
+
+  export let bookSections: Section[] = [];
 
   export let width: number;
 
@@ -839,6 +842,7 @@
   {:else}
     <BookReaderPaginated
       {htmlContent}
+      {bookSections}
       width={$contentViewportWidth$ ?? 0}
       height={$contentViewportHeight$ ?? 0}
       {verticalMode}

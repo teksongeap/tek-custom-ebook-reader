@@ -1,11 +1,13 @@
 <script lang="ts">
-  import { createEventDispatcher, onMount, tick } from 'svelte';
+  import { browser } from '$app/environment';
+  import { createEventDispatcher, onDestroy, onMount, tick } from 'svelte';
   import Fa from 'svelte-fa';
   import { faArrowRight, faMagnifyingGlass, faXmark } from '@fortawesome/free-solid-svg-icons';
   import {
-    buildReaderSearchIndex,
     getReaderSearchExcerpt,
+    getCachedReaderSearchIndex,
     searchReaderIndex,
+    type ReaderSearchBlock,
     type ReaderSearchResult
   } from '$lib/functions/reader-reference-layer/search';
   import type { ReaderTargetNavigation } from '$lib/functions/reader-reference-layer/navigation';
@@ -13,6 +15,7 @@
   import { getReaderChromeStyle } from '$lib/functions/reader-typography';
 
   export let htmlContent = '';
+  export let searchCacheKey: string | number | undefined;
   export let sectionData: SectionWithProgress[] = [];
   export let fontSize = 20;
   export let fontColor = '';
@@ -25,31 +28,92 @@
 
   let searchInputEl: HTMLInputElement | undefined;
   let searchQuery = '';
+  let searchIndex: ReaderSearchBlock[] = [];
+  let searchIndexHtmlContent = '';
+  let searchIndexLoading = false;
+  let searchIndexBuildToken = 0;
+  let hasLegacyReferenceMarkers = false;
 
   $: panelStyle = getReaderChromeStyle({ fontSize, fontColor, backgroundColor });
-  $: searchIndex = buildReaderSearchIndex(htmlContent);
   $: searchResults = searchReaderIndex(searchIndex, searchQuery);
-  $: hasLegacyReferenceMarkers =
-    !!htmlContent &&
-    !htmlContent.includes('data-ttu-search-block-id') &&
-    !htmlContent.includes('data-ttu-link-kind');
-  $: panelSubtitle = getPanelSubtitle(searchQuery, searchResults, searchIndex.length);
+  $: panelSubtitle = getPanelSubtitle(
+    searchQuery,
+    searchResults,
+    searchIndex.length,
+    searchIndexLoading
+  );
+  $: if (browser && htmlContent !== searchIndexHtmlContent) {
+    scheduleSearchIndexBuild(htmlContent);
+  }
 
   onMount(async () => {
     await tick();
     searchInputEl?.focus();
   });
 
+  onDestroy(() => {
+    searchIndexBuildToken += 1;
+  });
+
   function getPanelSubtitle(
     query: string,
     results: ReaderSearchResult[],
-    searchableBlockCount: number
+    searchableBlockCount: number,
+    isLoading: boolean
   ) {
+    if (isLoading) {
+      return 'Preparing search...';
+    }
+
     if (!query.trim()) {
       return `${searchableBlockCount} searchable passages`;
     }
 
     return `${results.length} ${results.length === 1 ? 'match' : 'matches'}`;
+  }
+
+  function scheduleSearchIndexBuild(nextHtmlContent: string) {
+    const buildToken = ++searchIndexBuildToken;
+    const cacheKey = searchCacheKey;
+
+    searchIndexHtmlContent = nextHtmlContent;
+    searchIndex = [];
+    searchIndexLoading = !!nextHtmlContent;
+    hasLegacyReferenceMarkers = false;
+
+    if (!nextHtmlContent) {
+      searchIndexLoading = false;
+      return;
+    }
+
+    waitForSearchIndexSlot().then(() => {
+      if (buildToken !== searchIndexBuildToken) {
+        return;
+      }
+
+      searchIndex = getCachedReaderSearchIndex(nextHtmlContent, cacheKey);
+      hasLegacyReferenceMarkers =
+        !nextHtmlContent.includes('data-ttu-search-block-id') &&
+        !nextHtmlContent.includes('data-ttu-link-kind');
+      searchIndexLoading = false;
+    });
+  }
+
+  function waitForSearchIndexSlot() {
+    return new Promise<void>((resolve) => {
+      const requestIdleCallback = (
+        window as Window & {
+          requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+        }
+      ).requestIdleCallback;
+
+      if (requestIdleCallback) {
+        requestIdleCallback(() => resolve(), { timeout: 700 });
+        return;
+      }
+
+      requestAnimationFrame(() => setTimeout(resolve));
+    });
   }
 
   function jumpToResult(result: ReaderSearchResult) {
@@ -193,6 +257,12 @@
           </span>
         </button>
       {/each}
+    {:else if searchIndexLoading}
+      <div class="book-search-panel-empty">
+        <div class="book-search-panel-empty-icon"><Fa icon={faMagnifyingGlass} /></div>
+        <div class="book-search-panel-empty-title">Preparing search</div>
+        <div class="book-search-panel-empty-copy">Indexing book text.</div>
+      </div>
     {:else if searchQuery.trim()}
       <div class="book-search-panel-empty">
         <div class="book-search-panel-empty-icon"><Fa icon={faMagnifyingGlass} /></div>

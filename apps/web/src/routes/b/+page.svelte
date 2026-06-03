@@ -2264,6 +2264,7 @@
   <StyleSheetRenderer styleSheet={$bookData$.styleSheet} />
   <BookReader
     htmlContent={$bookData$.htmlContent}
+    bookSections={$rawBookData$.sections ?? []}
     width={$containerViewportWidth$ ?? 0}
     height={$containerViewportHeight$ ?? 0}
     {fontFeatureSettings}
@@ -2378,6 +2379,7 @@
   >
     <BookSearchPanel
       htmlContent={$bookData$.htmlContent}
+      searchCacheKey={`${$rawBookData$.id}:${$rawBookData$.lastBookModified || 0}`}
       sectionData={$sectionData$ ?? []}
       fontSize={$fontSize$}
       fontColor={$themeOption$?.fontColor ?? ''}
