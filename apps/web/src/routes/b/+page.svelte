@@ -196,6 +196,7 @@
 
   let showSpinner = true;
   let showHeader = false;
+  let readerHeaderHotzoneEl: HTMLButtonElement | undefined;
   let isBookmarkScreen = false;
   let showFooter = true;
   let exploredCharCount = 0;
@@ -1662,13 +1663,15 @@
     readerTargetNavigation$.next(navigation);
   }
 
-  async function bookmarkPage() {
+  async function bookmarkPage({ hideHeader = true }: { hideHeader?: boolean } = {}) {
     const bookId = getBookIdSync();
     if (!bookId || !bookmarkManager) return;
 
     let data: BooksDbBookmarkData;
 
-    showHeader = false;
+    if (hideHeader) {
+      showHeader = false;
+    }
 
     if (isPaginated) {
       const userSelectedRange = $selectionToBookmarkEnabled$
@@ -1893,7 +1896,11 @@
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target;
 
-      if (event.defaultPrevented || (target instanceof Node && node.contains(target))) {
+      const isInsideHeaderArea =
+        target instanceof Node &&
+        (node.contains(target) || !!readerHeaderHotzoneEl?.contains(target));
+
+      if (event.defaultPrevented || isInsideHeaderArea) {
         return;
       }
 
@@ -2152,6 +2159,7 @@
 {$collectReaderImageGallerySpoilerToggles$ ?? ''}
 {$handleUpdateImageGalleryPictureSpoilers$ ?? ''}
 <button
+  bind:this={readerHeaderHotzoneEl}
   type="button"
   class="reader-header-hotzone fixed inset-x-0 top-0 z-[9] h-8 w-full"
   aria-label="Show reader controls"
@@ -2215,7 +2223,7 @@
         }
       }}
       on:fullscreenClick={onFullscreenClick}
-      on:bookmarkClick={bookmarkPage}
+      on:bookmarkClick={() => bookmarkPage()}
       on:scrollToBookmarkClick={() => {
         showHeader = false;
         scrollToBookmark();
@@ -2340,7 +2348,7 @@
     on:annotationActivate={({ detail }) => (activeAnnotationId = detail)}
     on:annotationUpdate={updateAnnotationComment}
     on:annotationDelete={({ detail }) => deleteAnnotation(detail)}
-    on:bookmark={bookmarkPage}
+    on:bookmark={() => bookmarkPage({ hideHeader: false })}
     on:trackerPause={() => pauseTracker(true)}
   />
   <AnnotationSelectionToolbar
