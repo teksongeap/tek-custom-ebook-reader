@@ -416,13 +416,30 @@
     const tempContainer = document.createElement('div');
     tempContainer.innerHTML = htmlContent;
 
-    const targetElement = findReaderTargetElement(tempContainer, target);
+    const targetElement =
+      findReaderTargetElement(tempContainer, target) ||
+      findUniqueFootnotePreviewTargetElement(tempContainer, target);
     const previewElement = targetElement ? getFootnotePreviewElement(targetElement) : undefined;
     const previewHtml = previewElement ? clonePreviewHtml(previewElement, target) : '';
 
     tempContainer.textContent = '';
 
     return previewHtml;
+  }
+
+  function findUniqueFootnotePreviewTargetElement(source: Element, target: ReaderTarget) {
+    if (!target.sourceHref || !target.fragment) {
+      return undefined;
+    }
+
+    const matches = Array.from(source.querySelectorAll<HTMLElement>('[id],[name]')).filter(
+      (element) =>
+        element.id === target.fragment || element.getAttribute('name') === target.fragment
+    );
+
+    return matches.length === 1
+      ? findReaderTargetElement(source, { fragment: target.fragment })
+      : undefined;
   }
 
   function getFootnotePreviewCacheKey(target: ReaderTarget) {

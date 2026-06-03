@@ -78,6 +78,8 @@ const parenthesizedNoteMarkerPattern =
   /^\(\s*(?:\d{1,3}|[ivxlcdm]{1,10}|[*#\u2020\u2021\u00a7\u00b6]+)\s*\)$/i;
 const bareNoteMarkerPattern = /^(?:\d{1,4}|[ivxlcdm]{1,10}|[*#\u2020\u2021\u00a7\u00b6]+)$/i;
 const superscriptClassPattern = /(?:^|[-_\s])(?:note)?sup(?:er|erscript)?(?:[-_\s]|$)/i;
+const noteMarkerClassPattern =
+  /(?:^|[-_\s])(?:(?:doc[-_\s]?)?noteref|(?:fn|ftn|note|footnote|endnote)[-_\s]?(?:number|marker|ref|reference))(?:[-_\s]|$)/i;
 const footnoteClassPattern =
   /(?:^|[-_\s])(?:fnote|fncontent|footnote|endnote|notecontent|footnotes?|endnotes?)(?:[-_\s]|$)/i;
 
@@ -321,7 +323,7 @@ function classifyReaderLink(
 ) {
   const targetElement = options.targetElement;
 
-  if (targetFragment && isLikelyFootnoteBacklink(element)) {
+  if (targetFragment && isLikelyFootnoteBacklink(element, targetFragment)) {
     return 'backlink';
   }
 
@@ -376,8 +378,16 @@ function classifyReaderLink(
   return 'internal';
 }
 
-function isLikelyFootnoteBacklink(element: Element | undefined) {
-  return !!element && isLikelyNumberedNoteMarker(element) && isInsideFootnoteElement(element);
+function isLikelyFootnoteBacklink(element: Element | undefined, targetFragment: string) {
+  if (!element || !isInsideFootnoteElement(element)) {
+    return false;
+  }
+
+  return isLikelyNumberedNoteMarker(element) || isLikelyBacklinkTargetFragment(targetFragment);
+}
+
+function isLikelyBacklinkTargetFragment(fragment: string) {
+  return /(?:^|[-_:])ref[-_:]?(?:fn|ftn|footnotes?|endnotes?|notes?)(?:[-_:]|\d|$)/i.test(fragment);
 }
 
 function hasReferenceToken(element: Element | undefined, attribute: string, token: string) {
@@ -398,10 +408,13 @@ function isLikelyNumberedNoteMarker(element: Element | undefined) {
   }
 
   if (parenthesizedNoteMarkerPattern.test(text)) {
-    return isInsideSuperscriptLikeElement(element);
+    return hasNoteMarkerClass(element) || isInsideSuperscriptLikeElement(element);
   }
 
-  return bareNoteMarkerPattern.test(text) && isInsideSuperscriptLikeElement(element);
+  return (
+    bareNoteMarkerPattern.test(text) &&
+    (hasNoteMarkerClass(element) || isInsideSuperscriptLikeElement(element))
+  );
 }
 
 function isLaterSpineTarget(options: CreateReaderLinkReferenceOptions) {
@@ -446,7 +459,7 @@ function isInsideFootnoteElement(element: Element) {
   let currentElement: Element | null = element;
 
   while (currentElement) {
-    if (footnoteClassPattern.test(getElementClassName(currentElement))) {
+    if (hasFootnoteContainerClass(currentElement)) {
       return true;
     }
 
@@ -454,6 +467,17 @@ function isInsideFootnoteElement(element: Element) {
   }
 
   return false;
+}
+
+function hasFootnoteContainerClass(element: Element) {
+  return getElementClassName(element)
+    .split(/\s+/)
+    .some((className) => {
+      footnoteClassPattern.lastIndex = 0;
+      noteMarkerClassPattern.lastIndex = 0;
+
+      return footnoteClassPattern.test(className) && !noteMarkerClassPattern.test(className);
+    });
 }
 
 function getFootnoteContainerSelector() {
@@ -502,6 +526,32 @@ function hasSuperscriptLikeDescendant(element: Element) {
       /vertical-align\s*:\s*(?:super|text-top)/i.test(style)
     );
   });
+}
+
+function hasNoteMarkerClass(element: Element) {
+  if (noteMarkerClassPattern.test(getElementClassName(element))) {
+    return true;
+  }
+
+  if (
+    Array.from(element.querySelectorAll('*')).some((child) =>
+      noteMarkerClassPattern.test(getElementClassName(child))
+    )
+  ) {
+    return true;
+  }
+
+  let currentElement = element.parentElement;
+
+  while (currentElement && !isBlockBoundaryElement(currentElement)) {
+    if (noteMarkerClassPattern.test(getElementClassName(currentElement))) {
+      return true;
+    }
+
+    currentElement = currentElement.parentElement;
+  }
+
+  return false;
 }
 
 function classifyStructuralFootnoteLink(
