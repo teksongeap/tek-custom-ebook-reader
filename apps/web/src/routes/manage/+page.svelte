@@ -105,6 +105,7 @@
   let replicationToProgress = 0;
   let replicationProgressRemaining = '~ ??:??:??';
   let replicationDone = new Subject<void>();
+  let progressSessionId = 0;
   let progressBase = 0;
   let executionStart: number;
   let exportAllBooks = false;
@@ -115,7 +116,11 @@
     }
   }
 
-  onDestroy(() => dialogManager.dialogs$.next([]));
+  onDestroy(() => {
+    cancelCurrentReplication();
+    resetProgress();
+    dialogManager.dialogs$.next([]);
+  });
 
   function bookmarkToProgress(b: BooksDbBookmarkData | undefined) {
     return b?.progress
@@ -274,9 +279,10 @@
 
     initializeReplicationProgressData();
 
-    const supportedExtRegex = /\.(?:htmlz|epub|txt)$/;
+    const supportedExtRegex = /\.(?:htmlz|epub|txt)$/i;
     const files = Array.from(fileList).filter((f) => supportedExtRegex.test(f.name));
     const errorTitle = 'Bookimport failed';
+    let error = '';
 
     if (!files.length) {
       resetProgress();
@@ -285,9 +291,11 @@
       return;
     }
 
-    const error = await importData(
-      document,
-      getStorageHandler(
+    try {
+      await tick();
+      await waitForNextPaint();
+
+      const targetHandler = getStorageHandler(
         window,
         $storageSource$,
         '',
@@ -296,13 +304,16 @@
         $replicationSaveBehavior$,
         $statisticsMergeMode$,
         $readingGoalsMergeMode$
-      ),
-      files,
-      cancelSignal,
-      $fileCountData$
-    ).catch((catchedError) => catchedError.message);
+      );
 
-    resetProgress();
+      error = await importData(document, targetHandler, files, cancelSignal, $fileCountData$).catch(
+        (catchedError) => catchedError.message
+      );
+    } catch (catchedError: any) {
+      error = catchedError.message;
+    } finally {
+      resetProgress();
+    }
 
     if (error) {
       showError(errorTitle, error, 'Error(s) occurred during bookimport');
@@ -326,11 +337,17 @@
   }
 
   function initializeReplicationProgressData() {
+    const sessionId = ++progressSessionId;
     replicationDone = new Subject<void>();
-    replicationProgress$.pipe(takeUntil(replicationDone)).subscribe(updateProgress);
+    replicationProgress$.pipe(takeUntil(replicationDone)).subscribe((progressData) => {
+      if (sessionId === progressSessionId) {
+        updateProgress(progressData);
+      }
+    });
     replicationProgressRemaining = '~ ??:??:??';
     replicationProgress = 0;
     replicationToProgress = 1;
+    progressBase = 0;
     executionStart = Date.now();
 
     logger.clearHistory();
@@ -340,11 +357,20 @@
   }
 
   function resetProgress() {
+    progressSessionId += 1;
     replicationDone.next();
     replicationDone.complete();
     replicationToProgress = 0;
     replicationProgress = 0;
+    progressBase = 0;
     cancelTooltip = '';
+  }
+
+  function cancelCurrentReplication() {
+    if (!cancelSignal.aborted) {
+      cancelToken.abort();
+      replicationProgressRemaining = 'Canceling ...';
+    }
   }
 
   function onSelectAllBooks() {
@@ -702,12 +728,7 @@
     on:filesChange={(ev) => onFilesChange(ev.detail)}
     on:domainHintClick={onDomainHintClick}
     on:bugReportClick={onBugReportClick}
-    on:cancelReplication={() => {
-      if (!cancelSignal.aborted) {
-        cancelToken.abort();
-        replicationProgressRemaining = 'Canceling ...';
-      }
-    }}
+    on:cancelReplication={cancelCurrentReplication}
     on:selectionToStatistics={() => {
       $preFilteredTitlesForStatistics$ = new Set(
         $bookCards$.filter((card) => selectedBookIds.has(card.id)).map((book) => book.title)

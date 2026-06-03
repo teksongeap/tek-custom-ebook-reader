@@ -9,17 +9,24 @@ import { isOPFType, type EpubContent, type EpubOPFContent } from './types';
 
 import type { Entry } from '@zip.js/zip.js';
 import { XMLParser } from 'fast-xml-parser';
+import { startProfile } from '$lib/functions/performance-profiler';
+import { throwIfAborted } from '$lib/functions/replication/replication-error';
 import initZipSettings from '../utils/init-zip-settings';
 import pLimit from 'p-limit';
 import path from 'path-browserify';
 
 initZipSettings();
 
-export default async function extractEpub(blob: Blob) {
+export default async function extractEpub(blob: Blob, cancelSignal?: AbortSignal) {
+  const profile = startProfile('epub extract', { sizeBytes: blob.size });
   const reader = new ZipReader(new BlobReader(blob));
+
   try {
+    throwIfAborted(cancelSignal);
     // get all entries from the zip
     const entries = await reader.getEntries();
+    throwIfAborted(cancelSignal);
+    profile.lap('read entries', { entries: entries.length });
 
     const result: Record<string, string | Blob> = {};
     let contentsDirectory = '';
@@ -39,6 +46,7 @@ export default async function extractEpub(blob: Blob) {
       const rootFile = Array.isArray(rootFiles) ? rootFiles[0] : rootFiles;
 
       const contentOpfFilename = rootFile['@_full-path'];
+      profile.lap('read container', { rootFile: contentOpfFilename });
 
       const contentsXml = await fileMap[contentOpfFilename].getData!(new TextWriter());
       result[contentOpfFilename] = contentsXml;
@@ -46,15 +54,22 @@ export default async function extractEpub(blob: Blob) {
       contentsDirectory = path.dirname(contentOpfFilename);
 
       contents = parser.parse(contentsXml);
+      profile.lap('read opf', { contentLength: contentsXml.length });
 
       const extractLimiter = pLimit(4);
-
-      await Promise.all(
-        (isOPFType(contents)
+      const manifestItems = normalizeArray(
+        isOPFType(contents)
           ? contents['opf:package']['opf:manifest']['opf:item']
           : contents.package.manifest.item
-        ).map((item) =>
+      );
+      let imageItems = 0;
+      let textItems = 0;
+      let skippedItems = 0;
+
+      await Promise.all(
+        manifestItems.map((item) =>
           extractLimiter(async () => {
+            throwIfAborted(cancelSignal);
             const fileRelativePath = item['@_href'];
             const entry = fileMap[path.join(contentsDirectory, fileRelativePath)];
 
@@ -64,17 +79,28 @@ export default async function extractEpub(blob: Blob) {
 
             if (entry.getData && !entry.directory) {
               let value: string | Blob;
-              const mediaType: string = item['@_media-type'];
+              const mediaType = normalizeMediaType(item['@_media-type']);
               if (mediaType.startsWith('image/')) {
                 value = await entry.getData(new BlobWriter(mediaType));
-              } else {
+                imageItems += 1;
+              } else if (isTextManifestItem(mediaType)) {
                 value = await entry.getData(new TextWriter());
+                textItems += 1;
+              } else {
+                skippedItems += 1;
+                return;
               }
               result[fileRelativePath] = value;
             }
           })
         )
       );
+      profile.lap('extract manifest', {
+        manifest: manifestItems.length,
+        images: imageItems,
+        text: textItems,
+        skipped: skippedItems
+      });
     }
 
     return {
@@ -83,8 +109,27 @@ export default async function extractEpub(blob: Blob) {
       result
     };
   } finally {
+    profile.end();
     await reader.close().catch(() => {
       // no-op
     });
   }
+}
+
+function normalizeArray<T>(value: T | T[]) {
+  return Array.isArray(value) ? value : [value];
+}
+
+function normalizeMediaType(mediaType?: string) {
+  return (mediaType || '').split(';')[0].trim().toLowerCase();
+}
+
+function isTextManifestItem(mediaType: string) {
+  return (
+    mediaType.startsWith('text/') ||
+    mediaType === 'application/xhtml+xml' ||
+    mediaType === 'application/xml' ||
+    mediaType === 'application/x-dtbncx+xml' ||
+    mediaType === 'application/smil+xml'
+  );
 }

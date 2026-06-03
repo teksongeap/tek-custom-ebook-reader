@@ -12,6 +12,7 @@ import { database, requestPersistentStorage$ } from '$lib/data/store';
 import loadEpub from '$lib/functions/file-loaders/epub/load-epub';
 import loadHtmlz from '$lib/functions/file-loaders/htmlz/load-htmlz';
 import loadTxt from '$lib/functions/file-loaders/txt/load-txt';
+import { startProfile } from '$lib/functions/performance-profiler';
 import type { LoadData } from '$lib/functions/file-loaders/types';
 import { handleErrorDuringReplication } from '$lib/functions/replication/error-handler';
 import { throwIfAborted } from '$lib/functions/replication/replication-error';
@@ -30,6 +31,10 @@ export async function importData(
   cancelSignal: AbortSignal,
   fileCountData?: Record<string, number>
 ) {
+  const profile = startProfile('book import', {
+    files: files.length,
+    sizeBytes: files.reduce((size, file) => size + file.size, 0)
+  });
   const dataIds: number[] = [];
   const tasks: Promise<void>[] = [];
   const lastBookModified = new Date().getTime();
@@ -39,102 +44,126 @@ export async function importData(
 
   let errorMessage = '';
 
-  replicationProgress$.next({ progressBase, maxProgress });
+  try {
+    replicationProgress$.next({ progressBase, maxProgress });
 
-  await persistStorage(targetHandler.storageType);
+    await persistStorage(targetHandler.storageType);
+    profile.lap('persistent storage');
 
-  if (targetHandler.isCacheDisabled()) {
-    targetHandler.clearData(false);
-  }
+    if (targetHandler.isCacheDisabled()) {
+      targetHandler.clearData(false);
+    }
 
-  let newFileData = 0;
+    let newFileData = 0;
 
-  files.forEach((file) =>
-    tasks.push(
-      limiter(async () => {
-        let currentTitle = file.name;
+    files.forEach((file) =>
+      tasks.push(
+        limiter(async () => {
+          const fileProfile = startProfile('book import file', {
+            file: file.name,
+            sizeBytes: file.size
+          });
+          let currentTitle = file.name;
 
-        if (fileCountData && Object.prototype.hasOwnProperty.call(fileCountData, currentTitle)) {
-          checkCancelAndProgress(cancelSignal, true, true);
-          checkCancelAndProgress(cancelSignal, true, true);
-          checkCancelAndProgress(cancelSignal, true, true);
+          try {
+            if (
+              fileCountData &&
+              Object.prototype.hasOwnProperty.call(fileCountData, currentTitle)
+            ) {
+              checkCancelAndProgress(cancelSignal, true, true);
+              checkCancelAndProgress(cancelSignal, true, true);
+              checkCancelAndProgress(cancelSignal, true, true);
 
-          return;
-        }
+              return;
+            }
 
-        try {
-          throwIfAborted(cancelSignal);
+            throwIfAborted(cancelSignal);
 
-          let bookContent: LoadData;
+            let bookContent: LoadData;
+            const normalizedFileName = file.name.toLowerCase();
 
-          if (file.name.endsWith('.epub')) {
-            bookContent = await loadEpub(file, document, lastBookModified);
-          } else if (file.name.endsWith('.txt')) {
-            bookContent = await loadTxt(file, lastBookModified);
-          } else {
-            bookContent = await loadHtmlz(file, document, lastBookModified);
-          }
+            if (normalizedFileName.endsWith('.epub')) {
+              bookContent = await loadEpub(file, document, lastBookModified, cancelSignal);
+            } else if (normalizedFileName.endsWith('.txt')) {
+              bookContent = await loadTxt(file, lastBookModified);
+            } else {
+              bookContent = await loadHtmlz(file, document, lastBookModified);
+            }
+            fileProfile.lap('load', {
+              title: bookContent.title,
+              characters: bookContent.characters,
+              sections: bookContent.sections?.length || 0
+            });
 
-          if (fileCountData) {
-            fileCountData[currentTitle] = bookContent.characters;
+            if (fileCountData) {
+              fileCountData[currentTitle] = bookContent.characters;
+              checkCancelAndProgress(cancelSignal, true, true);
+              checkCancelAndProgress(cancelSignal, true, true);
+              checkCancelAndProgress(cancelSignal, true, true);
+
+              newFileData += 1;
+
+              return;
+            }
+
             checkCancelAndProgress(cancelSignal, true, true);
-            checkCancelAndProgress(cancelSignal, true, true);
-            checkCancelAndProgress(cancelSignal, true, true);
 
-            newFileData += 1;
+            currentTitle = bookContent.title;
 
-            return;
+            targetHandler.startContext(
+              { title: bookContent.title, imagePath: bookContent.coverImage || '' },
+              cancelSignal
+            );
+
+            dataIds.push(await targetHandler.saveBook(bookContent, false));
+            fileProfile.lap('save book', { title: currentTitle });
+
+            checkCancelAndProgress(cancelSignal, false);
+
+            if (bookContent.coverImage) {
+              await targetHandler.saveCover(bookContent.coverImage);
+            }
+            fileProfile.lap('save cover', { hasCover: !!bookContent.coverImage });
+
+            database.dataListChanged$.next(targetHandler);
+
+            checkCancelAndProgress(cancelSignal, true, !bookContent.coverImage);
+          } catch (error: any) {
+            errorMessage = handleErrorDuringReplication(
+              error,
+              `Error importing ${currentTitle}: `,
+              [limiter]
+            );
+          } finally {
+            fileProfile.end({ title: currentTitle });
           }
-
-          checkCancelAndProgress(cancelSignal, true, true);
-
-          currentTitle = bookContent.title;
-
-          targetHandler.startContext(
-            { title: bookContent.title, imagePath: bookContent.coverImage || '' },
-            cancelSignal
-          );
-
-          dataIds.push(await targetHandler.saveBook(bookContent, false));
-
-          checkCancelAndProgress(cancelSignal, false);
-
-          if (bookContent.coverImage) {
-            await targetHandler.saveCover(bookContent.coverImage);
-          }
-
-          database.dataListChanged$.next(targetHandler);
-
-          checkCancelAndProgress(cancelSignal, true, !bookContent.coverImage);
-        } catch (error: any) {
-          errorMessage = handleErrorDuringReplication(error, `Error importing ${currentTitle}: `, [
-            limiter
-          ]);
-        }
-      })
-    )
-  );
-
-  await Promise.all(tasks).catch(() => {});
-
-  if (fileCountData && newFileData) {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(
-      new Blob([JSON.stringify(fileCountData)], { type: 'application/json' })
+        })
+      )
     );
-    a.rel = 'noopener';
-    a.download = 'characters';
 
-    setTimeout(() => {
-      URL.revokeObjectURL(a.href);
-    }, 1e4);
+    await Promise.all(tasks).catch(() => {});
 
-    setTimeout(() => {
-      a.click();
-    });
+    if (fileCountData && newFileData) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(
+        new Blob([JSON.stringify(fileCountData)], { type: 'application/json' })
+      );
+      a.rel = 'noopener';
+      a.download = 'characters';
+
+      setTimeout(() => {
+        URL.revokeObjectURL(a.href);
+      }, 1e4);
+
+      setTimeout(() => {
+        a.click();
+      });
+    }
+
+    return errorMessage;
+  } finally {
+    profile.end({ imported: dataIds.length, error: !!errorMessage });
   }
-
-  return errorMessage;
 }
 
 export async function importBackup(

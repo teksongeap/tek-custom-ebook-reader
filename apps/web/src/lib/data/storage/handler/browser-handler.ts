@@ -19,6 +19,7 @@ import { database, lastReadingGoalsModified$ } from '$lib/data/store';
 import type { MergeMode } from '$lib/data/merge-mode';
 import { ReplicationSaveBehavior } from '$lib/functions/replication/replication-options';
 import { StorageDataType } from '$lib/data/storage/storage-types';
+import { startProfile } from '$lib/functions/performance-profiler';
 
 export class BrowserStorageHandler extends BaseStorageHandler {
   updateSettings(
@@ -37,11 +38,13 @@ export class BrowserStorageHandler extends BaseStorageHandler {
 
   async getBookList() {
     if (!this.dataListFetched) {
+      const profile = startProfile('browser book list');
       database.listLoading$.next(true);
 
       try {
         const db = await database.db;
         const data = await db.getAll('data');
+        profile.lap('read data', { books: data.length });
 
         for (let index = 0, { length } = data; index < length; index += 1) {
           const book = data[index];
@@ -60,7 +63,9 @@ export class BrowserStorageHandler extends BaseStorageHandler {
         }
 
         this.dataListFetched = true;
+        profile.end({ cards: this.titleToBookCard.size });
       } catch (error) {
+        profile.end({ error: true });
         this.clearData();
         throw error;
       }
@@ -101,14 +106,21 @@ export class BrowserStorageHandler extends BaseStorageHandler {
   }
 
   async updateLastRead(book: BooksDbBookData) {
+    const profile = startProfile('browser last read update', {
+      title: book.title,
+      htmlLength: book.elementHtml.length,
+      blobs: Object.keys(book.blobs).length
+    });
     const filename = BaseStorageHandler.getBookFileName(book);
     const { characters, lastBookModified, lastBookOpen } =
       BaseStorageHandler.getBookMetadata(filename);
     const db = await database.db;
 
     await db.put('data', book);
+    profile.lap('put data');
 
     this.addBookCard(this.currentContext.title, { characters, lastBookModified, lastBookOpen });
+    profile.end();
   }
 
   async getFilenameForRecentCheck(fileIdentifier: string) {
@@ -391,32 +403,45 @@ export class BrowserStorageHandler extends BaseStorageHandler {
     skipTimestampFallback = true,
     removeStorageContext = true
   ) {
+    const profile =
+      data instanceof File
+        ? undefined
+        : startProfile('browser save book', {
+            title: data.title,
+            htmlLength: data.elementHtml.length,
+            blobs: Object.keys(data.blobs).length
+          });
     let idToReturn = 0;
 
-    if (!(data instanceof File)) {
-      const storedBookData = await database.upsertData(
-        data,
-        this.saveBehavior,
-        skipTimestampFallback,
-        removeStorageContext
-      );
+    try {
+      if (!(data instanceof File)) {
+        const storedBookData = await database.upsertData(
+          data,
+          this.saveBehavior,
+          skipTimestampFallback,
+          removeStorageContext
+        );
+        profile?.lap('upsert data', { id: storedBookData.id });
 
-      idToReturn = storedBookData.id;
-      this.addBookCard(data.title, {
-        id: storedBookData.id,
-        characters: BaseStorageHandler.getBookCharacters(
-          storedBookData.characters || 0,
-          storedBookData.sections || []
-        ),
-        lastBookModified: storedBookData.lastBookModified || 0,
-        lastBookOpen: storedBookData.lastBookOpen || 0,
-        isPlaceholder: !storedBookData.elementHtml
-      });
+        idToReturn = storedBookData.id;
+        this.addBookCard(data.title, {
+          id: storedBookData.id,
+          characters: BaseStorageHandler.getBookCharacters(
+            storedBookData.characters || 0,
+            storedBookData.sections || []
+          ),
+          lastBookModified: storedBookData.lastBookModified || 0,
+          lastBookOpen: storedBookData.lastBookOpen || 0,
+          isPlaceholder: !storedBookData.elementHtml
+        });
+      }
+
+      BaseStorageHandler.reportProgress();
+
+      return idToReturn;
+    } finally {
+      profile?.end({ id: idToReturn || undefined });
     }
-
-    BaseStorageHandler.reportProgress();
-
-    return idToReturn;
   }
 
   async saveProgress(data: BooksDbBookmarkData | File) {

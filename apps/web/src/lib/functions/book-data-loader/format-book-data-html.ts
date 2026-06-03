@@ -10,7 +10,8 @@ import { Observable } from 'rxjs';
 import { BaseStorageHandler } from '$lib/data/storage/handler/base-handler';
 import buildDummyBookImage from '$lib/functions/file-loaders/utils/build-dummy-book-image';
 import { isElementGaiji } from '$lib/functions/is-element-gaiji';
-import { map } from 'rxjs/operators';
+import { finalize, map } from 'rxjs/operators';
+import { startProfile } from '$lib/functions/performance-profiler';
 import {
   readerImageGalleryPictures$,
   type ReaderImageGalleryPicture
@@ -22,6 +23,12 @@ export default function formatBookDataHtml(
   isPaginated: boolean,
   blurMode: BlurMode
 ) {
+  const profile = startProfile('book html format', {
+    title: bookData.title,
+    htmlLength: bookData.elementHtml.length,
+    blobs: Object.keys(bookData.blobs).length
+  });
+
   return getHtmlWithImageSource(bookData, isPaginated).pipe(
     map((elementHtml) => {
       const element = document.createElement('div');
@@ -33,8 +40,12 @@ export default function formatBookDataHtml(
       addSpoilerTags(element, document, blurMode);
       removeOldBrTagSolution(element);
 
-      return element.innerHTML;
-    })
+      const formattedHtml = element.innerHTML;
+      profile.lap('dom cleanup', { htmlLength: formattedHtml.length });
+
+      return formattedHtml;
+    }),
+    finalize(() => profile.end())
   );
 }
 
@@ -53,6 +64,10 @@ function getHtmlWithImageSource(bookData: BooksDbBookData, isPaginated: boolean)
 }
 
 function buildHtmlWithImageSources(bookData: BooksDbBookData, isPaginated: boolean) {
+  const profile = startProfile('book html image sources', {
+    title: bookData.title,
+    blobs: Object.keys(bookData.blobs).length
+  });
   const objectUrls: string[] = [];
   const urlIndexes = new Map<string, number>();
 
@@ -85,6 +100,8 @@ function buildHtmlWithImageSources(bookData: BooksDbBookData, isPaginated: boole
   });
 
   urlIndexes.clear();
+
+  profile.end({ htmlLength: elementHtml.length, images: readerImageGalleryPictures.length });
 
   return { elementHtml, objectUrls, readerImageGalleryPictures };
 }
