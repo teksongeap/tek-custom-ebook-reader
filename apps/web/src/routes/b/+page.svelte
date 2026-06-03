@@ -1889,6 +1889,26 @@
     });
   }
 
+  function closeHeaderOnPointerDownOutside(node: HTMLElement) {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+
+      if (event.defaultPrevented || (target instanceof Node && node.contains(target))) {
+        return;
+      }
+
+      showHeader = false;
+    };
+
+    document.addEventListener('pointerdown', onPointerDown, true);
+
+    return {
+      destroy() {
+        document.removeEventListener('pointerdown', onPointerDown, true);
+      }
+    };
+  }
+
   async function leaveReader(routeId: string, deleteLastItem = true) {
     let message;
 
@@ -2135,13 +2155,13 @@
   type="button"
   class="reader-header-hotzone fixed inset-x-0 top-0 z-[9] h-8 w-full"
   aria-label="Show reader controls"
-  on:click={() => (showHeader = true)}
+  on:click|stopPropagation={() => (showHeader = true)}
 ></button>
 {#if showHeader}
   <div
     class="writing-horizontal-tb fixed inset-x-0 top-0 z-40 w-full"
     transition:fly|local={{ y: -300, easing: quintInOut }}
-    use:clickOutside={() => (showHeader = false)}
+    use:closeHeaderOnPointerDownOutside
   >
     <BookReaderHeader
       bookTitle={$rawBookData$?.title ?? ''}
@@ -2264,7 +2284,6 @@
   <StyleSheetRenderer styleSheet={$bookData$.styleSheet} />
   <BookReader
     htmlContent={$bookData$.htmlContent}
-    bookSections={$rawBookData$.sections ?? []}
     width={$containerViewportWidth$ ?? 0}
     height={$containerViewportHeight$ ?? 0}
     {fontFeatureSettings}
@@ -2379,7 +2398,6 @@
   >
     <BookSearchPanel
       htmlContent={$bookData$.htmlContent}
-      searchCacheKey={`${$rawBookData$.id}:${$rawBookData$.lastBookModified || 0}`}
       sectionData={$sectionData$ ?? []}
       fontSize={$fontSize$}
       fontColor={$themeOption$?.fontColor ?? ''}
