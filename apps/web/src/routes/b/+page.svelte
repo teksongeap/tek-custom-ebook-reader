@@ -268,6 +268,7 @@
   });
   const routeDestroy$ = new Subject<void>();
   const queuedReaderImageGalleryPictures = new Map<string, boolean>();
+  const emptyBookSections: NonNullable<BooksDbBookData['sections']> = [];
   const fontFeatureSettings = [
     $enableVerticalFontKerning$ && '"vkrn"',
     $enableFontVPAL$ && '"vpal"'
@@ -376,6 +377,8 @@
     }),
     share()
   );
+
+  $: readerBookSections = $rawBookData$?.sections ?? emptyBookSections;
 
   const leaveIfBookMissing$ = rawBookData$.pipe(
     tap((data) => {
@@ -2292,6 +2295,7 @@
   <StyleSheetRenderer styleSheet={$bookData$.styleSheet} />
   <BookReader
     htmlContent={$bookData$.htmlContent}
+    bookSections={readerBookSections}
     width={$containerViewportWidth$ ?? 0}
     height={$containerViewportHeight$ ?? 0}
     {fontFeatureSettings}
@@ -2397,7 +2401,7 @@
   </div>
 {/if}
 
-{#if showSearchPanel && $bookData$}
+{#if showSearchPanel && $bookData$ && $rawBookData$}
   <div
     class="reader-side-panel-shell writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
     style={readerSurfaceStyle}
@@ -2406,6 +2410,7 @@
   >
     <BookSearchPanel
       htmlContent={$bookData$.htmlContent}
+      searchCacheKey={`${$rawBookData$.id}:${$rawBookData$.lastBookModified || 0}`}
       sectionData={$sectionData$ ?? []}
       fontSize={$fontSize$}
       fontColor={$themeOption$?.fontColor ?? ''}

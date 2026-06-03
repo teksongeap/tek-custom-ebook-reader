@@ -472,14 +472,26 @@
     calculatorInstance: SectionCharacterStatsCalculator,
     targetElement: Element
   ) {
-    const nodeRange = document.createRange();
-
-    nodeRange.setStart(targetElement, 0);
-    nodeRange.setEnd(targetElement, targetElement.childNodes.length);
+    const nodeRange = createTargetElementRange(targetElement);
 
     return calculatorInstance.getScrollPosByCharCount(
       calculatorInstance.calcExploredCharCount(nodeRange)
     );
+  }
+
+  function createTargetElementRange(targetElement: Element) {
+    const firstReadableNode = getParagraphNodes(targetElement)[0];
+
+    if (firstReadableNode) {
+      // Some EPUB ToC ids point at a whole chapter wrapper; anchor to its first readable node.
+      return createRange(firstReadableNode);
+    }
+
+    const nodeRange = document.createRange();
+    nodeRange.setStart(targetElement, 0);
+    nodeRange.setEnd(targetElement, targetElement.childNodes.length);
+
+    return nodeRange;
   }
 
   function createReaderSections(
