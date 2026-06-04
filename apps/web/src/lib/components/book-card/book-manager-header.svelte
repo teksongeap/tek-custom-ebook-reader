@@ -109,6 +109,13 @@
   let isOldUrl = false;
   let showLoadCount = false;
 
+  $: operationProgressPercent = replicationToProgress
+    ? Math.min(Math.max((replicationProgress / replicationToProgress) * 100, 0), 100)
+    : 0;
+  $: operationProgressValue = Math.min(replicationProgress, replicationToProgress);
+  $: operationProgressRemaining =
+    replicationProgressRemaining === '~ ??:??:??' ? 'Working...' : replicationProgressRemaining;
+
   $: if (browser) {
     isOldUrl = isOnOldUrl(window);
     showLoadCount = new URLSearchParams(window.location.search).has('count');
@@ -581,7 +588,7 @@
   {:else}
     <div
       title="Cancel Operation"
-      class="absolute inset-0 mx-auto flex h-full transform-gpu items-center justify-center px-4 md:px-8 lg:max-w-4xl xl:max-w-none 2xl:max-w-6xl"
+      class="book-manager-operation absolute inset-0 mx-auto flex h-full transform-gpu items-center justify-center px-4 md:px-8 lg:max-w-4xl xl:max-w-none 2xl:max-w-6xl"
       in:scale={inAnimationParams}
       out:scale={outAnimationParams}
     >
@@ -589,14 +596,32 @@
         <div
           tabindex="0"
           role="button"
+          aria-label="Cancel operation"
+          class="book-manager-operation__cancel"
           on:click={() => dispatch('cancelReplication')}
           on:keyup={dummyFn}
         >
-          <Fa icon={faCircleXmark} class="cursor-pointer" />
+          <Fa icon={faCircleXmark} />
         </div>
       </Popover>
-      <progress class="mx-4 w-full" value={replicationProgress} max={replicationToProgress} />
-      <div class="ml-4 min-w-fit">{replicationProgressRemaining}</div>
+      <div class="book-manager-operation__meter">
+        <span class="book-manager-operation__pulse" aria-hidden="true"></span>
+        <div
+          class="book-manager-operation__track"
+          role="progressbar"
+          aria-label="Operation progress"
+          aria-valuemin="0"
+          aria-valuemax={replicationToProgress}
+          aria-valuenow={operationProgressValue}
+        >
+          <span class="book-manager-operation__fill" style:width={`${operationProgressPercent}%`}
+          ></span>
+          <span class="book-manager-operation__sweep" aria-hidden="true"></span>
+        </div>
+      </div>
+      <div class="book-manager-operation__status" title={operationProgressRemaining}>
+        {operationProgressRemaining}
+      </div>
     </div>
   {/if}
 </div>

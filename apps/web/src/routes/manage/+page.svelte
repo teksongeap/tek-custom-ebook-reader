@@ -103,7 +103,7 @@
   let cancelTooltip = '';
   let replicationProgress = 0;
   let replicationToProgress = 0;
-  let replicationProgressRemaining = '~ ??:??:??';
+  let replicationProgressRemaining = 'Working...';
   let replicationDone = new Subject<void>();
   let progressSessionId = 0;
   let progressBase = 0;
@@ -344,7 +344,7 @@
         updateProgress(progressData);
       }
     });
-    replicationProgressRemaining = '~ ??:??:??';
+    replicationProgressRemaining = 'Working...';
     replicationProgress = 0;
     replicationToProgress = 1;
     progressBase = 0;
