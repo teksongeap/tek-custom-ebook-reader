@@ -2,10 +2,9 @@
   import DialogTemplate from '$lib/components/dialog-template.svelte';
   import SvelteUserFontAdd from '$lib/components/settings/settings-user-font-add.svelte';
   import { dialogManager } from '$lib/data/dialog-manager';
-  import { userFontsCacheName } from '$lib/data/fonts';
+  import { isUserFont, userFontsCacheName } from '$lib/data/fonts';
   import { logger } from '$lib/data/logger';
   import { userFonts$ } from '$lib/data/store';
-  import { dummyFn } from '$lib/functions/utils';
   import { faSpinner, faTrashCan } from '@fortawesome/free-solid-svg-icons';
   import type { BehaviorSubject } from 'rxjs';
   import { onMount } from 'svelte';
@@ -28,7 +27,9 @@
         (request: Request) => new URL(request.url).pathname
       );
 
-      $userFonts$ = $userFonts$.filter((userFont) => fonts.includes(userFont.path));
+      $userFonts$ = $userFonts$.filter(
+        (userFont) => isUserFont(userFont) && fonts.includes(userFont.path)
+      );
 
       for (let index = 0, { length } = fonts; index < length; index += 1) {
         const font = fonts[index];
@@ -81,72 +82,56 @@
 <DialogTemplate>
   <div slot="content">
     {#if cacheLoaded}
-      <div class="border-b border-b-gray-200">
-        <ul class="-mb-px flex items-center gap-4 text-sm font-medium">
-          {#each tabs as tab (tab)}
-            <li class="flex-1">
-              <button
-                class="relative flex items-center justify-center gap-2 px-1 py-3 hover:text-blue-700"
-                class:text-blue-700={currentTab === tab}
-                class:after:absolute={currentTab === tab}
-                class:after:left-0={currentTab === tab}
-                class:after:bottom-0={currentTab === tab}
-                class:after:h-0.5={currentTab === tab}
-                class:after:w-full={currentTab === tab}
-                class:after:bg-blue-700={currentTab === tab}
-                class:text-gray-500={currentTab !== tab}
-                on:click={() => (currentTab = tab)}
-              >
-                {tab}
-              </button>
-            </li>
-          {/each}
-        </ul>
+      <div class="settings-dialog-tabs">
+        {#each tabs as tab (tab)}
+          <button
+            type="button"
+            class="settings-dialog-tab"
+            class:settings-dialog-tab--active={currentTab === tab}
+            on:click={() => (currentTab = tab)}
+          >
+            {tab}
+          </button>
+        {/each}
       </div>
       <div class="mt-5">
         {#if currentTab === 'Stored'}
           {#if $userFonts$.length}
             <div
-              class="grid grid-cols-[repeat(3,auto)] items-center gap-y-4 gap-x-4 max-h-[50vh] overflow-auto break-all md:gap-x-14"
+              class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-y-3 gap-x-3 max-h-[50vh] overflow-auto"
             >
               {#each $userFonts$ as userFont (userFont.path)}
-                <div
-                  tabindex="0"
-                  role="button"
+                <button
+                  type="button"
                   title="Click to select Font"
-                  class="hover:text-blue-700"
+                  class="settings-font-list-button"
                   on:click={() => selectFont(userFont.name)}
-                  on:keyup={dummyFn}
                 >
                   {userFont.name}
-                </div>
-                <div
-                  tabindex="0"
-                  role="button"
+                </button>
+                <button
+                  type="button"
                   title="Click to select Font"
-                  class="hover:text-blue-700"
+                  class="settings-font-list-button settings-font-list-file"
                   on:click={() => selectFont(userFont.name)}
-                  on:keyup={dummyFn}
                 >
                   {userFont.fileName}
-                </div>
-                <div
-                  tabindex="0"
-                  role="button"
+                </button>
+                <button
+                  type="button"
                   title="Remove Font"
-                  class="hover:text-blue-700"
+                  class="settings-icon-action settings-icon-action--boxed settings-icon-action--danger"
                   on:click={() => removeFont(userFont.path)}
-                  on:keyup={dummyFn}
                 >
                   <Fa icon={faTrashCan} />
-                </div>
+                </button>
               {/each}
             </div>
           {:else}
             <div>You have currently no stored Fonts</div>
           {/if}
         {:else if fontCache}
-          <SvelteUserFontAdd {fontCache} bind:isLoading />
+          <SvelteUserFontAdd {fontCache} bind:isLoading on:saved={() => (currentTab = 'Stored')} />
         {/if}
       </div>
     {/if}

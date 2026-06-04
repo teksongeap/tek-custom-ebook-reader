@@ -411,7 +411,7 @@
             tabindex="0"
             role="button"
             title="Open Custom Font Dialog"
-            class="settings-icon-action"
+            class="settings-icon-action settings-icon-action--boxed"
             on:click={() =>
               dialogManager.dialogs$.next([
                 {
@@ -442,7 +442,8 @@
           <div
             tabindex="0"
             role="button"
-            class="settings-icon-action"
+            title="Open Custom Font Dialog"
+            class="settings-icon-action settings-icon-action--boxed"
             on:click={() =>
               dialogManager.dialogs$.next([
                 {

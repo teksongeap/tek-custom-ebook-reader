@@ -25,6 +25,13 @@ export interface UserFont {
 
 export const userFontsCacheName = 'ttu-userfonts';
 
+const userFontFormatsByExtension: Record<string, string> = {
+  otf: 'opentype',
+  ttf: 'truetype',
+  woff: 'woff',
+  woff2: 'woff2'
+};
+
 export const reservedFontNames = new Set([
   'KZ UDGothic',
   'KZ UDMincho',
@@ -42,4 +49,24 @@ export function isStoredFont(fontName: string, userFonts: UserFont[]) {
   return (
     reservedFontNames.has(fontName) || !!userFonts.find((userFont) => userFont.name === fontName)
   );
+}
+
+export function isUserFont(value: unknown): value is UserFont {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const userFont = value as Partial<UserFont>;
+
+  return (
+    typeof userFont.name === 'string' &&
+    typeof userFont.path === 'string' &&
+    typeof userFont.fileName === 'string'
+  );
+}
+
+export function getUserFontFormat(fileName: string) {
+  const extension = fileName.split('.').pop()?.toLowerCase() || '';
+
+  return userFontFormatsByExtension[extension] || '';
 }

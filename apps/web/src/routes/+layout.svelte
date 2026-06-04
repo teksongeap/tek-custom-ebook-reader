@@ -5,7 +5,12 @@
   import LoadingDialog from '$lib/components/loading-dialog.svelte';
   import { basePath, clearConsoleOnReload } from '$lib/data/env';
   import { dialogManager, type Dialog } from '$lib/data/dialog-manager';
-  import { userFontsCacheName, type UserFont } from '$lib/data/fonts';
+  import {
+    getUserFontFormat,
+    isUserFont,
+    userFontsCacheName,
+    type UserFont
+  } from '$lib/data/fonts';
   import {
     customThemes$,
     fontFamilyGroupOne$,
@@ -41,29 +46,26 @@
 
   function addUserFonts(userFonts: UserFont[]) {
     let styleContent = '';
+    let styleElement = document.getElementById(userFontsCacheName);
+
+    if (!Array.isArray(userFonts)) {
+      styleElement?.remove();
+      return;
+    }
 
     for (let index = 0, { length } = userFonts; index < length; index += 1) {
       const userFont = userFonts[index];
-      const ext = userFont.fileName.split('.').pop() || '';
+      if (!isUserFont(userFont)) {
+        continue;
+      }
 
-      let format = '';
-
-      switch (ext) {
-        case 'otf':
-          format = 'opentype';
-          break;
-        case 'ttf':
-          format = 'truetype';
-          break;
-        default:
-          format = ext;
-          break;
+      const format = getUserFontFormat(userFont.fileName);
+      if (!format) {
+        continue;
       }
 
       styleContent += `@font-face{font-family: '${userFont.name}';font-style: normal;font-weight: 400;font-display: swap;src: local(''), url('${userFont.path}') format('${format}')}\n`;
     }
-
-    let styleElement = document.getElementById(userFontsCacheName);
 
     if (!styleContent) {
       styleElement?.remove();

@@ -41,11 +41,21 @@
         <Ripple />
       </button>
       {#if option.showIcons && option.id === selectedOptionId && !availableThemes.has(option.id)}
-        <div class="flex flex-col justify-around mr-2">
-          <button on:click={() => dispatch('edit', option.id)}>
+        <div class="setting-toggle-actions">
+          <button
+            type="button"
+            title={`Edit ${option.id}`}
+            class="settings-icon-action settings-icon-action--boxed setting-toggle-icon-action"
+            on:click={() => dispatch('edit', option.id)}
+          >
             <Fa icon={faPen} />
           </button>
-          <button on:click={() => dispatch('delete', option.id)}>
+          <button
+            type="button"
+            title={`Delete ${option.id}`}
+            class="settings-icon-action settings-icon-action--boxed settings-icon-action--danger-hover setting-toggle-icon-action"
+            on:click={() => dispatch('delete', option.id)}
+          >
             <Fa icon={faTrash} />
           </button>
         </div>
