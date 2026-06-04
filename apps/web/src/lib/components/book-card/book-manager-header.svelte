@@ -113,6 +113,7 @@
     ? Math.min(Math.max((replicationProgress / replicationToProgress) * 100, 0), 100)
     : 0;
   $: operationProgressValue = Math.min(replicationProgress, replicationToProgress);
+  $: operationProgressIsWaiting = operationProgressValue <= 0;
   $: operationProgressRemaining =
     replicationProgressRemaining === '~ ??:??:??' ? 'Working...' : replicationProgressRemaining;
 
@@ -616,7 +617,9 @@
         >
           <span class="book-manager-operation__fill" style:width={`${operationProgressPercent}%`}
           ></span>
-          <span class="book-manager-operation__sweep" aria-hidden="true"></span>
+          {#if operationProgressIsWaiting}
+            <span class="book-manager-operation__sweep" aria-hidden="true"></span>
+          {/if}
         </div>
       </div>
       <div class="book-manager-operation__status" title={operationProgressRemaining}>
