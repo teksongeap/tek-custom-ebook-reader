@@ -19,7 +19,10 @@ export default function clearAllBadImageRef(el: HTMLElement) {
   };
 
   Array.from(el.getElementsByTagName('image')).forEach((tag) => {
-    clearTagBadImageAttribute(tag, 'href');
+    tag
+      .getAttributeNames()
+      .filter((attributeName) => attributeName.endsWith('href'))
+      .forEach((attributeName) => clearTagBadImageAttribute(tag, attributeName));
   });
 
   Array.from(el.getElementsByTagName('img')).forEach((tag) => {

@@ -40,6 +40,7 @@ export const prependValue = 'ttu-';
 const controlCharactersRegex = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/gim;
 const htmlHexEntitiesRegex = /&#x([0-9A-Fa-f]+);/gim;
 const htmlDecEntitiesRegex = /&#(\d+);/gim;
+const externalImageReferenceRegex = /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i;
 const selfClosingTagsRegex = /><\/(meta|link)>/gim;
 const tocFragmentAttributeRegex = /\s(?:id|name)\s*=\s*(["'])(.*?)\1/gim;
 const selfClosingContentTags = [
@@ -138,6 +139,7 @@ export default async function generateEpubHtml(
     }
     return acc;
   }, []);
+  const blobLocationByReference = createBlobLocationByReference(blobLocations, contentsDirectory);
 
   const parser = new DOMParser();
   const spineItemRef = isOPFType(contents)
@@ -254,19 +256,15 @@ export default async function generateEpubHtml(
         const value = elm.getAttribute(attr);
 
         if (value) {
-          elm.setAttribute(attr, path.join(path.dirname(htmlHref), value));
+          elm.setAttribute(
+            attr,
+            resolveImageAttributeValue(value, htmlHref, blobLocationByReference)
+          );
         }
       }
     }
 
-    let innerHtml = body.innerHTML || '';
-
-    blobLocations.forEach((blobLocation) => {
-      innerHtml = innerHtml.replaceAll(
-        relative(contentsDirectory, blobLocation),
-        buildDummyBookImage(blobLocation)
-      );
-    });
+    const innerHtml = body.innerHTML || '';
 
     const childBodyDiv = document.createElement('div');
     childBodyDiv.className = `ttu-book-body-wrapper ${bodyClass}`;
@@ -808,6 +806,97 @@ function resolveSpineItemHtmlRef(
   }
 
   return { itemIdRef, htmlHref };
+}
+
+function createBlobLocationByReference(blobLocations: string[], contentsDirectory: string) {
+  const blobLocationByReference = new Map<string, string>();
+
+  blobLocations.forEach((blobLocation) => {
+    addBlobLocationReference(blobLocationByReference, blobLocation, blobLocation);
+    addBlobLocationReference(
+      blobLocationByReference,
+      relative(contentsDirectory, blobLocation),
+      blobLocation
+    );
+  });
+
+  return blobLocationByReference;
+}
+
+function addBlobLocationReference(
+  blobLocationByReference: Map<string, string>,
+  reference: string,
+  blobLocation: string
+) {
+  addNormalizedBlobLocationReference(blobLocationByReference, reference, blobLocation);
+  addNormalizedBlobLocationReference(
+    blobLocationByReference,
+    safeDecodeURIComponent(reference),
+    blobLocation
+  );
+}
+
+function addNormalizedBlobLocationReference(
+  blobLocationByReference: Map<string, string>,
+  reference: string,
+  blobLocation: string
+) {
+  const normalizedReference = normalizeEpubPath(reference);
+
+  if (normalizedReference && !blobLocationByReference.has(normalizedReference)) {
+    blobLocationByReference.set(normalizedReference, blobLocation);
+  }
+}
+
+function resolveImageAttributeValue(
+  value: string,
+  htmlHref: string,
+  blobLocationByReference: Map<string, string>
+) {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue || externalImageReferenceRegex.test(normalizedValue)) {
+    return value;
+  }
+
+  const hrefPath = splitImageReference(normalizedValue);
+  if (!hrefPath) {
+    return value;
+  }
+
+  const sourceDir = path.dirname(htmlHref);
+  const resolvedHref = normalizeEpubPath(
+    hrefPath.startsWith('/') ? hrefPath : path.join(sourceDir === '.' ? '' : sourceDir, hrefPath)
+  );
+  const blobLocation =
+    getBlobLocation(blobLocationByReference, resolvedHref) ||
+    getBlobLocation(blobLocationByReference, hrefPath);
+
+  return blobLocation ? buildDummyBookImage(blobLocation) : resolvedHref;
+}
+
+function splitImageReference(value: string) {
+  const suffixIndex = value.search(/[?#]/);
+
+  return suffixIndex >= 0 ? value.slice(0, suffixIndex) : value;
+}
+
+function getBlobLocation(blobLocationByReference: Map<string, string>, reference: string) {
+  const normalizedReference = normalizeEpubPath(reference);
+  const decodedReference = normalizeEpubPath(safeDecodeURIComponent(normalizedReference));
+
+  return (
+    blobLocationByReference.get(normalizedReference) ||
+    blobLocationByReference.get(decodedReference)
+  );
+}
+
+function safeDecodeURIComponent(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch (_) {
+    return value;
+  }
 }
 
 /**

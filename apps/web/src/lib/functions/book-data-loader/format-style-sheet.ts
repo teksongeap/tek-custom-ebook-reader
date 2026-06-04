@@ -7,13 +7,13 @@
 import type { BooksDbBookData } from '$lib/data/database/books-db/versions/books-db';
 import parseCss from '../css-parser/css-parser';
 import stringifyCss from '../css-parser/css-stringify';
-import type { Declaration, Rule } from '../css-parser/types';
+import type { CssTree, Declaration, Rule } from '../css-parser/types';
 
 const htmlRegex = /\s?html\s?/i;
 const bodyRegex = /\s?body\s?/i;
 
 export default function formatStyleSheet(bookData: BooksDbBookData, parentSelector: string) {
-  const cssTree = parseCss(bookData.styleSheet);
+  const cssTree = parseStyleSheet(bookData.styleSheet);
 
   const newRules = cssTree.stylesheet.rules
     .filter((r) => r.type === 'rule')
@@ -62,6 +62,19 @@ export default function formatStyleSheet(bookData: BooksDbBookData, parentSelect
     },
     type: 'stylesheet'
   });
+}
+
+function parseStyleSheet(styleSheet: string): CssTree {
+  try {
+    return parseCss(styleSheet);
+  } catch (_) {
+    return {
+      stylesheet: {
+        rules: []
+      },
+      type: 'stylesheet'
+    };
+  }
 }
 
 function encapsulatedSelectors(selectors: string[], parentSelector: string) {

@@ -48,10 +48,15 @@ export default async function extractEpub(blob: Blob, cancelSignal?: AbortSignal
       const contentOpfFilename = rootFile['@_full-path'];
       profile.lap('read container', { rootFile: contentOpfFilename });
 
-      const contentsXml = await fileMap[contentOpfFilename].getData!(new TextWriter());
+      const contentsEntry = findZipEntry(fileMap, '', contentOpfFilename);
+      if (!contentsEntry?.getData) {
+        throw new Error(`content file ${contentOpfFilename} not found`);
+      }
+
+      const contentsXml = await contentsEntry.getData(new TextWriter());
       result[contentOpfFilename] = contentsXml;
 
-      contentsDirectory = path.dirname(contentOpfFilename);
+      contentsDirectory = path.dirname(contentsEntry.filename);
 
       contents = parser.parse(contentsXml);
       profile.lap('read opf', { contentLength: contentsXml.length });
@@ -71,7 +76,12 @@ export default async function extractEpub(blob: Blob, cancelSignal?: AbortSignal
           extractLimiter(async () => {
             throwIfAborted(cancelSignal);
             const fileRelativePath = item['@_href'];
-            const entry = fileMap[path.join(contentsDirectory, fileRelativePath)];
+            if (!fileRelativePath) {
+              skippedItems += 1;
+              return;
+            }
+
+            const entry = findZipEntry(fileMap, contentsDirectory, fileRelativePath);
 
             if (!entry) {
               throw new Error(`item ${fileRelativePath} not found`);
@@ -132,4 +142,34 @@ function isTextManifestItem(mediaType: string) {
     mediaType === 'application/x-dtbncx+xml' ||
     mediaType === 'application/smil+xml'
   );
+}
+
+function findZipEntry(
+  fileMap: Record<string, Entry>,
+  contentsDirectory: string,
+  fileRelativePath: string
+) {
+  const candidatePaths = new Set([fileRelativePath, safeDecodeURIComponent(fileRelativePath)]);
+
+  for (const candidatePath of candidatePaths) {
+    const entry = fileMap[normalizeZipPath(path.join(contentsDirectory, candidatePath))];
+
+    if (entry) {
+      return entry;
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeZipPath(value: string) {
+  return value.replace(/\\/g, '/').replace(/^\/+/, '').replace(/^\.\//, '');
+}
+
+function safeDecodeURIComponent(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch (_) {
+    return value;
+  }
 }
