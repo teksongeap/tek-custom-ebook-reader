@@ -20,6 +20,7 @@
   export let fontSize = 20;
   export let fontColor = '';
   export let backgroundColor = '';
+  export let searchQuery = '';
 
   const dispatch = createEventDispatcher<{
     close: void;
@@ -27,7 +28,6 @@
   }>();
 
   let searchInputEl: HTMLInputElement | undefined;
-  let searchQuery = '';
   let searchIndex: ReaderSearchBlock[] = [];
   let searchIndexHtmlContent = '';
   let searchIndexLoading = false;

@@ -90,6 +90,7 @@
     readingGoalsMergeMode$,
     pauseTrackerOnCustomPointChange$,
     hideSpoilerImageMode$,
+    ignorePublisherFontColors$,
     enableVerticalFontKerning$,
     enableFontVPAL$,
     verticalTextOrientation$,
@@ -221,6 +222,8 @@
   let annotations: BooksDbAnnotation[] = [];
   let showAnnotationsPanel = false;
   let showSearchPanel = false;
+  let bookSearchQuery = '';
+  let bookSearchQueryBookId = '';
   let activeAnnotationId = '';
   let activeAnnotationEditId = '';
   let annotationPopoverResetKey = 0;
@@ -379,6 +382,14 @@
   );
 
   $: readerBookSections = $rawBookData$?.sections ?? emptyBookSections;
+  $: bookSearchBookId = browser ? $page.url.searchParams.get('id') || '' : '';
+  $: bookSearchCacheKey = $rawBookData$
+    ? `${$rawBookData$.id}:${$rawBookData$.lastBookModified || 0}`
+    : undefined;
+  $: if (bookSearchBookId !== bookSearchQueryBookId) {
+    bookSearchQueryBookId = bookSearchBookId;
+    bookSearchQuery = '';
+  }
 
   const leaveIfBookMissing$ = rawBookData$.pipe(
     tap((data) => {
@@ -2303,6 +2314,7 @@
     prioritizeReaderStyles={$prioritizeReaderStyles$}
     enableTextJustification={$enableTextJustification$}
     enableTextWrapPretty={$enableTextWrapPretty$}
+    ignorePublisherFontColors={$ignorePublisherFontColors$}
     verticalMode={$verticalMode$}
     fontColor={$themeOption$?.fontColor}
     backgroundColor={$backgroundColor$}
@@ -2410,7 +2422,8 @@
   >
     <BookSearchPanel
       htmlContent={$bookData$.htmlContent}
-      searchCacheKey={`${$rawBookData$.id}:${$rawBookData$.lastBookModified || 0}`}
+      searchCacheKey={bookSearchCacheKey}
+      bind:searchQuery={bookSearchQuery}
       sectionData={$sectionData$ ?? []}
       fontSize={$fontSize$}
       fontColor={$themeOption$?.fontColor ?? ''}

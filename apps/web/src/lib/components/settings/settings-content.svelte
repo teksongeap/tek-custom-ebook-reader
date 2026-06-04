@@ -155,6 +155,8 @@
 
   export let importHTMLFixMode: string;
 
+  export let ignorePublisherFontColors: boolean;
+
   export let restrictImportFixToAnchor: boolean;
 
   export let customFootnoteTargetRegexRules: string;
@@ -246,6 +248,9 @@
   let importHTMLFixModeTooltip = '';
   let autoReplicationTypeTooltip = '';
   let trackerAutoPauseTooltip = '';
+  let footnoteRegexTextareaHeight = 0;
+  let isSyncingFootnoteRegexTextareaHeight = false;
+  const footnoteRegexTextareas = new Set<HTMLTextAreaElement>();
 
   $: if ($textMarginMode$ === 'auto') {
     $textMarginValue$ = 0;
@@ -346,6 +351,49 @@
         logger.error(`Failed to retrieve storage sources: ${error.message}`);
         database.storageSourcesChanged$.next([]);
       });
+  }
+
+  function syncFootnoteRegexTextarea(node: HTMLTextAreaElement) {
+    const observer = new ResizeObserver(() => {
+      if (isSyncingFootnoteRegexTextareaHeight) {
+        return;
+      }
+
+      syncFootnoteRegexTextareaHeight(Math.round(node.getBoundingClientRect().height));
+    });
+
+    footnoteRegexTextareas.add(node);
+    observer.observe(node);
+
+    if (footnoteRegexTextareaHeight) {
+      node.style.height = `${footnoteRegexTextareaHeight}px`;
+    } else {
+      syncFootnoteRegexTextareaHeight(Math.round(node.getBoundingClientRect().height));
+    }
+
+    return {
+      destroy() {
+        observer.disconnect();
+        footnoteRegexTextareas.delete(node);
+      }
+    };
+  }
+
+  function syncFootnoteRegexTextareaHeight(nextHeight: number) {
+    if (!nextHeight || nextHeight === footnoteRegexTextareaHeight) {
+      return;
+    }
+
+    footnoteRegexTextareaHeight = nextHeight;
+    isSyncingFootnoteRegexTextareaHeight = true;
+
+    footnoteRegexTextareas.forEach((textarea) => {
+      textarea.style.height = `${footnoteRegexTextareaHeight}px`;
+    });
+
+    requestAnimationFrame(() => {
+      isSyncingFootnoteRegexTextareaHeight = false;
+    });
   }
 </script>
 
@@ -812,6 +860,15 @@
         bind:selectedOptionId={importHTMLFixMode}
       />
     </SettingsItemGroup>
+    <SettingsItemGroup
+      title="Ignore Publisher Text Colors"
+      tooltip="Uses the reader theme text color instead of EPUB text colors. Applies at display time and does not modify the book data."
+    >
+      <ButtonToggleGroup
+        options={optionsForToggle}
+        bind:selectedOptionId={ignorePublisherFontColors}
+      />
+    </SettingsItemGroup>
     {#if importHTMLFixMode !== ImportHTMLFixMode.OFF}
       <SettingsItemGroup
         title="Restrict to Links"
@@ -832,6 +889,7 @@
         rows="3"
         spellcheck="false"
         placeholder={'^jz[-_]\\d\n^note-[0-9]+$'}
+        use:syncFootnoteRegexTextarea
         bind:value={customFootnoteTargetRegexRules}
       />
     </SettingsItemGroup>
@@ -844,6 +902,7 @@
         rows="3"
         spellcheck="false"
         placeholder={'^jzyy[-_]\\d\n^note-ref-[0-9]+$'}
+        use:syncFootnoteRegexTextarea
         bind:value={customFootnoteBacklinkRegexRules}
       />
     </SettingsItemGroup>

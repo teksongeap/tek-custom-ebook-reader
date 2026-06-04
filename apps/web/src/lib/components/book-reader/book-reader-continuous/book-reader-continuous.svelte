@@ -78,6 +78,8 @@
 
   export let enableTextWrapPretty: boolean;
 
+  export let ignorePublisherFontColors: boolean;
+
   export let fontColor: string;
 
   export let backgroundColor: string;
@@ -978,6 +980,7 @@
   class:ttu-apply-important={prioritizeReaderStyles}
   class:ttu-apply-justification={enableTextJustification}
   class:ttu-text-wrap-pretty={enableTextWrapPretty}
+  class:book-content--ignore-publisher-text-colors={ignorePublisherFontColors}
   class="book-content m-auto"
 >
   <HtmlRenderer html={htmlContent} on:load={onHtmlLoad} />

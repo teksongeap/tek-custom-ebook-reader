@@ -34,6 +34,7 @@
     hideFurigana$,
     hideSpoilerImage$,
     hoverFocusEnabled$,
+    ignorePublisherFontColors$,
     importHTMLFixMode$,
     lineHeight$,
     manualBookmark$,
@@ -191,6 +192,7 @@
       bind:autoBookmark={$autoBookmark$}
       bind:autoBookmarkTime={$autoBookmarkTime$}
       bind:importHTMLFixMode={$importHTMLFixMode$}
+      bind:ignorePublisherFontColors={$ignorePublisherFontColors$}
       bind:restrictImportFixToAnchor={$restrictImportFixToAnchor$}
       bind:customFootnoteTargetRegexRules={$customFootnoteTargetRegexRules$}
       bind:customFootnoteBacklinkRegexRules={$customFootnoteBacklinkRegexRules$}

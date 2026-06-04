@@ -51,6 +51,15 @@
     color: var(--reader-page-text, currentColor) !important;
   }
 
+  &.book-content--ignore-publisher-text-colors {
+    color: var(--reader-page-text, currentColor);
+
+    :global(:where(*):not(a):not(a *):not(svg):not(svg *):not(rt):not(rt *)) {
+      color: inherit !important;
+      -webkit-text-fill-color: currentColor !important;
+    }
+  }
+
   :global(ruby > rt) {
     user-select: none;
   }

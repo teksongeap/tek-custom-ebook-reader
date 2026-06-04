@@ -82,6 +82,8 @@
 
   export let enableTextWrapPretty: boolean;
 
+  export let ignorePublisherFontColors: boolean;
+
   export let textIndentation: number;
 
   export let textMarginValue: number;
@@ -819,6 +821,7 @@
       {prioritizeReaderStyles}
       {enableTextJustification}
       {enableTextWrapPretty}
+      {ignorePublisherFontColors}
       {fontColor}
       {backgroundColor}
       {selectionFontColor}
@@ -868,6 +871,7 @@
       {prioritizeReaderStyles}
       {enableTextJustification}
       {enableTextWrapPretty}
+      {ignorePublisherFontColors}
       {fontColor}
       {backgroundColor}
       {selectionFontColor}

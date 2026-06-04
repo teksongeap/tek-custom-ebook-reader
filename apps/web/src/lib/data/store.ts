@@ -106,6 +106,10 @@ export const prioritizeReaderStyles$ = writableBooleanLocalStorageSubject()(
   'prioritizeReaderStyles',
   false
 );
+export const ignorePublisherFontColors$ = writableBooleanLocalStorageSubject()(
+  'ignorePublisherFontColors',
+  false
+);
 export const enableTextJustification$ = writableBooleanLocalStorageSubject()(
   'enableTextJustification',
   false
