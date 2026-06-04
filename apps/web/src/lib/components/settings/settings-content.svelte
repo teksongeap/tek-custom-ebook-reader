@@ -860,15 +860,6 @@
         bind:selectedOptionId={importHTMLFixMode}
       />
     </SettingsItemGroup>
-    <SettingsItemGroup
-      title="Ignore Publisher Text Colors"
-      tooltip="Uses the reader theme text color instead of EPUB text colors. Applies at display time and does not modify the book data."
-    >
-      <ButtonToggleGroup
-        options={optionsForToggle}
-        bind:selectedOptionId={ignorePublisherFontColors}
-      />
-    </SettingsItemGroup>
     {#if importHTMLFixMode !== ImportHTMLFixMode.OFF}
       <SettingsItemGroup
         title="Restrict to Links"
@@ -880,6 +871,15 @@
         />
       </SettingsItemGroup>
     {/if}
+    <SettingsItemGroup
+      title="Ignore Publisher Text Colors"
+      tooltip="Uses the reader theme text color instead of EPUB text colors. Applies at display time and does not modify the book data."
+    >
+      <ButtonToggleGroup
+        options={optionsForToggle}
+        bind:selectedOptionId={ignorePublisherFontColors}
+      />
+    </SettingsItemGroup>
     <SettingsItemGroup
       title="Footnote Target Regex"
       tooltip="One pattern per line, matched against the link target id. Use this for ids that belong to note text."

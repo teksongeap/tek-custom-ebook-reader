@@ -37,6 +37,7 @@ export default function formatBookDataHtml(
       addImageContainerClass(element);
       // combineImagePairs(element);
       removeSvgDimensions(element);
+      removeUnsafeInlineStyleUrls(element);
       addSpoilerTags(element, document, blurMode);
       removeOldBrTagSolution(element);
 
@@ -129,6 +130,33 @@ function removeSvgDimensions(el: HTMLElement) {
   Array.from(el.getElementsByTagName('svg')).forEach((tag) => {
     tag.removeAttribute('width');
     tag.removeAttribute('height');
+  });
+}
+
+function removeUnsafeInlineStyleUrls(el: HTMLElement) {
+  el.querySelectorAll('[style]').forEach((tag) => {
+    const style = tag.getAttribute('style') || '';
+
+    if (hasUnsafeUrl(style)) {
+      tag.removeAttribute('style');
+    }
+  });
+}
+
+function hasUnsafeUrl(value: unknown) {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  return Array.from(value.matchAll(/url\(\s*(['"]?)(.*?)\1\s*\)/gi)).some(([, , url]) => {
+    const normalizedUrl = url.trim().toLowerCase();
+
+    return (
+      normalizedUrl.length > 0 &&
+      !normalizedUrl.startsWith('data:') &&
+      !normalizedUrl.startsWith('blob:') &&
+      !normalizedUrl.startsWith('#')
+    );
   });
 }
 

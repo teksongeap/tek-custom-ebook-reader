@@ -33,12 +33,14 @@
       return;
     }
 
+    const fileName = file.name.toLowerCase();
+
     if (
       !(
-        file.name.endsWith('.woff2') ||
-        file.name.endsWith('.woff') ||
-        file.name.endsWith('.ttf') ||
-        file.name.endsWith('.otf')
+        fileName.endsWith('.woff2') ||
+        fileName.endsWith('.woff') ||
+        fileName.endsWith('.ttf') ||
+        fileName.endsWith('.otf')
       )
     ) {
       currentError = 'only woff2, woff, ttf and otf fonts are supported';
@@ -92,11 +94,13 @@
 
     try {
       const path = `/userfonts/${encodeURIComponent(fontFile.name)}`;
+      const fontExtension = fontFile.name.split('.').pop()?.toLowerCase() || 'octet-stream';
+
       await fontCache.put(
         path,
         new Response(fontFile, {
           headers: {
-            'Content-Type': `font/${fontFile.name.split('.').pop()}`,
+            'Content-Type': `font/${fontExtension}`,
             'Content-Length': `${fontFile.size}`
           }
         })

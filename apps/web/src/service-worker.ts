@@ -63,8 +63,9 @@ worker.addEventListener('fetch', (event) => {
   if (isSelfHost && url.pathname.startsWith('/userfonts/')) {
     event.respondWith(
       caches
-        .match(url.pathname)
-        .then((r) => r ?? createRedirectResponse('/fonts/noto-serif-v21-regular.woff2'))
+        .open(userFontsCacheName)
+        .then((cache) => cache.match(url.pathname))
+        .then((r) => r ?? createMissingUserFontResponse())
     );
     return;
   }
@@ -170,6 +171,10 @@ function createRedirectResponse(location: string) {
       location
     }
   });
+}
+
+function createMissingUserFontResponse() {
+  return new Response(null, { status: 404 });
 }
 
 function isFontAsset(asset: string) {

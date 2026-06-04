@@ -62,13 +62,14 @@
     isLoading = true;
 
     try {
+      const removedFont = $userFonts$.find((userFont) => userFont.path === path);
       await fontCache.delete(path);
 
       $userFonts$ = $userFonts$.filter((userFont) => userFont.path !== path);
 
       const currentFontName = fontFamily.getValue();
 
-      if (!$userFonts$.find((userFont) => userFont.name === currentFontName)) {
+      if (removedFont?.name === currentFontName) {
         fontFamily.next('');
       }
     } catch (error: any) {

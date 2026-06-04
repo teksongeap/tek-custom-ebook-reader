@@ -21,7 +21,7 @@
   import { availableThemes, type ThemeOption } from '$lib/data/theme-option';
   import { getReaderFontFamilyCssValue, toCssQuotedString } from '$lib/functions/reader-typography';
   import { dummyFn, isMobile, isMobile$ } from '$lib/functions/utils';
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { MetaTags } from 'svelte-meta-tags';
   import '../app.scss';
 
@@ -32,12 +32,20 @@
   let navigationRouteId: string | null | undefined;
   let showNavigationWarmup = false;
   let appTheme: ThemeOption | undefined;
+  let userFontLoadToken = 0;
+  let userFontObjectUrls: string[] = [];
 
   const navigationWarmupRoutes = new Set(['/b', '/manage', '/settings', '/statistics']);
 
   $: if (browser) {
     isMobile$.next(isMobile(window));
-    addUserFonts($userFonts$);
+  }
+
+  $: if (browser) {
+    void addUserFonts($userFonts$);
+  }
+
+  $: if (browser) {
     applyAppTheme(appTheme);
   }
 
@@ -61,13 +69,30 @@
     };
   });
 
-  function addUserFonts(userFonts: UserFont[]) {
+  onDestroy(() => {
+    if (!browser) {
+      return;
+    }
+
+    userFontLoadToken += 1;
+    removeUserFontRules();
+  });
+
+  async function addUserFonts(userFonts: UserFont[]) {
+    const loadToken = ++userFontLoadToken;
     let styleContent = '';
-    let styleElement = document.getElementById(userFontsCacheName);
+    const nextObjectUrls: string[] = [];
+    let fontCache: Cache | undefined;
 
     if (!Array.isArray(userFonts)) {
-      styleElement?.remove();
+      removeUserFontRules(loadToken);
       return;
+    }
+
+    try {
+      fontCache = 'caches' in window ? await caches.open(userFontsCacheName) : undefined;
+    } catch (_) {
+      fontCache = undefined;
     }
 
     for (let index = 0, { length } = userFonts; index < length; index += 1) {
@@ -81,18 +106,44 @@
         continue;
       }
 
-      styleContent += `@font-face{font-family: ${getReaderFontFamilyCssValue(userFont.name)};font-style: normal;font-weight: 400;font-display: swap;src: local(''), url(${toCssQuotedString(userFont.path)}) format(${toCssQuotedString(format)})}\n`;
+      const fontUrl = await getUserFontUrl(userFont, fontCache);
+      if (!fontUrl) {
+        continue;
+      }
+
+      if (fontUrl.startsWith('blob:')) {
+        nextObjectUrls.push(fontUrl);
+      }
+
+      if (loadToken !== userFontLoadToken) {
+        revokeObjectUrls(nextObjectUrls);
+        return;
+      }
+
+      styleContent += `@font-face{font-family: ${getReaderFontFamilyCssValue(userFont.name)};font-style: normal;font-weight: 400;font-display: swap;src: local(''), url(${toCssQuotedString(fontUrl)}) format(${toCssQuotedString(format)})}\n`;
     }
 
-    if (!styleContent) {
-      styleElement?.remove();
+    if (loadToken !== userFontLoadToken) {
+      revokeObjectUrls(nextObjectUrls);
       return;
     }
 
+    if (!styleContent) {
+      removeUserFontRules(loadToken, nextObjectUrls);
+      return;
+    }
+
+    let styleElement = document.getElementById(userFontsCacheName);
     const textNode = document.createTextNode(styleContent);
+    revokeObjectUrls(userFontObjectUrls);
+    userFontObjectUrls = nextObjectUrls;
 
     if (styleElement) {
-      styleElement.replaceChild(textNode, styleElement.childNodes[0]);
+      if (styleElement.firstChild) {
+        styleElement.replaceChild(textNode, styleElement.firstChild);
+      } else {
+        styleElement.appendChild(textNode);
+      }
     } else {
       styleElement = document.createElement('style');
       styleElement.id = userFontsCacheName;
@@ -100,6 +151,39 @@
       styleElement.appendChild(textNode);
       document.head.append(styleElement);
     }
+  }
+
+  async function getUserFontUrl(userFont: UserFont, fontCache?: Cache) {
+    if (!fontCache) {
+      return userFont.path;
+    }
+
+    const response = await fontCache.match(userFont.path);
+    if (!response) {
+      return '';
+    }
+
+    return URL.createObjectURL(await response.blob());
+  }
+
+  function removeUserFontRules(expectedLoadToken?: number, objectUrls: string[] = []) {
+    if (!browser) {
+      return;
+    }
+
+    if (expectedLoadToken !== undefined && expectedLoadToken !== userFontLoadToken) {
+      revokeObjectUrls(objectUrls);
+      return;
+    }
+
+    document.getElementById(userFontsCacheName)?.remove();
+    revokeObjectUrls(userFontObjectUrls);
+    revokeObjectUrls(objectUrls);
+    userFontObjectUrls = [];
+  }
+
+  function revokeObjectUrls(objectUrls: string[]) {
+    objectUrls.forEach((url) => URL.revokeObjectURL(url));
   }
 
   function applyAppTheme(themeOption: ThemeOption | undefined) {

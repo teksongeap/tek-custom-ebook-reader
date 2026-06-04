@@ -58,6 +58,10 @@
       color: inherit !important;
       -webkit-text-fill-color: currentColor !important;
     }
+
+    :global(a[href]) {
+      -webkit-text-fill-color: currentColor !important;
+    }
   }
 
   :global(ruby > rt) {

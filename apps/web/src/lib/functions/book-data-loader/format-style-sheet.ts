@@ -9,8 +9,8 @@ import parseCss from '../css-parser/css-parser';
 import stringifyCss from '../css-parser/css-stringify';
 import type { Declaration, Rule } from '../css-parser/types';
 
-const htmlRegex = /\s?html\s?/gi;
-const bodyRegex = /\s?body\s?/gi;
+const htmlRegex = /\s?html\s?/i;
+const bodyRegex = /\s?body\s?/i;
 
 export default function formatStyleSheet(bookData: BooksDbBookData, parentSelector: string) {
   const cssTree = parseCss(bookData.styleSheet);
@@ -23,7 +23,11 @@ export default function formatStyleSheet(bookData: BooksDbBookData, parentSelect
     const newDeclarations: Record<string, string> = {};
 
     rule.declarations = rule.declarations.filter(
-      (d) => !/line-height$/.test(d.property) && !/text-indent$/.test(d.property)
+      (d) =>
+        isValidDeclaration(d) &&
+        !/line-height$/.test(d.property) &&
+        !/text-indent$/.test(d.property) &&
+        !hasUnsafeUrl(d.value)
     );
 
     const lineBreakFormatter = new LineBreakFormatter(rule.declarations, newDeclarations);
@@ -88,6 +92,27 @@ function convertPrefixedDeclaration(declaration: Declaration) {
     };
   }
   return undefined;
+}
+
+function isValidDeclaration(declaration: Declaration) {
+  return typeof declaration.property === 'string' && typeof declaration.value === 'string';
+}
+
+function hasUnsafeUrl(value: unknown) {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  return Array.from(value.matchAll(/url\(\s*(['"]?)(.*?)\1\s*\)/gi)).some(([, , url]) => {
+    const normalizedUrl = url.trim().toLowerCase();
+
+    return (
+      normalizedUrl.length > 0 &&
+      !normalizedUrl.startsWith('data:') &&
+      !normalizedUrl.startsWith('blob:') &&
+      !normalizedUrl.startsWith('#')
+    );
+  });
 }
 
 function convertFontFamily(declaration: Declaration) {
