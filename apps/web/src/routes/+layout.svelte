@@ -19,7 +19,9 @@
     userFonts$
   } from '$lib/data/store';
   import { availableThemes, type ThemeOption } from '$lib/data/theme-option';
+  import { getReaderFontFamilyCssValue, toCssQuotedString } from '$lib/functions/reader-typography';
   import { dummyFn, isMobile, isMobile$ } from '$lib/functions/utils';
+  import { onMount } from 'svelte';
   import { MetaTags } from 'svelte-meta-tags';
   import '../app.scss';
 
@@ -44,6 +46,21 @@
     import.meta.hot.on('vite:beforeUpdate', () => console.clear());
   }
 
+  onMount(() => {
+    if (!('serviceWorker' in navigator)) {
+      return undefined;
+    }
+
+    const refreshUserFontRules = () => addUserFonts($userFonts$);
+
+    void navigator.serviceWorker.ready.then(refreshUserFontRules).catch(dummyFn);
+    navigator.serviceWorker.addEventListener('controllerchange', refreshUserFontRules);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener('controllerchange', refreshUserFontRules);
+    };
+  });
+
   function addUserFonts(userFonts: UserFont[]) {
     let styleContent = '';
     let styleElement = document.getElementById(userFontsCacheName);
@@ -64,7 +81,7 @@
         continue;
       }
 
-      styleContent += `@font-face{font-family: '${userFont.name}';font-style: normal;font-weight: 400;font-display: swap;src: local(''), url('${userFont.path}') format('${format}')}\n`;
+      styleContent += `@font-face{font-family: ${getReaderFontFamilyCssValue(userFont.name)};font-style: normal;font-weight: 400;font-display: swap;src: local(''), url(${toCssQuotedString(userFont.path)}) format(${toCssQuotedString(format)})}\n`;
     }
 
     if (!styleContent) {
@@ -174,6 +191,6 @@
   </div>
 {/if}
 
-<span style={`font-family: ${$fontFamilyGroupOne$ || 'Noto Serif JP'}`} />
+<span style={`font-family: ${getReaderFontFamilyCssValue($fontFamilyGroupOne$)}`} />
 
 <DomainHint />

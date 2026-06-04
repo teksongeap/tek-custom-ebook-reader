@@ -30,6 +30,10 @@
   } from '$lib/functions/reader-reference-layer/epub-reference';
   import { highlightReaderTargetElementAfterPaint } from '$lib/functions/reader-reference-layer/highlight';
   import { readerTargetNavigation$ } from '$lib/functions/reader-reference-layer/navigation';
+  import {
+    getReaderFontFamilyCssValue,
+    waitForReaderFontLoad
+  } from '$lib/functions/reader-typography';
   import { getExternalTargetElement } from '$lib/functions/utils';
   import { faBookmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
   import {
@@ -176,11 +180,7 @@
 
   let bookmarkAdjustment = window.matchMedia('(min-width: 640px)').matches ? '0.5rem' : '0.25rem';
 
-  let fontLoadingAdded = false;
-
-  let fontLoadTimer: ReturnType<typeof setTimeout> | undefined;
-
-  let fontLoadingDoneHandler: (() => void) | undefined;
+  let fontLoadAttempt = 0;
 
   const scrollFn = browser
     ? horizontalMouseWheel(4, document.documentElement, requestAnimationFrame)
@@ -396,7 +396,7 @@
   onDestroy(() => {
     document.removeEventListener('ttu-action', handleAction, false);
     sectionNavigator = undefined;
-    clearFontLoadingListener();
+    fontLoadAttempt += 1;
     cancelActiveTocFrame();
     calculator?.destroy();
     contentReset$.next();
@@ -793,54 +793,30 @@
     prevIntendedCharCount = exploredCharCount;
     bookCharCount = calculator.charCount;
 
-    let fontLoaded = false;
+    const loadedContentEl = contentEl;
+    const activeFontLoadAttempt = ++fontLoadAttempt;
+    const timeout = isStoredFont(fontFamilyGroupOne, $userFonts$) ? 30000 : 10000;
 
-    try {
-      fontLoaded = document.fonts.check(`${fontSize}px ${fontFamilyGroupOne || 'Noto Serif JP'}`);
-    } catch (error: any) {
-      logger.error(`Error checking Font Load: ${error.message}`);
-      fontLoaded = true;
-    }
-
-    if (fontLoaded) {
-      dispatch('contentChange', contentEl);
-    } else if (!fontLoadingAdded) {
-      fontLoadingAdded = true;
-
-      const timeout = isStoredFont(fontFamilyGroupOne, $userFonts$) ? 30000 : 10000;
-      fontLoadTimer = setTimeout(() => {
-        clearFontLoadingListener();
-
-        if (!contentEl) {
+    void waitForReaderFontLoad(fontSize, fontFamilyGroupOne, timeout)
+      .then((result) => {
+        if (activeFontLoadAttempt !== fontLoadAttempt || loadedContentEl !== contentEl) {
           return;
         }
 
-        logger.error(`Error loading primary Font: ${fontFamilyGroupOne}`);
-        dispatch('contentChange', contentEl);
-      }, timeout);
-
-      fontLoadingDoneHandler = () => {
-        clearFontLoadingListener();
-
-        if (contentEl) {
-          dispatch('contentChange', contentEl);
+        if (result === 'error' || result === 'timeout') {
+          logger.error(`Error loading primary Font: ${fontFamilyGroupOne}`);
         }
-      };
 
-      document.fonts.addEventListener('loadingdone', fontLoadingDoneHandler);
-    }
-  }
+        dispatch('contentChange', loadedContentEl);
+      })
+      .catch((error: any) => {
+        if (activeFontLoadAttempt !== fontLoadAttempt || loadedContentEl !== contentEl) {
+          return;
+        }
 
-  function clearFontLoadingListener() {
-    if (fontLoadTimer) {
-      clearTimeout(fontLoadTimer);
-      fontLoadTimer = undefined;
-    }
-
-    if (fontLoadingDoneHandler) {
-      document.fonts.removeEventListener('loadingdone', fontLoadingDoneHandler);
-      fontLoadingDoneHandler = undefined;
-    }
+        logger.error(`Error checking Font Load: ${error.message}`);
+        dispatch('contentChange', loadedContentEl);
+      });
   }
 
   function resetContentState() {
@@ -958,8 +934,8 @@
   style:padding-bottom={!verticalMode && firstDimensionMargin
     ? `${firstDimensionMargin}px`
     : undefined}
-  style:--font-family-serif={fontFamilyGroupOne}
-  style:--font-family-sans-serif={fontFamilyGroupTwo}
+  style:--font-family-serif={getReaderFontFamilyCssValue(fontFamilyGroupOne)}
+  style:--font-family-sans-serif={getReaderFontFamilyCssValue(fontFamilyGroupTwo, 'Noto Sans JP')}
   style:--book-content-hint-furigana-font-color={hintFuriganaFontColor}
   style:--book-content-hint-furigana-shadow-color={hintFuriganaShadowColor}
   style:--book-content-selection-color={selectionFontColor || undefined}

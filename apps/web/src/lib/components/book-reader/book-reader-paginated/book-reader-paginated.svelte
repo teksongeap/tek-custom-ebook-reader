@@ -34,6 +34,10 @@
   import { highlightReaderTargetElementAfterPaint } from '$lib/functions/reader-reference-layer/highlight';
   import { readerTargetNavigation$ } from '$lib/functions/reader-reference-layer/navigation';
   import { iffBrowser } from '$lib/functions/rxjs/iff-browser';
+  import {
+    getReaderFontFamilyCssValue,
+    waitForReaderFontLoad
+  } from '$lib/functions/reader-typography';
   import { getExternalTargetElement, isMobile$ } from '$lib/functions/utils';
   import { faBookmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
   import {
@@ -197,11 +201,7 @@
 
   let bookmarkRightAdjustment: string | undefined;
 
-  let fontLoadingAdded = false;
-
-  let fontLoadTimer: ReturnType<typeof setTimeout> | undefined;
-
-  let fontLoadingDoneHandler: (() => void) | undefined;
+  let fontLoadAttempt = 0;
 
   let currentSectionId = '';
 
@@ -582,7 +582,7 @@
   onDestroy(() => {
     document.removeEventListener('ttu-action', handleAction, false);
     sectionNavigator = undefined;
-    clearFontLoadingListener();
+    fontLoadAttempt += 1;
     clearWheelNavigationLock();
 
     document.body.classList.remove(cssClassOverflowHidden);
@@ -933,46 +933,29 @@
     previousIntendedCount = 0;
     bookCharCount = nextCalculator.charCount;
 
-    let fontLoaded = false;
+    const activeFontLoadAttempt = ++fontLoadAttempt;
+    const timeout = isStoredFont(fontFamilyGroupOne, $userFonts$) ? 30000 : 10000;
 
-    try {
-      fontLoaded = document.fonts.check(`${fontSize}px ${fontFamilyGroupOne || 'Noto Serif JP'}`);
-    } catch (error: any) {
-      logger.error(`Error checking Font Load: ${error.message}`);
-      fontLoaded = true;
-    }
+    void waitForReaderFontLoad(fontSize, fontFamilyGroupOne, timeout)
+      .then((result) => {
+        if (activeFontLoadAttempt !== fontLoadAttempt) {
+          return;
+        }
 
-    if (fontLoaded || fontLoadingAdded) {
-      triggerContentChange(nextCalculator, loadedSectionIndex);
-    } else if (!fontLoadingAdded) {
-      fontLoadingAdded = true;
+        if (result === 'error' || result === 'timeout') {
+          logger.error(`Error loading primary Font: ${fontFamilyGroupOne}`);
+        }
 
-      const timeout = isStoredFont(fontFamilyGroupOne, $userFonts$) ? 30000 : 10000;
-      fontLoadTimer = setTimeout(() => {
-        clearFontLoadingListener();
-        logger.error(`Error loading primary Font: ${fontFamilyGroupOne}`);
         triggerContentChange(nextCalculator, loadedSectionIndex);
-      }, timeout);
+      })
+      .catch((error: any) => {
+        if (activeFontLoadAttempt !== fontLoadAttempt) {
+          return;
+        }
 
-      fontLoadingDoneHandler = () => {
-        clearFontLoadingListener();
+        logger.error(`Error checking Font Load: ${error.message}`);
         triggerContentChange(nextCalculator, loadedSectionIndex);
-      };
-
-      document.fonts.addEventListener('loadingdone', fontLoadingDoneHandler);
-    }
-  }
-
-  function clearFontLoadingListener() {
-    if (fontLoadTimer) {
-      clearTimeout(fontLoadTimer);
-      fontLoadTimer = undefined;
-    }
-
-    if (fontLoadingDoneHandler) {
-      document.fonts.removeEventListener('loadingdone', fontLoadingDoneHandler);
-      fontLoadingDoneHandler = undefined;
-    }
+      });
   }
 
   function triggerContentChange(
@@ -1385,8 +1368,8 @@
     : undefined}
   style:max-width={width ? `${width}px` : undefined}
   style:max-height={verticalMode && height ? `${height}px` : undefined}
-  style:--font-family-serif={fontFamilyGroupOne}
-  style:--font-family-sans-serif={fontFamilyGroupTwo}
+  style:--font-family-serif={getReaderFontFamilyCssValue(fontFamilyGroupOne)}
+  style:--font-family-sans-serif={getReaderFontFamilyCssValue(fontFamilyGroupTwo, 'Noto Sans JP')}
   style:--book-content-hint-furigana-font-color={hintFuriganaFontColor}
   style:--book-content-hint-furigana-shadow-color={hintFuriganaShadowColor}
   style:--book-content-selection-color={selectionFontColor || undefined}

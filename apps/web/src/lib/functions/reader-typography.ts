@@ -11,6 +11,22 @@ type ReaderChromeStyleOptions = {
 };
 
 const defaultReaderFontSize = 20;
+const defaultReaderFontFamily = 'Noto Serif JP';
+const genericFontFamilies = new Set([
+  'cursive',
+  'emoji',
+  'fangsong',
+  'fantasy',
+  'math',
+  'monospace',
+  'sans-serif',
+  'serif',
+  'system-ui',
+  'ui-monospace',
+  'ui-rounded',
+  'ui-sans-serif',
+  'ui-serif'
+]);
 
 export function getReaderTypographyStyle(fontSize: number | undefined) {
   const contentFontSize = normalizeFontSize(fontSize);
@@ -44,6 +60,47 @@ export function getReaderSurfaceStyle(options: ReaderChromeStyleOptions) {
     `color: ${options.fontColor || 'var(--font-color)'}`,
     `background-color: ${options.backgroundColor || 'var(--background-color)'}`
   ].join('; ');
+}
+
+export function getReaderFontFamilyCssValue(
+  fontFamily: string | undefined,
+  fallback = defaultReaderFontFamily
+) {
+  const normalizedFontFamily = fontFamily || fallback;
+
+  if (genericFontFamilies.has(normalizedFontFamily.toLowerCase())) {
+    return normalizedFontFamily;
+  }
+
+  return toCssQuotedString(normalizedFontFamily);
+}
+
+export function getReaderFontLoadDescriptor(fontSize: number, fontFamily: string | undefined) {
+  return `${normalizeFontSize(fontSize)}px ${getReaderFontFamilyCssValue(fontFamily)}`;
+}
+
+export async function waitForReaderFontLoad(
+  fontSize: number,
+  fontFamily: string | undefined,
+  timeout: number
+) {
+  const fontDescriptor = getReaderFontLoadDescriptor(fontSize, fontFamily);
+
+  if (document.fonts.check(fontDescriptor)) {
+    return 'ready';
+  }
+
+  return Promise.race([
+    document.fonts.load(fontDescriptor).then(
+      () => 'loaded',
+      () => 'error'
+    ),
+    new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), timeout))
+  ]);
+}
+
+export function toCssQuotedString(value: string) {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
 function normalizeFontSize(fontSize: number | undefined) {

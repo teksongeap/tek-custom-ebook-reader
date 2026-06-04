@@ -24,12 +24,15 @@ worker.addEventListener('install', (event) => {
 
 worker.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      const keysWithOldCache = keys.filter(
-        (key) => key !== BUILD_CACHE_NAME && key !== userFontsCacheName
-      );
-      return Promise.all(keysWithOldCache.map((key) => caches.delete(key)));
-    })
+    caches
+      .keys()
+      .then((keys) => {
+        const keysWithOldCache = keys.filter(
+          (key) => key !== BUILD_CACHE_NAME && key !== userFontsCacheName
+        );
+        return Promise.all(keysWithOldCache.map((key) => caches.delete(key)));
+      })
+      .then(() => worker.clients.claim())
   );
 });
 
