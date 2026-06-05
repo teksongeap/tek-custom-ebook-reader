@@ -13,11 +13,11 @@ The app runs fully in the browser (can be used offline), can be installed as a P
 - Navigate with keyboard, swipe, wheel, tap-to-flip margins, table of contents, chapter jumps, bookmarks, and character-position jumps.
 - Use auto-scroll in continuous mode and glide or instant page transitions in paginated mode.
 - Customize themes, custom themes, bundled Japanese fonts, user-uploaded fonts, font size, line height, paragraph spacing, page columns, reader margins, vertical kerning, VPAL, text orientation, justification, and pretty wrapping.
-- Tune Japanese-learning behavior with furigana hiding modes, spoiler image blur, hover focus, custom reading points, selection-to-bookmark, avoid-page-break pagination, and a character counter.
+- Tune Japanese and Korean learning behavior with furigana/ruby text hiding modes, spoiler image blur, hover focus, custom reading points, selection-to-bookmark, avoid-page-break pagination, and a character counter.
 - Highlight selected text with color-coded annotations, optional comments, an annotation list, jump-to-highlight, edit, delete, and export/sync support.
 - Track reading time, characters read, speed, completion, session history, freeze positions, idle rollback, skip thresholds, dictionary popup detection, reading goals, and completion behavior.
 - Search for text within the book
-- Footnotes are fully navigable and even provide a preview popup so you don't have to jump to the actual note (depends on book however, some books are just made special)
+- Footnotes are fully navigable and even provide a preview popup so you don't have to jump to the actual note (depends on the book however, some books are just made special, you can always add regex in settings Data tab if I forgot one)
 - Review statistics with date ranges, title filters, overview charts, summaries, heatmaps, aggregation modes, copy/export actions, and selective deletion.
 - Manage a local library with covers, progress, sorting, selection, deletion, import/export, external placeholders, and bug-report logs.
 - Import, export, and sync book data, bookmarks, annotations, statistics, reading goals, audiobook progress, and subtitles.
