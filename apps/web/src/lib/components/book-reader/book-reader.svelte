@@ -4,7 +4,6 @@
     combineLatest,
     debounceTime,
     filter,
-    fromEvent,
     map,
     mergeMap,
     of,
@@ -172,7 +171,9 @@
 
   export let annotationPopoverResetKey = 0;
 
-  export let annotationHoverDelay = 120;
+  export let annotationHoverEnabled = true;
+
+  export let annotationHoverDelay = 240;
 
   let showBlurMessage = false;
 
@@ -289,25 +290,6 @@
     tap((contentEl) => {
       mutationObserver.disconnect();
       mutationObserver.observe(contentEl, { attributes: true });
-    }),
-    reduceToEmptyString()
-  );
-
-  const hoverFocusKeybind$ = iffBrowser(() =>
-    fromEvent<KeyboardEvent>(document, 'keydown', { capture: true })
-  ).pipe(
-    filter(
-      (event) =>
-        event.altKey &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        !event.shiftKey &&
-        event.key.toLowerCase() === 'h' &&
-        !isEditableEventTarget(event.target)
-    ),
-    tap((event) => {
-      event.preventDefault();
-      hoverFocusEnabled$.next(!$hoverFocusEnabled$);
     }),
     reduceToEmptyString()
   );
@@ -966,6 +948,7 @@
   {activeAnnotationId}
   editAnnotationId={activeAnnotationEditId}
   {annotationPopoverResetKey}
+  {annotationHoverEnabled}
   {annotationHoverDelay}
   {fontColor}
   {fontSize}
@@ -977,7 +960,6 @@
 />
 {$blurListener$ ?? ''}
 {$reactiveElements$ ?? ''}
-{$hoverFocusKeybind$ ?? ''}
 {$footnoteRequest$ ?? ''}
 <svelte:document
   bind:visibilityState

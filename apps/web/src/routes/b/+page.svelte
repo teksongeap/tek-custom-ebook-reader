@@ -39,6 +39,7 @@
   import StyleSheetRenderer from '$lib/components/style-sheet-renderer.svelte';
   import {
     annotationHoverDelay$,
+    annotationHoverEnabled$,
     autoBookmark$,
     autoBookmarkTime$,
     autoPositionOnResize$,
@@ -2360,6 +2361,7 @@
     {activeAnnotationId}
     {activeAnnotationEditId}
     {annotationPopoverResetKey}
+    annotationHoverEnabled={$annotationHoverEnabled$}
     annotationHoverDelay={$annotationHoverDelay$}
     on:annotationActivate={({ detail }) => (activeAnnotationId = detail)}
     on:annotationUpdate={updateAnnotationComment}

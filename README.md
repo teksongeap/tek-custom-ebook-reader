@@ -51,7 +51,6 @@ Keys are bound by physical key code where available.
 | <kbd>PageDown</kbd> / <kbd>PageUp</kbd> | Next or previous page/image    |
 | <kbd>N</kbd> / <kbd>M</kbd>             | Previous or next chapter       |
 | <kbd>Esc</kbd>                          | Close image gallery            |
-| <kbd>Alt</kbd> + <kbd>H</kbd>           | Toggle hover focus             |
 
 ## Storage And Sync
 

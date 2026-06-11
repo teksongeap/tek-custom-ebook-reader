@@ -42,7 +42,8 @@
   export let backgroundColor = '';
   export let renderRevision = 0;
   export let annotationPopoverResetKey = 0;
-  export let annotationHoverDelay = 120;
+  export let annotationHoverEnabled = true;
+  export let annotationHoverDelay = 240;
 
   const dispatch = createEventDispatcher<{
     activate: string;
@@ -146,6 +147,19 @@
     }
 
     previousActiveAnnotationId = activeAnnotationId;
+  }
+
+  $: if (!annotationHoverEnabled && typeof window !== 'undefined') {
+    window.clearTimeout(hoverOpenTimer);
+
+    if (hoveredAnnotationId) {
+      hoveredAnnotationId = '';
+      updateActiveHighlight();
+    }
+
+    if (activeAnnotation && !isPinned && !editingAnnotationId) {
+      closeAnnotationCard();
+    }
   }
 
   onDestroy(() => {
@@ -279,6 +293,10 @@
   }
 
   function queueHoverOpen(annotation: BooksDbAnnotation) {
+    if (!annotationHoverEnabled) {
+      return;
+    }
+
     hoveredAnnotationId = annotation.id;
     updateActiveHighlight();
 
@@ -301,6 +319,10 @@
   }
 
   function clearHoverOpen(annotation: BooksDbAnnotation) {
+    if (!annotationHoverEnabled) {
+      return;
+    }
+
     window.clearTimeout(hoverOpenTimer);
 
     if (hoveredAnnotationId === annotation.id) {
@@ -735,7 +757,7 @@
     const delay = Number(annotationHoverDelay);
 
     if (!Number.isFinite(delay)) {
-      return 120;
+      return 240;
     }
 
     return limitToRange(0, 2000, Math.round(delay));

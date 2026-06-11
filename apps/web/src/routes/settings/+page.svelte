@@ -9,6 +9,7 @@
     addCharactersOnCompletion$,
     adjustStatisticsAfterIdleTime$,
     annotationHoverDelay$,
+    annotationHoverEnabled$,
     autoBookmark$,
     autoBookmarkTime$,
     autoPositionOnResize$,
@@ -169,6 +170,7 @@
       bind:enableTextJustification={$enableTextJustification$}
       bind:enableTextWrapPretty={$enableTextWrapPretty$}
       bind:hoverFocusEnabled={$hoverFocusEnabled$}
+      bind:annotationHoverEnabled={$annotationHoverEnabled$}
       bind:annotationHoverDelay={$annotationHoverDelay$}
       bind:textMarginMode={$textMarginMode$}
       bind:enableReaderWakeLock={$enableReaderWakeLock$}
