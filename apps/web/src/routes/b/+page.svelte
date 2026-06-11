@@ -1440,7 +1440,8 @@
       progress: bookCharCount ? annotationExploredCharCount / bookCharCount : 0,
       exploredCharCount: annotationExploredCharCount,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
+      editedAt: 0
     };
 
     await database.putAnnotation(annotation);
@@ -1475,7 +1476,11 @@
 
   async function updateAnnotationComment({
     detail
-  }: CustomEvent<{ annotation: BooksDbAnnotation; comment: string }>) {
+  }: CustomEvent<{
+    annotation: BooksDbAnnotation;
+    comment: string;
+    isInitialComment?: boolean;
+  }>) {
     if (detail.comment === detail.annotation.comment) {
       activeAnnotationId = detail.annotation.id;
       if (activeAnnotationEditId === detail.annotation.id) {
@@ -1484,10 +1489,12 @@
       return;
     }
 
+    const updatedAt = new Date().getTime();
     const updatedAnnotation: BooksDbAnnotation = {
       ...detail.annotation,
       comment: detail.comment,
-      updatedAt: new Date().getTime()
+      updatedAt,
+      editedAt: detail.isInitialComment ? (detail.annotation.editedAt ?? 0) : updatedAt
     };
 
     await database.putAnnotation(updatedAnnotation);
@@ -2364,6 +2371,11 @@
     annotationHoverEnabled={$annotationHoverEnabled$}
     annotationHoverDelay={$annotationHoverDelay$}
     on:annotationActivate={({ detail }) => (activeAnnotationId = detail)}
+    on:annotationEditHandled={({ detail }) => {
+      if (activeAnnotationEditId === detail) {
+        activeAnnotationEditId = '';
+      }
+    }}
     on:annotationUpdate={updateAnnotationComment}
     on:annotationDelete={({ detail }) => deleteAnnotation(detail)}
     on:bookmark={() => bookmarkPage({ hideHeader: false })}

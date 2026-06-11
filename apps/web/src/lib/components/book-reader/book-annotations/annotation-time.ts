@@ -29,8 +29,18 @@ function padDatePart(value: number) {
 
 export function getAnnotationEditedAt(annotation: BooksDbAnnotation) {
   const createdAt = annotation.createdAt || 0;
+  const hasEditedAt = Object.prototype.hasOwnProperty.call(annotation, 'editedAt');
+
+  if (hasEditedAt) {
+    return getVisibleEditedAt(createdAt, annotation.editedAt || 0);
+  }
+
   const updatedAt = annotation.updatedAt || 0;
 
+  return getVisibleEditedAt(createdAt, updatedAt);
+}
+
+function getVisibleEditedAt(createdAt: number, updatedAt: number) {
   if (updatedAt <= createdAt) {
     return 0;
   }

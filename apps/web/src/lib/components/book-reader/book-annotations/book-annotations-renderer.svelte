@@ -47,8 +47,9 @@
 
   const dispatch = createEventDispatcher<{
     activate: string;
-    update: { annotation: BooksDbAnnotation; comment: string };
+    update: { annotation: BooksDbAnnotation; comment: string; isInitialComment?: boolean };
     delete: BooksDbAnnotation;
+    editHandled: string;
   }>();
 
   let renderedSpans: RenderedAnnotationSpan[] = [];
@@ -64,6 +65,7 @@
   let previousActiveAnnotationId = '';
   let previousAnnotationPopoverResetKey = annotationPopoverResetKey;
   let handledEditAnnotationId = '';
+  let initialCommentEditAnnotationId = '';
   let pendingLocalActivationId = '';
   let editingAnnotationId = '';
   let draftComment = '';
@@ -119,6 +121,10 @@
 
     if (nextAnnotation) {
       handledEditAnnotationId = editAnnotationId;
+      initialCommentEditAnnotationId = isPendingInitialCommentEdit(nextAnnotation)
+        ? editAnnotationId
+        : '';
+      dispatch('editHandled', editAnnotationId);
       void openAnnotationForEditing(nextAnnotation);
     }
   }
@@ -470,6 +476,9 @@
   function closeAnnotationCard() {
     window.clearTimeout(hoverOpenTimer);
     window.clearTimeout(closeTimer);
+    if (activeAnnotation?.id === initialCommentEditAnnotationId) {
+      initialCommentEditAnnotationId = '';
+    }
     activeAnnotation = undefined;
     isPinned = false;
     popoverReady = false;
@@ -543,6 +552,7 @@
     }
 
     const annotation = activeAnnotation;
+    const isInitialComment = initialCommentEditAnnotationId === annotation.id;
     const comment = draftComment.trim();
     editingAnnotationId = '';
     draftComment = '';
@@ -553,7 +563,11 @@
     isEditingPopoverManuallySized = false;
 
     if (comment !== annotation.comment) {
-      dispatch('update', { annotation, comment });
+      dispatch('update', { annotation, comment, isInitialComment });
+    }
+
+    if (isInitialComment) {
+      initialCommentEditAnnotationId = '';
     }
 
     if (closeAfterSave) {
@@ -566,7 +580,20 @@
   }
 
   function cancelActiveEdit() {
+    if (activeAnnotation?.id === initialCommentEditAnnotationId) {
+      initialCommentEditAnnotationId = '';
+    }
+
     closeAnnotationCard();
+  }
+
+  function isPendingInitialCommentEdit(annotation: BooksDbAnnotation) {
+    return (
+      !annotation.comment &&
+      Object.prototype.hasOwnProperty.call(annotation, 'editedAt') &&
+      (annotation.editedAt || 0) <= 0 &&
+      (annotation.updatedAt || 0) <= (annotation.createdAt || 0)
+    );
   }
 
   async function updateCommentExpansionState() {

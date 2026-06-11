@@ -79,6 +79,7 @@ interface BooksDbV7Annotation {
   exploredCharCount: number;
   createdAt: number;
   updatedAt: number;
+  editedAt?: number;
 }
 
 interface BooksDbV7StorageSource {

@@ -203,8 +203,13 @@
 
   const dispatch = createEventDispatcher<{
     annotationActivate: string;
-    annotationUpdate: { annotation: BooksDbAnnotation; comment: string };
+    annotationUpdate: {
+      annotation: BooksDbAnnotation;
+      comment: string;
+      isInitialComment?: boolean;
+    };
     annotationDelete: BooksDbAnnotation;
+    annotationEditHandled: string;
   }>();
 
   const mutationObserver: MutationObserver = new MutationObserver(handleMutation);
@@ -957,6 +962,7 @@
   on:activate={({ detail }) => dispatch('annotationActivate', detail)}
   on:update={({ detail }) => dispatch('annotationUpdate', detail)}
   on:delete={({ detail }) => dispatch('annotationDelete', detail)}
+  on:editHandled={({ detail }) => dispatch('annotationEditHandled', detail)}
 />
 {$blurListener$ ?? ''}
 {$reactiveElements$ ?? ''}

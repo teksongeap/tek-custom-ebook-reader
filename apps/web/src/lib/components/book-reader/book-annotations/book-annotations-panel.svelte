@@ -66,7 +66,7 @@
   const dispatch = createEventDispatcher<{
     close: void;
     jump: BooksDbAnnotation;
-    update: { annotation: BooksDbAnnotation; comment: string };
+    update: { annotation: BooksDbAnnotation; comment: string; isInitialComment?: boolean };
     delete: BooksDbAnnotation;
   }>();
 

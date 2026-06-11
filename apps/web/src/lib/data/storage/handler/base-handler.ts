@@ -961,7 +961,7 @@ export abstract class BaseStorageHandler {
         ? annotation.id
         : `${anchor.sectionId}_${anchor.startOffset}_${anchor.endOffset}_${createdAt}`;
 
-    return {
+    const normalizedAnnotation: BooksDbAnnotation = {
       id,
       dataId: dataId || annotationDataId,
       color,
@@ -976,6 +976,15 @@ export abstract class BaseStorageHandler {
       createdAt,
       updatedAt
     };
+
+    if (Object.prototype.hasOwnProperty.call(annotation, 'editedAt')) {
+      normalizedAnnotation.editedAt = Math.max(
+        0,
+        BaseStorageHandler.toFiniteNumber(annotation.editedAt, 0)
+      );
+    }
+
+    return normalizedAnnotation;
   }
 
   private static normalizeAnnotationAnchor(anchor: unknown, selectedText: unknown) {

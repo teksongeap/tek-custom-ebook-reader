@@ -1,9 +1,9 @@
 <script lang="ts">
   import {
-    faBookOpen,
     faChevronDown,
     faChevronLeft,
     faChevronRight,
+    faList,
     faXmark
   } from '@fortawesome/free-solid-svg-icons';
   import {
@@ -476,7 +476,7 @@
 >
   <div class="book-toc-panel-header">
     <div class="book-toc-panel-title">
-      <span class="book-toc-panel-title-icon"><Fa icon={faBookOpen} /></span>
+      <span class="book-toc-panel-title-icon"><Fa icon={faList} /></span>
       <div>
         <div class="book-toc-panel-title-main">Contents</div>
         <div class="book-toc-panel-title-sub">{tocEntryCount} entries</div>
@@ -533,7 +533,7 @@
       {/each}
     {:else}
       <div class="book-toc-panel-empty">
-        <div class="book-toc-panel-empty-icon"><Fa icon={faBookOpen} /></div>
+        <div class="book-toc-panel-empty-icon"><Fa icon={faList} /></div>
         <div class="book-toc-panel-empty-title">No contents</div>
       </div>
     {/if}
