@@ -70,11 +70,12 @@
   let editingAnnotationId = '';
   let draftComment = '';
   let draftTextAreaEl: HTMLTextAreaElement | undefined;
+  let manualPopoverLeft: number | undefined;
+  let manualPopoverTop: number | undefined;
   let editingPopoverWidth = 0;
   let editingPopoverHeight = 0;
-  let editingPopoverLeft: number | undefined;
-  let editingPopoverTop: number | undefined;
   let isEditingPopoverManuallySized = false;
+  let isAnnotationPopoverDragging = false;
   let isEditing = false;
   let commentEl: HTMLElement | undefined;
   let commentCanExpand = false;
@@ -257,6 +258,10 @@
       return;
     }
 
+    if (activeAnnotation?.id !== annotation.id) {
+      resetManualPopoverPosition();
+    }
+
     if (editingAnnotationId) {
       if (!pinned || editingAnnotationId === annotation.id) {
         return;
@@ -381,11 +386,11 @@
       ? rect.top - height - gap
       : Math.min(viewportTop + viewportHeight - height - 12, rect.bottom + gap);
     const top =
-      isEditing && editingPopoverTop !== undefined
+      manualPopoverTop !== undefined
         ? limitToRange(
             viewportTop + 12,
             viewportTop + viewportHeight - height - 12,
-            editingPopoverTop
+            manualPopoverTop
           )
         : preserveTop && popoverReady
           ? limitToRange(
@@ -395,11 +400,11 @@
             )
           : anchoredTop;
     const left =
-      isEditing && editingPopoverLeft !== undefined
+      manualPopoverLeft !== undefined
         ? limitToRange(
             viewportLeft + 12,
             viewportLeft + viewportWidth - width - 12,
-            editingPopoverLeft
+            manualPopoverLeft
           )
         : limitToRange(
             viewportLeft + 12,
@@ -486,8 +491,7 @@
     draftComment = '';
     editingPopoverWidth = 0;
     editingPopoverHeight = 0;
-    editingPopoverLeft = undefined;
-    editingPopoverTop = undefined;
+    resetManualPopoverPosition();
     isEditingPopoverManuallySized = false;
     isCommentExpanded = false;
     commentCanExpand = false;
@@ -528,8 +532,12 @@
     draftComment = activeAnnotation.comment;
     editingPopoverWidth = expandedPopoverRect?.width || 0;
     editingPopoverHeight = 0;
-    editingPopoverLeft = expandedPopoverRect?.left;
-    editingPopoverTop = expandedPopoverRect?.top;
+
+    if (expandedPopoverRect && manualPopoverLeft === undefined && manualPopoverTop === undefined) {
+      manualPopoverLeft = expandedPopoverRect.left;
+      manualPopoverTop = expandedPopoverRect.top;
+    }
+
     isEditingPopoverManuallySized = false;
     isCommentExpanded = false;
     isPinned = true;
@@ -558,8 +566,6 @@
     draftComment = '';
     editingPopoverWidth = 0;
     editingPopoverHeight = 0;
-    editingPopoverLeft = undefined;
-    editingPopoverTop = undefined;
     isEditingPopoverManuallySized = false;
 
     if (comment !== annotation.comment) {
@@ -780,6 +786,11 @@
     return Math.min(Math.max(value, min), Math.max(min, max));
   }
 
+  function resetManualPopoverPosition() {
+    manualPopoverLeft = undefined;
+    manualPopoverTop = undefined;
+  }
+
   function getAnnotationHoverDelay() {
     const delay = Number(annotationHoverDelay);
 
@@ -838,6 +849,73 @@
     return Math.max(draftTextAreaMinHeight, viewportMaxHeight - popoverChromeHeight);
   }
 
+  function beginAnnotationPopoverDrag(event: PointerEvent) {
+    if (
+      !popoverEl ||
+      !activeAnnotation ||
+      (!isPinned && !isEditing) ||
+      event.button !== 0 ||
+      isAnnotationPopoverDragIgnoredTarget(event.target)
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    window.clearTimeout(closeTimer);
+
+    const startRect = popoverEl.getBoundingClientRect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    manualPopoverLeft = startRect.left;
+    manualPopoverTop = startRect.top;
+    isAnnotationPopoverDragging = true;
+
+    const finishDrag = () => {
+      isAnnotationPopoverDragging = false;
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', finishDrag);
+      window.removeEventListener('pointercancel', finishDrag);
+    };
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+
+      if (!popoverEl || !activeAnnotation) {
+        finishDrag();
+        return;
+      }
+
+      const viewport = window.visualViewport;
+      const viewportLeft = viewport?.offsetLeft || 0;
+      const viewportTop = viewport?.offsetTop || 0;
+      const viewportWidth = viewport?.width || window.innerWidth;
+      const viewportHeight = viewport?.height || window.innerHeight;
+      manualPopoverLeft = limitToRange(
+        viewportLeft + 12,
+        viewportLeft + viewportWidth - startRect.width - 12,
+        startRect.left + moveEvent.clientX - startX
+      );
+      manualPopoverTop = limitToRange(
+        viewportTop + 12,
+        viewportTop + viewportHeight - startRect.height - 12,
+        startRect.top + moveEvent.clientY - startY
+      );
+      void updatePopoverPosition({ preserveTop: true });
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: false });
+    window.addEventListener('pointerup', finishDrag, { once: true });
+    window.addEventListener('pointercancel', finishDrag, { once: true });
+  }
+
+  function isAnnotationPopoverDragIgnoredTarget(target: EventTarget | null) {
+    return (
+      target instanceof Element &&
+      !!target.closest('button,a,input,textarea,select,[contenteditable]')
+    );
+  }
+
   function beginEditingPopoverResize(event: PointerEvent) {
     if (!popoverEl || !isEditing) {
       return;
@@ -849,8 +927,8 @@
     const startRect = popoverEl.getBoundingClientRect();
     const startX = event.clientX;
     const startY = event.clientY;
-    editingPopoverLeft = startRect.left;
-    editingPopoverTop = startRect.top;
+    manualPopoverLeft = startRect.left;
+    manualPopoverTop = startRect.top;
     editingPopoverWidth = startRect.width;
     editingPopoverHeight = startRect.height;
     isEditingPopoverManuallySized = true;
@@ -905,8 +983,8 @@
 
     const rect = popoverEl.getBoundingClientRect();
     const { minWidth, maxWidth, minHeight, maxHeight } = getEditingPopoverSizeBounds();
-    editingPopoverLeft = rect.left;
-    editingPopoverTop = rect.top;
+    manualPopoverLeft = rect.left;
+    manualPopoverTop = rect.top;
     editingPopoverWidth = limitToRange(
       minWidth,
       maxWidth,
@@ -974,7 +1052,12 @@
     on:wheel|stopPropagation={() => {}}
   >
     <div class="book-annotation-card-accent" aria-hidden="true"></div>
-    <div class="book-annotation-card-header">
+    <div
+      class="book-annotation-card-header"
+      class:book-annotation-card-header--draggable={isPinned || isEditing}
+      class:book-annotation-card-header--dragging={isAnnotationPopoverDragging}
+      on:pointerdown={beginAnnotationPopoverDrag}
+    >
       <span class="book-annotation-card-heading">
         <span class="book-annotation-card-title">
           Added {formatAnnotationTimestamp(activeAnnotation.createdAt)}
@@ -1197,6 +1280,16 @@
     font-weight: 500;
     letter-spacing: 0;
     line-height: 1.25;
+  }
+
+  .book-annotation-card-header--draggable {
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .book-annotation-card-header--dragging {
+    cursor: grabbing;
   }
 
   .book-annotation-card-heading {
