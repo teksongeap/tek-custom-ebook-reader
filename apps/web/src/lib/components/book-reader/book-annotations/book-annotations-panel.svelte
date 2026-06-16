@@ -379,6 +379,17 @@
     cancelEditing();
   }
 
+  function handleDraftCommentKeydown(event: KeyboardEvent, annotation: BooksDbAnnotation) {
+    event.stopPropagation();
+
+    if (event.key !== 'Enter' || event.shiftKey || event.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    saveAnnotation(annotation);
+  }
+
   function toggleCommentExpanded(annotationId: string) {
     const nextExpandedCommentIds = new Set(expandedCommentIds);
 
@@ -699,7 +710,7 @@
                   rows={canExpandAnnotationComment ? 6 : 3}
                   placeholder="Add an optional comment"
                   on:click|stopPropagation={() => {}}
-                  on:keydown|stopPropagation={() => {}}
+                  on:keydown={(event) => handleDraftCommentKeydown(event, annotation)}
                 ></textarea>
                 <span class="annotation-item-editor-actions">
                   <button
@@ -712,6 +723,7 @@
                   <button
                     type="button"
                     class="annotation-item-editor-save"
+                    aria-keyshortcuts="Enter"
                     on:click|stopPropagation={() => saveAnnotation(annotation)}
                   >
                     <span>Save</span>
