@@ -25,7 +25,10 @@
   import type { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
   import { BookReaderAvailableKeybind } from '$lib/data/book-reader-keybind';
   import { ViewMode } from '$lib/data/view-mode';
-  import { getReaderChromeStyle } from '$lib/functions/reader-typography';
+  import {
+    getReaderChromeStyle,
+    getReaderFontFamilyCssValue
+  } from '$lib/functions/reader-typography';
   import { iffBrowser } from '$lib/functions/rxjs/iff-browser';
   import { reduceToEmptyString } from '$lib/functions/rxjs/reduce-to-empty-string';
   import {
@@ -900,6 +903,8 @@
   <div
     class="book-footnote-preview-root writing-horizontal-tb"
     class:book-footnote-preview-root--vertical={verticalMode}
+    style:--font-family-serif={getReaderFontFamilyCssValue(fontFamilyGroupOne)}
+    style:--font-family-sans-serif={getReaderFontFamilyCssValue(fontFamilyGroupTwo, 'Noto Sans JP')}
     use:clickOutside={closeFootnotePreview}
     on:touchmove|stopPropagation={() => {}}
     on:wheel|stopPropagation={() => {}}

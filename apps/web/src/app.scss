@@ -641,6 +641,7 @@
   }
 
   .reader-loading-screen {
+    writing-mode: horizontal-tb;
     background:
       radial-gradient(
         circle at center,
