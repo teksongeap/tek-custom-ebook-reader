@@ -64,8 +64,10 @@
     }
   }
 
-  :global(ruby > rt) {
+  :global(rt),
+  :global(rp) {
     user-select: none;
+    -webkit-user-select: none;
   }
 
   :global(p),

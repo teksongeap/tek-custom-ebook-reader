@@ -40,6 +40,7 @@ export default function formatBookDataHtml(
       removeUnsafeInlineStyleUrls(element);
       addSpoilerTags(element, document, blurMode);
       removeOldBrTagSolution(element);
+      hideRubyAnnotationsFromSpeech(element);
 
       const formattedHtml = element.innerHTML;
       profile.lap('dom cleanup', { htmlLength: formattedHtml.length });
@@ -199,6 +200,13 @@ function addSpoilerTags(el: HTMLElement, document: Document, blurMode: BlurMode)
 function removeOldBrTagSolution(el: HTMLElement) {
   el.querySelectorAll('.placeholder-br').forEach((placeholderEl) => {
     placeholderEl.parentElement!.removeChild(placeholderEl);
+  });
+}
+
+function hideRubyAnnotationsFromSpeech(el: HTMLElement) {
+  // Keep ruby annotations visible, but hide them from selection/accessibility speech so macOS Speak Selection reads only base text.
+  el.querySelectorAll('rt, rp').forEach((rubyAnnotationEl) => {
+    rubyAnnotationEl.setAttribute('aria-hidden', 'true');
   });
 }
 
