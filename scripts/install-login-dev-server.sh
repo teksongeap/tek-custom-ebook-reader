@@ -10,11 +10,22 @@ REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
 START_SCRIPT="${REPO_DIR}/scripts/start-dev-server.sh"
 PLIST_DIR="${HOME}/Library/LaunchAgents"
 LOG_DIR="${HOME}/Library/Logs/${APP_NAME}"
+COMMAND_DIR="${HOME}/Library/Application Support/${APP_NAME}"
+COMMAND_PATH="${COMMAND_DIR}/start-dev-server.command"
 PLIST_PATH="${PLIST_DIR}/${LABEL}.plist"
 USER_ID="$(id -u)"
 
-mkdir -p "$PLIST_DIR" "$LOG_DIR"
+mkdir -p "$PLIST_DIR" "$LOG_DIR" "$COMMAND_DIR"
 chmod +x "$START_SCRIPT"
+
+cat > "$COMMAND_PATH" <<COMMAND
+#!/bin/zsh
+
+cd "${REPO_DIR}"
+exec "${START_SCRIPT}"
+COMMAND
+
+chmod +x "$COMMAND_PATH"
 
 cat > "$PLIST_PATH" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -27,11 +38,11 @@ cat > "$PLIST_PATH" <<PLIST
 
   <key>ProgramArguments</key>
   <array>
-    <string>${START_SCRIPT}</string>
+    <string>/usr/bin/open</string>
+    <string>-a</string>
+    <string>Terminal</string>
+    <string>${COMMAND_PATH}</string>
   </array>
-
-  <key>WorkingDirectory</key>
-  <string>${REPO_DIR}</string>
 
   <key>RunAtLoad</key>
   <true/>
@@ -53,3 +64,4 @@ launchctl kickstart -k "gui/${USER_ID}/${LABEL}"
 echo "Installed ${LABEL}"
 echo "Dev server URL: http://127.0.0.1:5173"
 echo "Logs: ${LOG_DIR}"
+echo "Login command: ${COMMAND_PATH}"

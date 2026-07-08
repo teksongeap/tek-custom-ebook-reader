@@ -11,10 +11,14 @@ REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
 LOG_DIR="${HOME}/Library/Logs/${APP_NAME}"
 START_LOG="${LOG_DIR}/start-dev-server.log"
 
-mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
 
 timestamp() {
   date "+%Y-%m-%d %H:%M:%S"
+}
+
+log_message() {
+  echo "$(timestamp) $*" >> "$START_LOG" 2>/dev/null || true
 }
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:${HOME}/.local/bin:${HOME}/.npm-global/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -39,7 +43,7 @@ if [[ -s "${HOME}/.nvm/nvm.sh" ]]; then
 fi
 
 if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"${PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "$(timestamp) dev server already listening on port ${PORT}; leaving it alone." >> "$START_LOG"
+  log_message "dev server already listening on port ${PORT}; leaving it alone."
   exit 0
 fi
 
@@ -52,12 +56,10 @@ if ! command -v pnpm >/dev/null 2>&1; then
 fi
 
 if ! command -v pnpm >/dev/null 2>&1; then
-  {
-    echo "$(timestamp) pnpm not found."
-    echo "Install pnpm or enable corepack, then run this script again: ${0}"
-  } >> "$START_LOG"
+  log_message "pnpm not found. Install pnpm or enable corepack, then run this script again: ${0}"
+  echo "pnpm not found. Install pnpm or enable corepack, then run this script again: ${0}" >&2
   exit 127
 fi
 
-echo "$(timestamp) starting ${APP_NAME} dev server at http://${HOST}:${PORT}" >> "$START_LOG"
-exec pnpm --dir "${REPO_DIR}/apps/web" dev -- --host "${HOST}" --port "${PORT}" --strictPort
+log_message "starting ${APP_NAME} dev server at http://${HOST}:${PORT}"
+exec pnpm --dir "${REPO_DIR}/apps/web" exec vite dev --host "${HOST}" --port "${PORT}" --strictPort
