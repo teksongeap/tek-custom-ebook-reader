@@ -8,7 +8,6 @@
   import {
     faChevronDown,
     faChevronUp,
-    faFloppyDisk,
     faPen,
     faTrash,
     faXmark,
@@ -27,6 +26,7 @@
   import { getAnnotationColorValue } from './annotation-colors';
   import { formatAnnotationTimestamp, getAnnotationEditedAt } from './annotation-time';
   import AnnotationLinkifiedText from './annotation-linkified-text.svelte';
+  import AnnotationSaveReturnIcon from './annotation-save-return-icon.svelte';
   import {
     annotationCommentCollapsedLineCount,
     hasAnnotationCommentOverflow,
@@ -648,11 +648,13 @@
   function handleDraftCommentKeydown(event: KeyboardEvent) {
     event.stopPropagation();
 
+    const isEmptyAnnotationDeleteShortcut =
+      (event.key === 'Delete' && !event.metaKey) || (event.key === 'Backspace' && event.metaKey);
+
     if (
-      event.key === 'Delete' &&
+      isEmptyAnnotationDeleteShortcut &&
       !event.altKey &&
       !event.ctrlKey &&
-      !event.metaKey &&
       !event.shiftKey &&
       !event.isComposing &&
       !draftComment.trim()
@@ -1128,8 +1130,8 @@
               aria-keyshortcuts="Enter"
               on:click|stopPropagation={() => saveActiveAnnotation(true)}
             >
-              <span>Save(⏎)</span>
-              <Fa icon={faFloppyDisk} />
+              <span>Save</span>
+              <AnnotationSaveReturnIcon />
             </button>
           </span>
           <span class="book-annotation-card-editor-resize-actions">
