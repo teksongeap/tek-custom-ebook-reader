@@ -47,7 +47,13 @@
   import { logger } from '$lib/data/logger';
   import { imageLoadingState } from './image-loading-state';
   import { reactiveElements } from './reactive-elements';
-  import type { AutoScroller, BookmarkManager, PageManager, SectionNavigator } from './types';
+  import type {
+    AutoScroller,
+    BookmarkManager,
+    PageManager,
+    ReaderContentChange,
+    SectionNavigator
+  } from './types';
   import BookReaderPaginated from './book-reader-paginated/book-reader-paginated.svelte';
   import { hoverFocus } from './hover-focus';
   import {
@@ -60,6 +66,10 @@
   } from '$lib/data/store';
   import { createEventDispatcher, onDestroy } from 'svelte';
   import BookAnnotationsRenderer from './book-annotations/book-annotations-renderer.svelte';
+  import {
+    createAnnotationIndex,
+    getRenderedAnnotations
+  } from './book-annotations/annotation-index';
   import { faArrowUpRightFromSquare, faXmark } from '@fortawesome/free-solid-svg-icons';
   import Fa from 'svelte-fa';
   import { clickOutside } from '$lib/functions/use-click-outside';
@@ -192,6 +202,10 @@
 
   let contentEl: HTMLElement | undefined;
 
+  let readerContentChange: ReaderContentChange | undefined;
+
+  let renderedViewMode = viewMode;
+
   let footnotePreviewHtml = '';
 
   let footnotePreviewTarget: ReaderTarget | undefined;
@@ -228,6 +242,18 @@
       ? firstDimensionMargin * 2
       : 0;
   $: readerChromeStyle = getReaderChromeStyle({ fontSize, fontColor, backgroundColor });
+  $: annotationIndex = createAnnotationIndex(annotations);
+  $: renderedAnnotations = getRenderedAnnotations(
+    annotations,
+    annotationIndex,
+    readerContentChange
+  );
+
+  $: if (renderedViewMode !== viewMode) {
+    renderedViewMode = viewMode;
+    contentEl = undefined;
+    readerContentChange = undefined;
+  }
   $: readerContainerStyle = [
     readerChromeStyle,
     'padding-top: 2.375rem',
@@ -346,10 +372,11 @@
     showBlurMessage = mutation.target.style.filter.includes('blur');
   }
 
-  function handleContentChange({ detail }: CustomEvent<HTMLElement>) {
-    contentEl = detail;
+  function handleContentChange({ detail }: CustomEvent<ReaderContentChange>) {
+    contentEl = detail.contentEl;
+    readerContentChange = detail;
     annotationRenderRevision += 1;
-    contentEl$.next(detail);
+    contentEl$.next(detail.contentEl);
   }
 
   function openFootnotePreview(target: ReaderTarget) {
@@ -954,7 +981,8 @@
 {/if}
 <BookAnnotationsRenderer
   {contentEl}
-  {annotations}
+  annotations={renderedAnnotations}
+  annotationsById={annotationIndex.byId}
   {activeAnnotationId}
   editAnnotationId={activeAnnotationEditId}
   {annotationPopoverResetKey}

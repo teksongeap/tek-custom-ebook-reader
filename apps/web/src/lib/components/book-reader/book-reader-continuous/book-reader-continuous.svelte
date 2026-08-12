@@ -57,7 +57,13 @@
   } from 'rxjs';
   import { createEventDispatcher, onDestroy, onMount } from 'svelte';
   import Fa from 'svelte-fa';
-  import type { AutoScroller, BookmarkManager, PageManager, SectionNavigator } from '../types';
+  import type {
+    AutoScroller,
+    BookmarkManager,
+    PageManager,
+    ReaderContentChange,
+    SectionNavigator
+  } from '../types';
   import { AutoScrollerContinuous } from './auto-scroller-continuous';
   import { BookmarkManagerContinuous, type BookmarkPosData } from './bookmark-manager-continuous';
   import { CharacterStatsCalculator } from './character-stats-calculator';
@@ -152,7 +158,7 @@
 
   const dispatch = createEventDispatcher<{
     bookmark: void;
-    contentChange: HTMLElement;
+    contentChange: ReaderContentChange;
     trackerPause: void;
   }>();
 
@@ -807,7 +813,7 @@
           logger.error(`Error loading primary Font: ${fontFamilyGroupOne}`);
         }
 
-        dispatch('contentChange', loadedContentEl);
+        dispatch('contentChange', { contentEl: loadedContentEl, scope: 'book' });
       })
       .catch((error: any) => {
         if (activeFontLoadAttempt !== fontLoadAttempt || loadedContentEl !== contentEl) {
@@ -815,7 +821,7 @@
         }
 
         logger.error(`Error checking Font Load: ${error.message}`);
-        dispatch('contentChange', loadedContentEl);
+        dispatch('contentChange', { contentEl: loadedContentEl, scope: 'book' });
       });
   }
 

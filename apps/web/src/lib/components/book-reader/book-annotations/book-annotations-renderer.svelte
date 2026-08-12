@@ -23,6 +23,7 @@
     renderAnnotationHighlights,
     type RenderedAnnotationSpan
   } from './annotation-range';
+  import { getAnnotationHighlightKey } from './annotation-index';
   import { getAnnotationColorValue } from './annotation-colors';
   import { formatAnnotationTimestamp, getAnnotationEditedAt } from './annotation-time';
   import AnnotationLinkifiedText from './annotation-linkified-text.svelte';
@@ -34,7 +35,8 @@
   } from './annotation-comment-expansion';
 
   export let contentEl: HTMLElement | undefined;
-  export let annotations: BooksDbAnnotation[] = [];
+  export let annotations: ReadonlyArray<BooksDbAnnotation> = [];
+  export let annotationsById: ReadonlyMap<string, BooksDbAnnotation> = new Map();
   export let activeAnnotationId = '';
   export let editAnnotationId = '';
   export let fontSize = 20;
@@ -86,9 +88,8 @@
   const editingPopoverMinHeight = 164;
   const collapsedCommentLineCount = annotationCommentCollapsedLineCount;
 
-  $: annotationKey = annotations
-    .map((annotation) => `${annotation.id}:${annotation.updatedAt}`)
-    .join('|');
+  $: renderedAnnotationIds = new Set(annotations.map((annotation) => annotation.id));
+  $: annotationKey = JSON.stringify(annotations.map(getAnnotationHighlightKey));
   $: commentCanExpandBeforeMeasurement = activeAnnotation?.comment
     ? shouldOfferAnnotationCommentExpansionBeforeMeasurement(
         activeAnnotation.comment,
@@ -107,9 +108,10 @@
   $: if (
     activeAnnotationId &&
     activeAnnotationId !== handledActiveAnnotationId &&
-    !pendingLocalActivationId
+    !pendingLocalActivationId &&
+    renderedAnnotationIds.has(activeAnnotationId)
   ) {
-    const nextAnnotation = annotations.find((annotation) => annotation.id === activeAnnotationId);
+    const nextAnnotation = annotationsById.get(activeAnnotationId);
 
     if (nextAnnotation) {
       handledActiveAnnotationId = activeAnnotationId;
@@ -117,8 +119,12 @@
     }
   }
 
-  $: if (editAnnotationId && editAnnotationId !== handledEditAnnotationId) {
-    const nextAnnotation = annotations.find((annotation) => annotation.id === editAnnotationId);
+  $: if (
+    editAnnotationId &&
+    editAnnotationId !== handledEditAnnotationId &&
+    renderedAnnotationIds.has(editAnnotationId)
+  ) {
+    const nextAnnotation = annotationsById.get(editAnnotationId);
 
     if (nextAnnotation) {
       handledEditAnnotationId = editAnnotationId;
@@ -140,8 +146,25 @@
   }
 
   $: isEditing = !!activeAnnotation && editingAnnotationId === activeAnnotation.id;
+  $: if (activeAnnotation && !isEditing) {
+    const nextActiveAnnotation = renderedAnnotationIds.has(activeAnnotation.id)
+      ? annotationsById.get(activeAnnotation.id)
+      : undefined;
+
+    if (nextActiveAnnotation && nextActiveAnnotation !== activeAnnotation) {
+      void refreshActiveAnnotation(nextActiveAnnotation);
+    }
+  }
   $: if (isEditing && draftComment !== undefined) {
     void fitDraftTextAreaToComment();
+  }
+
+  $: if (!contentEl && activeAnnotation) {
+    if (isEditing && annotationsById.has(activeAnnotation.id)) {
+      void saveActiveAnnotation(true);
+    } else {
+      closeAnnotationCard();
+    }
   }
 
   $: {
@@ -198,36 +221,84 @@
     renderedSpans.forEach(({ annotation, span }) => attachSpanListeners(annotation, span));
 
     if (activeAnnotation) {
-      activeAnnotation = annotations.find((annotation) => annotation.id === activeAnnotation?.id);
+      const nextActiveAnnotation = renderedAnnotationIds.has(activeAnnotation.id)
+        ? annotationsById.get(activeAnnotation.id)
+        : undefined;
 
-      if (activeAnnotation) {
-        updateActiveHighlight();
-        await updatePopoverPosition();
-        await updateCommentExpansionState();
+      if (!nextActiveAnnotation) {
+        if (isEditing && annotationsById.has(activeAnnotation.id)) {
+          await saveActiveAnnotation(true);
+        } else {
+          closeAnnotationCard();
+        }
+        return;
       }
+
+      activeAnnotation = nextActiveAnnotation;
+      updateActiveHighlight();
+      await updatePopoverPosition();
+      await updateCommentExpansionState();
     }
   }
 
+  async function refreshActiveAnnotation(annotation: BooksDbAnnotation) {
+    activeAnnotation = annotation;
+
+    await tick();
+
+    if (activeAnnotation !== annotation) {
+      return;
+    }
+
+    await updatePopoverPosition();
+    await updateCommentExpansionState();
+  }
+
   function attachSpanListeners(annotation: BooksDbAnnotation, span: HTMLSpanElement) {
-    const pointerEnter = () => queueHoverOpen(annotation);
+    const getCurrentAnnotation = () => annotationsById.get(annotation.id);
+    const pointerEnter = () => {
+      const currentAnnotation = getCurrentAnnotation();
+
+      if (currentAnnotation) {
+        queueHoverOpen(currentAnnotation);
+      }
+    };
     const pointerLeave = () => clearHoverOpen(annotation);
     const click = (event: MouseEvent) => {
+      const currentAnnotation = getCurrentAnnotation();
+
+      if (!currentAnnotation) {
+        return;
+      }
+
       event.preventDefault();
       event.stopPropagation();
-      void openAnnotation(annotation, true);
+      void openAnnotation(currentAnnotation, true);
     };
     const doubleClick = (event: MouseEvent) => {
+      const currentAnnotation = getCurrentAnnotation();
+
+      if (!currentAnnotation) {
+        return;
+      }
+
       event.preventDefault();
       event.stopPropagation();
-      void openAnnotationForEditing(annotation);
+      void openAnnotationForEditing(currentAnnotation);
     };
     const keydown = (event: KeyboardEvent) => {
       if (event.key !== 'Enter' && event.key !== ' ') {
         return;
       }
 
+      const currentAnnotation = getCurrentAnnotation();
+
+      if (!currentAnnotation) {
+        return;
+      }
+
       event.preventDefault();
-      void openAnnotation(annotation, true);
+      void openAnnotation(currentAnnotation, true);
     };
 
     span.addEventListener('pointerenter', pointerEnter, false);
@@ -325,7 +396,13 @@
         return;
       }
 
-      void openAnnotation(annotation, false);
+      const currentAnnotation = renderedAnnotationIds.has(annotation.id)
+        ? annotationsById.get(annotation.id)
+        : undefined;
+
+      if (currentAnnotation) {
+        void openAnnotation(currentAnnotation, false);
+      }
     }, getAnnotationHoverDelay());
   }
 

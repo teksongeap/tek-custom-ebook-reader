@@ -221,6 +221,7 @@
   let annotationSelectionAnchorRect: DOMRect | undefined;
   let annotationSelectionText = '';
   let annotations: BooksDbAnnotation[] = [];
+  let annotationsBookId: number | undefined;
   let showAnnotationsPanel = false;
   let showSearchPanel = false;
   let bookSearchQuery = '';
@@ -410,7 +411,16 @@
   );
 
   const initAnnotations$ = rawBookData$.pipe(
-    switchMap((rawBookData) => (rawBookData ? database.getAnnotations(rawBookData.id) : of([]))),
+    switchMap((rawBookData) => {
+      if (annotationsBookId !== rawBookData?.id) {
+        annotationsBookId = rawBookData?.id;
+        annotations = [];
+        activeAnnotationId = '';
+        activeAnnotationEditId = '';
+      }
+
+      return rawBookData ? database.getAnnotations(rawBookData.id) : of([]);
+    }),
     tap((bookAnnotations) => {
       annotations = bookAnnotations;
     }),

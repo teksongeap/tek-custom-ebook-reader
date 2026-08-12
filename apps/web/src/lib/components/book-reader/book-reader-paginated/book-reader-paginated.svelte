@@ -57,7 +57,12 @@
   } from 'rxjs';
   import Fa from 'svelte-fa';
   import { swipe } from 'svelte-gestures';
-  import type { BookmarkManager, PageManager, SectionNavigator } from '../types';
+  import type {
+    BookmarkManager,
+    PageManager,
+    ReaderContentChange,
+    SectionNavigator
+  } from '../types';
   import { BookmarkManagerPaginated } from './bookmark-manager-paginated';
   import { PageManagerPaginated } from './page-manager-paginated';
   import { SectionCharacterStatsCalculator } from './section-character-stats-calculator';
@@ -150,7 +155,7 @@
 
   const dispatch = createEventDispatcher<{
     bookmark: void;
-    contentChange: HTMLElement;
+    contentChange: ReaderContentChange;
     trackerPause: void;
   }>();
 
@@ -186,6 +191,8 @@
   let displayedSectionIndex = -1;
 
   let displayedSectionRenderToken = 0;
+
+  let displayedSectionMountKey = 0;
 
   let skipFirstHtmlLoad = true;
 
@@ -691,7 +698,10 @@
       }
 
       displayedSectionIndex = index;
+      currentSectionId = sections[index]?.id || '';
+      currentSectionSourceHref = sections[index]?.sourceHref || '';
       displayedHtml = html;
+      displayedSectionMountKey = renderToken;
     }, 2);
   });
 
@@ -967,12 +977,19 @@
       !scrollEl ||
       sectionIndex < 0 ||
       calculatorInstance !== calculator ||
-      sectionIndex !== calculatorSectionIndex
+      sectionIndex !== calculatorSectionIndex ||
+      sectionIndex !== displayedSectionIndex ||
+      sectionIndex !== sectionIndex$.getValue() ||
+      !sections[sectionIndex]
     )
       return;
 
     calculatorInstance.updateCurrentSection(sectionIndex);
-    dispatch('contentChange', scrollEl);
+    dispatch('contentChange', {
+      contentEl: scrollEl,
+      scope: 'section',
+      sectionId: sections[sectionIndex].id
+    });
   }
 
   function onContentDisplayChange(
@@ -983,7 +1000,8 @@
       sectionIndex < 0 ||
       _calculator !== calculator ||
       sectionIndex !== calculatorSectionIndex ||
-      displayedSectionIndex !== sectionIndex
+      displayedSectionIndex !== sectionIndex ||
+      sectionIndex$.getValue() !== sectionIndex
     ) {
       return;
     }
@@ -1411,7 +1429,9 @@
     data-ttu-source-href={currentSectionSourceHref || null}
     bind:this={contentEl}
   >
-    <HtmlRenderer html={displayedHtml} on:load={onHtmlLoad} />
+    {#key displayedSectionMountKey}
+      <HtmlRenderer html={displayedHtml} on:load={onHtmlLoad} />
+    {/key}
   </div>
   <div class="book-content-tail-spacer" bind:this={tailSpacerEl} aria-hidden="true"></div>
 </div>

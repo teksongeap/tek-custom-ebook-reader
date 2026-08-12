@@ -61,6 +61,14 @@ export function restoreAnnotationRange(
     return undefined;
   }
 
+  return restoreAnnotationRangeInSection(document, sectionEl, annotation);
+}
+
+function restoreAnnotationRangeInSection(
+  document: Document,
+  sectionEl: HTMLElement,
+  annotation: BooksDbAnnotation
+) {
   const startPoint = getTextPointAtOffset(sectionEl, annotation.anchor.startOffset);
   const endPoint = getTextPointAtOffset(sectionEl, annotation.anchor.endOffset);
 
@@ -87,17 +95,42 @@ export function restoreAnnotationRange(
 export function renderAnnotationHighlights(
   document: Document,
   contentRoot: HTMLElement,
-  annotations: BooksDbAnnotation[]
+  annotations: ReadonlyArray<BooksDbAnnotation>
 ) {
   const renderedSpans: RenderedAnnotationSpan[] = [];
 
   clearAnnotationHighlights(contentRoot);
 
+  const annotationsBySection = groupAnnotationsBySection(annotations);
+  const sectionElements = findAnnotationSectionsById(contentRoot, annotationsBySection.keys());
+
+  annotationsBySection.forEach((sectionAnnotations, sectionId) => {
+    const sectionEl = sectionElements.get(sectionId);
+
+    if (!sectionEl) {
+      return;
+    }
+
+    renderedSpans.push(
+      ...renderAnnotationHighlightsInSection(document, sectionEl, sectionAnnotations)
+    );
+  });
+
+  return renderedSpans;
+}
+
+function renderAnnotationHighlightsInSection(
+  document: Document,
+  sectionEl: HTMLElement,
+  annotations: ReadonlyArray<BooksDbAnnotation>
+) {
+  const renderedSpans: RenderedAnnotationSpan[] = [];
+
   annotations
     .slice()
     .sort((a, b) => b.anchor.startOffset - a.anchor.startOffset)
     .forEach((annotation) => {
-      const range = restoreAnnotationRange(document, contentRoot, annotation);
+      const range = restoreAnnotationRangeInSection(document, sectionEl, annotation);
 
       if (!range) {
         return;
@@ -112,6 +145,23 @@ export function renderAnnotationHighlights(
     });
 
   return renderedSpans;
+}
+
+function groupAnnotationsBySection(annotations: ReadonlyArray<BooksDbAnnotation>) {
+  const annotationsBySection = new Map<string, BooksDbAnnotation[]>();
+
+  annotations.forEach((annotation) => {
+    const sectionId = annotation.anchor.sectionId;
+    const sectionAnnotations = annotationsBySection.get(sectionId);
+
+    if (sectionAnnotations) {
+      sectionAnnotations.push(annotation);
+    } else {
+      annotationsBySection.set(sectionId, [annotation]);
+    }
+  });
+
+  return annotationsBySection;
 }
 
 export function clearAnnotationHighlights(contentRoot: HTMLElement) {
@@ -168,6 +218,35 @@ function findAnnotationSectionById(contentRoot: HTMLElement, sectionId: string) 
   return Array.from(contentRoot.querySelectorAll<HTMLElement>('[id]')).find(
     (element) => element.id === sectionId
   );
+}
+
+function findAnnotationSectionsById(contentRoot: HTMLElement, sectionIds: Iterable<string>) {
+  const unresolvedSectionIds = new Set(sectionIds);
+  const sectionElements = new Map<string, HTMLElement>();
+
+  if (unresolvedSectionIds.has(contentRoot.id)) {
+    sectionElements.set(contentRoot.id, contentRoot);
+    unresolvedSectionIds.delete(contentRoot.id);
+  }
+
+  if (!unresolvedSectionIds.size) {
+    return sectionElements;
+  }
+
+  for (const element of contentRoot.querySelectorAll<HTMLElement>('[id]')) {
+    if (!unresolvedSectionIds.has(element.id)) {
+      continue;
+    }
+
+    sectionElements.set(element.id, element);
+    unresolvedSectionIds.delete(element.id);
+
+    if (!unresolvedSectionIds.size) {
+      break;
+    }
+  }
+
+  return sectionElements;
 }
 
 function getTextOffset(root: HTMLElement, container: Node, offset: number) {

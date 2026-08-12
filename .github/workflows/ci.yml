@@ -34,5 +34,9 @@ jobs:
         run: pnpm check
         working-directory: apps/web
 
+      - name: Unit tests
+        run: pnpm test
+        working-directory: apps/web
+
       - name: Test build
         run: pnpm build

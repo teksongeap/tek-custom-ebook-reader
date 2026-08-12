@@ -45,3 +45,14 @@ export interface PageManager {
 export interface SectionNavigator {
   jumpToSectionTarget: (targetId: string, isUser?: boolean) => Promise<boolean>;
 }
+
+export type ReaderContentChange =
+  | {
+      contentEl: HTMLElement;
+      scope: 'book';
+    }
+  | {
+      contentEl: HTMLElement;
+      scope: 'section';
+      sectionId: string;
+    };
