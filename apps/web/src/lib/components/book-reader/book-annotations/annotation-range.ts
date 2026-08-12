@@ -332,6 +332,7 @@ function wrapRangeWithAnnotation(document: Document, range: Range, annotation: B
     span.className = annotationHighlightClass;
     span.dataset.ttuAnnotationId = annotation.id;
     span.dataset.ttuAnnotationColor = annotation.color;
+    span.title = '';
     span.tabIndex = 0;
     span.style.setProperty('--book-annotation-base', getAnnotationColorValue(annotation.color));
 
