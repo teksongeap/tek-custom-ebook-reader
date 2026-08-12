@@ -77,6 +77,7 @@
   let isAnnotationPopoverDragging = false;
   let isEditing = false;
   let commentEl: HTMLElement | undefined;
+  let commentExpandButtonEl: HTMLButtonElement | undefined;
   let commentCanExpand = false;
   let isCommentExpanded = false;
   let commentHasContentAbove = false;
@@ -737,15 +738,16 @@
     }
   }
 
-  async function toggleCommentExpanded() {
+  async function toggleCommentExpanded(focusExpandedControl = false) {
     if (!activeAnnotation) {
       return;
     }
 
     const isExpanding = !isCommentExpanded;
     const expansionTop = isExpanding ? popoverEl?.getBoundingClientRect().top : undefined;
-    const shouldFocusExpandedPopover =
-      isExpanding && !isPinned && !popoverEl?.contains(document.activeElement);
+    const shouldFocusExpandedControl =
+      isExpanding &&
+      (focusExpandedControl || (!isPinned && !popoverEl?.contains(document.activeElement)));
 
     if (isExpanding) {
       window.clearTimeout(closeTimer);
@@ -773,8 +775,8 @@
     await updatePopoverPosition({ preferredTop: expansionTop });
     updateCommentScrollEdges();
 
-    if (shouldFocusExpandedPopover) {
-      popoverEl?.focus({ preventScroll: true });
+    if (shouldFocusExpandedControl) {
+      commentExpandButtonEl?.focus({ preventScroll: true });
     }
   }
 
@@ -825,6 +827,12 @@
     event.stopPropagation();
     commentEl.scrollTop = limitToRange(0, maxScrollTop, nextScrollTop);
     updateCommentScrollEdges();
+  }
+
+  function handleCommentExpandButtonKeydown(event: KeyboardEvent) {
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.stopPropagation();
+    }
   }
 
   function handleAnnotationViewportResize() {
@@ -921,7 +929,7 @@
     ) {
       event.preventDefault();
       event.stopPropagation();
-      void toggleCommentExpanded();
+      void toggleCommentExpanded(true);
     }
   }
 
@@ -1254,6 +1262,7 @@
     data-ttu-annotation-card
     bind:this={popoverEl}
     class="book-annotation-card writing-horizontal-tb fixed z-40"
+    class:book-annotation-card--pinned={isPinned}
     class:book-annotation-card--expanded={isCommentExpanded && !isEditing}
     class:book-annotation-card--editing={isEditing}
     class:book-annotation-card--manual-size={isEditingPopoverManuallySized}
@@ -1417,13 +1426,15 @@
         </div>
         {#if commentCanExpand || commentCanExpandBeforeMeasurement}
           <button
+            bind:this={commentExpandButtonEl}
             type="button"
             class="book-annotation-card-expand"
             aria-expanded={isCommentExpanded}
             aria-controls={`annotation-comment-${activeAnnotation.id}`}
             aria-keyshortcuts="S"
             title={`${isCommentExpanded ? 'Show less' : 'Show more'} (S)`}
-            on:click|stopPropagation={toggleCommentExpanded}
+            on:click|stopPropagation={() => toggleCommentExpanded()}
+            on:keydown={handleCommentExpandButtonKeydown}
           >
             <span class="book-annotation-card-expand-label">
               {isCommentExpanded ? 'Less' : 'More'}
@@ -1508,6 +1519,7 @@
       var(--reader-page-bg) 98%,
       var(--reader-page-text)
     );
+    --book-annotation-card-state-ring: transparent;
     box-sizing: border-box;
     width: min(22.5rem, var(--annotation-popover-max-width, calc(100vw - 1.5rem)));
     max-height: calc(100vh - 1.5rem);
@@ -1524,12 +1536,38 @@
       ),
       var(--reader-page-bg);
     box-shadow:
+      0 0 0 1px var(--book-annotation-card-state-ring),
       0 18px 44px rgba(5, 7, 10, 0.22),
       0 4px 12px rgba(5, 7, 10, 0.1),
       inset 0 1px 0 color-mix(in srgb, #ffffff 14%, transparent);
     color: var(--reader-page-text);
     font-size: var(--reader-ui-font-size);
+    outline: none;
     backdrop-filter: blur(20px) saturate(125%);
+    transition:
+      border-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+
+  .book-annotation-card--pinned {
+    --book-annotation-card-state-ring: color-mix(
+      in srgb,
+      var(--book-annotation-base) 18%,
+      transparent
+    );
+    border-color: color-mix(
+      in srgb,
+      var(--book-annotation-base) 38%,
+      var(--book-annotation-card-border)
+    );
+  }
+
+  .book-annotation-card:focus-visible {
+    --book-annotation-card-state-ring: color-mix(
+      in srgb,
+      var(--book-annotation-base) 34%,
+      transparent
+    );
   }
 
   .book-annotation-card--editing {
@@ -1671,7 +1709,6 @@
   }
 
   .book-annotation-card-action:focus-visible,
-  .book-annotation-card-expand:focus-visible,
   .book-annotation-card-empty:focus-visible,
   .book-annotation-card-editor-action:focus-visible {
     box-shadow: var(--app-focus-ring);
@@ -1797,6 +1834,15 @@
   .book-annotation-card-expand:focus-visible {
     background: color-mix(in srgb, var(--reader-page-text) 8%, transparent);
     color: var(--reader-page-text);
+  }
+
+  .book-annotation-card-expand:focus-visible {
+    box-shadow: 0 0 0 2px
+      color-mix(
+        in srgb,
+        var(--book-annotation-base) 56%,
+        color-mix(in srgb, var(--reader-page-text) 42%, transparent)
+      );
   }
 
   .book-annotation-card-expand-icon {
@@ -2020,6 +2066,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     :global(.book-annotation-highlight),
+    .book-annotation-card,
     .book-annotation-card-action,
     .book-annotation-card-comment-viewport--expanded::before,
     .book-annotation-card-comment-viewport--expanded::after,
@@ -2031,6 +2078,20 @@
   }
 
   @media (forced-colors: active) {
+    .book-annotation-card--pinned {
+      border-color: Highlight;
+    }
+
+    .book-annotation-card:focus-visible,
+    .book-annotation-card-action:focus-visible,
+    .book-annotation-card-comment:focus-visible,
+    .book-annotation-card-expand:focus-visible,
+    .book-annotation-card-empty:focus-visible,
+    .book-annotation-card-editor-action:focus-visible {
+      outline: 2px solid Highlight;
+      outline-offset: 2px;
+    }
+
     .book-annotation-card-comment-viewport--expanded::before,
     .book-annotation-card-comment-viewport--expanded::after {
       display: none;
