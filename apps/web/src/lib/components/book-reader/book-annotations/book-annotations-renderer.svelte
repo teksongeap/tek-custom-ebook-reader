@@ -3,7 +3,7 @@
   import type { BooksDbAnnotation } from '$lib/data/database/books-db/versions/books-db';
   import { bookReaderKeybindMap$ } from '$lib/data/store';
   import { getReaderChromeStyle } from '$lib/functions/reader-typography';
-  import { createEventDispatcher, onDestroy, tick } from 'svelte';
+  import { createEventDispatcher, onDestroy, onMount, tick } from 'svelte';
   import Fa from 'svelte-fa';
   import {
     faChevronDown,
@@ -25,6 +25,7 @@
   import AnnotationSaveReturnIcon from './annotation-save-return-icon.svelte';
   import {
     annotationCommentCollapsedLineCount,
+    getAnnotationCommentScrollEdges,
     hasAnnotationCommentOverflow,
     shouldOfferAnnotationCommentExpansionBeforeMeasurement
   } from './annotation-comment-expansion';
@@ -78,11 +79,23 @@
   let commentEl: HTMLElement | undefined;
   let commentCanExpand = false;
   let isCommentExpanded = false;
+  let commentHasContentAbove = false;
+  let commentHasContentBelow = false;
+  let popoverViewportResizeFrame: number | undefined;
   let hoveredAnnotationId = '';
   const cleanupBySpan = new WeakMap<HTMLSpanElement, () => void>();
   const draftTextAreaMinHeight = 38;
   const editingPopoverMinHeight = 164;
   const collapsedCommentLineCount = annotationCommentCollapsedLineCount;
+  const annotationCommentScrollKeys = new Set([
+    'ArrowDown',
+    'ArrowUp',
+    'End',
+    'Home',
+    'PageDown',
+    'PageUp',
+    'Space'
+  ]);
 
   $: renderedAnnotationIds = new Set(annotations.map((annotation) => annotation.id));
   $: annotationKey = JSON.stringify(annotations.map(getAnnotationHighlightKey));
@@ -188,11 +201,22 @@
     }
   }
 
+  onMount(() => {
+    const visualViewport = window.visualViewport;
+
+    visualViewport?.addEventListener('resize', handleAnnotationViewportResize);
+
+    return () => visualViewport?.removeEventListener('resize', handleAnnotationViewportResize);
+  });
+
   onDestroy(() => {
     window.clearTimeout(hoverOpenTimer);
     window.clearTimeout(closeTimer);
     detachSpanListeners();
     document.removeEventListener('pointerdown', closePinnedPopover, true);
+    if (popoverViewportResizeFrame !== undefined) {
+      window.cancelAnimationFrame(popoverViewportResizeFrame);
+    }
 
     if (contentEl) {
       clearAnnotationHighlights(contentEl);
@@ -329,7 +353,9 @@
       return;
     }
 
-    if (activeAnnotation?.id !== annotation.id) {
+    const isDifferentAnnotation = activeAnnotation?.id !== annotation.id;
+
+    if (isDifferentAnnotation) {
       resetManualPopoverPosition();
     }
 
@@ -351,6 +377,7 @@
     isPinned = pinned;
     focusReturnEl = pinned ? triggerEl : undefined;
     isCommentExpanded = preserveExpandedState;
+    resetCommentScrollEdges();
     commentCanExpand =
       shouldOfferAnnotationCommentExpansionBeforeMeasurement(
         annotation.comment,
@@ -366,6 +393,9 @@
     updateActiveHighlight();
 
     await tick();
+    if (isDifferentAnnotation && commentEl) {
+      commentEl.scrollTop = 0;
+    }
     await updatePopoverPosition();
     await updateCommentExpansionState();
 
@@ -428,7 +458,10 @@
     await editActiveAnnotation();
   }
 
-  async function updatePopoverPosition({ preserveTop = false } = {}) {
+  async function updatePopoverPosition({
+    preserveTop = false,
+    preferredTop
+  }: { preserveTop?: boolean; preferredTop?: number } = {}) {
     if (!activeAnnotation || !popoverEl) {
       return;
     }
@@ -464,6 +497,17 @@
     const anchoredTop = hasRoomAbove
       ? rect.top - height - gap
       : Math.min(viewportTop + viewportHeight - height - 12, rect.bottom + gap);
+    const preservedTop =
+      preferredTop ?? (preserveTop && popoverReady ? popoverRect.top : undefined);
+    const preservedViewportTop =
+      preservedTop !== undefined
+        ? limitToRange(viewportTop + 12, viewportTop + viewportHeight - 12, preservedTop)
+        : undefined;
+    const availableHeightFromPreservedTop =
+      preservedViewportTop !== undefined
+        ? Math.max(120, viewportTop + viewportHeight - preservedViewportTop - 12)
+        : undefined;
+    const positionedMaxHeight = Math.min(maxHeight, availableHeightFromPreservedTop ?? maxHeight);
     const top =
       manualPopoverTop !== undefined
         ? limitToRange(
@@ -471,12 +515,8 @@
             viewportTop + viewportHeight - height - 12,
             manualPopoverTop
           )
-        : preserveTop && popoverReady
-          ? limitToRange(
-              viewportTop + 12,
-              viewportTop + viewportHeight - height - 12,
-              popoverRect.top
-            )
+        : preservedViewportTop !== undefined
+          ? preservedViewportTop
           : anchoredTop;
     const left =
       manualPopoverLeft !== undefined
@@ -497,7 +537,7 @@
       `left: ${left}px`,
       `--annotation-popover-max-width: ${maxWidth}px`,
       `max-width: ${maxWidth}px`,
-      `max-height: ${maxHeight}px`,
+      `max-height: ${positionedMaxHeight}px`,
       isEditing ? `--annotation-popover-min-height: ${minHeight}px` : '',
       nextEditingWidth ? `width: ${nextEditingWidth}px` : '',
       nextEditingHeight ? `height: ${nextEditingHeight}px` : ''
@@ -667,7 +707,14 @@
   async function updateCommentExpansionState() {
     const annotationId = activeAnnotation?.id;
 
-    if (!activeAnnotation?.comment || isEditing || isCommentExpanded) {
+    if (!activeAnnotation?.comment || isEditing) {
+      resetCommentScrollEdges();
+      return;
+    }
+
+    if (isCommentExpanded) {
+      await tick();
+      updateCommentScrollEdges();
       return;
     }
 
@@ -695,7 +742,21 @@
       return;
     }
 
-    isCommentExpanded = !isCommentExpanded;
+    const isExpanding = !isCommentExpanded;
+    const expansionTop = isExpanding ? popoverEl?.getBoundingClientRect().top : undefined;
+    const shouldFocusExpandedPopover =
+      isExpanding && !isPinned && !popoverEl?.contains(document.activeElement);
+
+    if (isExpanding) {
+      window.clearTimeout(closeTimer);
+      focusReturnEl ??= renderedSpans.find(
+        ({ annotation, span }) => annotation.id === activeAnnotation?.id && span.tabIndex === 0
+      )?.span;
+      isPinned = true;
+    }
+
+    isCommentExpanded = isExpanding;
+    resetCommentScrollEdges();
 
     if (isCommentExpanded && isPinned) {
       activateAnnotation(activeAnnotation.id);
@@ -704,7 +765,88 @@
     }
 
     await tick();
-    await updatePopoverPosition();
+    if (commentEl) {
+      commentEl.scrollTop = 0;
+    }
+    await updatePopoverPosition({ preferredTop: expansionTop });
+    await tick();
+    await updatePopoverPosition({ preferredTop: expansionTop });
+    updateCommentScrollEdges();
+
+    if (shouldFocusExpandedPopover) {
+      popoverEl?.focus({ preventScroll: true });
+    }
+  }
+
+  function updateCommentScrollEdges() {
+    if (!commentEl || !isCommentExpanded) {
+      resetCommentScrollEdges();
+      return;
+    }
+
+    const { hasContentAbove, hasContentBelow } = getAnnotationCommentScrollEdges(commentEl);
+
+    commentHasContentAbove = hasContentAbove;
+    commentHasContentBelow = hasContentBelow;
+  }
+
+  function resetCommentScrollEdges() {
+    commentHasContentAbove = false;
+    commentHasContentBelow = false;
+  }
+
+  function handleCommentKeydown(event: KeyboardEvent) {
+    if (!commentEl || !isCommentExpanded || !annotationCommentScrollKeys.has(event.code)) {
+      return;
+    }
+
+    const lineHeight = Number.parseFloat(window.getComputedStyle(commentEl).lineHeight) || 24;
+    const pageStep = Math.max(lineHeight, commentEl.clientHeight - lineHeight);
+    const maxScrollTop = Math.max(0, commentEl.scrollHeight - commentEl.clientHeight);
+    let nextScrollTop = commentEl.scrollTop;
+
+    if (event.code === 'ArrowDown') {
+      nextScrollTop += lineHeight;
+    } else if (event.code === 'ArrowUp') {
+      nextScrollTop -= lineHeight;
+    } else if (event.code === 'PageDown') {
+      nextScrollTop += pageStep;
+    } else if (event.code === 'PageUp') {
+      nextScrollTop -= pageStep;
+    } else if (event.code === 'Space') {
+      nextScrollTop += event.shiftKey ? -pageStep : pageStep;
+    } else if (event.code === 'Home') {
+      nextScrollTop = 0;
+    } else if (event.code === 'End') {
+      nextScrollTop = maxScrollTop;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    commentEl.scrollTop = limitToRange(0, maxScrollTop, nextScrollTop);
+    updateCommentScrollEdges();
+  }
+
+  function handleAnnotationViewportResize() {
+    if (!activeAnnotation) {
+      return;
+    }
+
+    if (popoverViewportResizeFrame !== undefined) {
+      window.cancelAnimationFrame(popoverViewportResizeFrame);
+    }
+
+    popoverViewportResizeFrame = window.requestAnimationFrame(() => {
+      popoverViewportResizeFrame = undefined;
+      void refreshPopoverAfterViewportResize();
+    });
+  }
+
+  async function refreshPopoverAfterViewportResize() {
+    await tick();
+    await updatePopoverPosition({ preserveTop: true });
+    await tick();
+    updateCommentScrollEdges();
   }
 
   function handleDraftCommentKeydown(event: KeyboardEvent) {
@@ -1102,7 +1244,10 @@
   on:keydown={handleAnnotationCardKeydown}
   on:wheel={handleAnnotationCardNavigationWheel}
 />
-<svelte:window on:scroll={handleAnnotationCardNavigationScroll} />
+<svelte:window
+  on:resize={handleAnnotationViewportResize}
+  on:scroll={handleAnnotationCardNavigationScroll}
+/>
 
 {#if activeAnnotation}
   <div
@@ -1248,14 +1393,27 @@
     {:else if activeAnnotation.comment}
       <div class="book-annotation-card-body">
         <div
-          bind:this={commentEl}
-          class="book-annotation-card-comment"
-          class:book-annotation-card-comment--clamped={!isCommentExpanded}
-          class:book-annotation-card-comment--expanded={isCommentExpanded}
-          id={`annotation-comment-${activeAnnotation.id}`}
-          style:--book-annotation-card-comment-line-clamp={collapsedCommentLineCount}
+          class="book-annotation-card-comment-viewport"
+          class:book-annotation-card-comment-viewport--expanded={isCommentExpanded}
+          class:book-annotation-card-comment-viewport--content-above={commentHasContentAbove}
+          class:book-annotation-card-comment-viewport--content-below={commentHasContentBelow}
         >
-          <AnnotationLinkifiedText text={activeAnnotation.comment} />
+          <!-- svelte-ignore a11y-no-noninteractive-tabindex a11y-no-noninteractive-element-interactions -->
+          <div
+            bind:this={commentEl}
+            class="book-annotation-card-comment"
+            class:book-annotation-card-comment--clamped={!isCommentExpanded}
+            class:book-annotation-card-comment--expanded={isCommentExpanded}
+            id={`annotation-comment-${activeAnnotation.id}`}
+            tabindex={isCommentExpanded ? 0 : undefined}
+            role="region"
+            aria-label={`${getAnnotationColorPurposeLabel(activeAnnotation.color)} note text`}
+            style:--book-annotation-card-comment-line-clamp={collapsedCommentLineCount}
+            on:scroll={updateCommentScrollEdges}
+            on:keydown={handleCommentKeydown}
+          >
+            <AnnotationLinkifiedText text={activeAnnotation.comment} />
+          </div>
         </div>
         {#if commentCanExpand || commentCanExpandBeforeMeasurement}
           <button
@@ -1345,6 +1503,11 @@
       var(--reader-page-text) 18%,
       var(--reader-page-bg)
     );
+    --book-annotation-card-surface: color-mix(
+      in srgb,
+      var(--reader-page-bg) 98%,
+      var(--reader-page-text)
+    );
     box-sizing: border-box;
     width: min(22.5rem, var(--annotation-popover-max-width, calc(100vw - 1.5rem)));
     max-height: calc(100vh - 1.5rem);
@@ -1378,6 +1541,8 @@
   }
 
   .book-annotation-card--expanded {
+    display: flex;
+    flex-direction: column;
     width: var(--annotation-popover-max-width, min(34rem, calc(100vw - 1.5rem)));
   }
 
@@ -1516,7 +1681,13 @@
     display: flex;
     min-height: 0;
     flex-direction: column;
+    background: var(--book-annotation-card-surface);
     padding: 0.78rem 0.9rem 0.76rem 1rem;
+  }
+
+  .book-annotation-card--expanded .book-annotation-card-body {
+    flex: 1 1 auto;
+    overflow: hidden;
   }
 
   .book-annotation-card-comment {
@@ -1528,6 +1699,51 @@
     line-height: 1.5;
   }
 
+  .book-annotation-card-comment-viewport--expanded {
+    position: relative;
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    font-size: var(--reader-reading-font-size);
+    line-height: 1.5;
+  }
+
+  .book-annotation-card-comment-viewport--expanded::before,
+  .book-annotation-card-comment-viewport--expanded::after {
+    position: absolute;
+    z-index: 1;
+    right: 0.8rem;
+    left: 0;
+    height: 1.5em;
+    height: 1lh;
+    content: '';
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+
+  .book-annotation-card-comment-viewport--expanded::before {
+    top: 0;
+    background: linear-gradient(to bottom, var(--book-annotation-card-surface), transparent);
+  }
+
+  .book-annotation-card-comment-viewport--expanded::after {
+    bottom: 0;
+    background: linear-gradient(to top, var(--book-annotation-card-surface), transparent);
+  }
+
+  .book-annotation-card-comment-viewport--content-above::before,
+  .book-annotation-card-comment-viewport--content-below::after {
+    opacity: 1;
+  }
+
+  .book-annotation-card-comment-viewport--expanded:has(
+    .book-annotation-card-comment:focus-visible
+  ) {
+    border-radius: 0.35rem;
+    box-shadow: var(--app-focus-ring);
+  }
+
   .book-annotation-card-comment--clamped {
     display: -webkit-box;
     overflow: hidden;
@@ -1537,11 +1753,19 @@
   }
 
   .book-annotation-card-comment--expanded {
-    max-height: min(18rem, calc(100vh - 11rem));
+    min-height: 0;
+    flex: 1 1 auto;
+    max-height: 15em;
     overflow: auto;
     overscroll-behavior: contain;
     padding-right: 0.4rem;
+    scroll-padding-block: 1.5em;
+    scroll-padding-block: 1lh;
     scrollbar-gutter: stable;
+  }
+
+  .book-annotation-card-comment--expanded:focus-visible {
+    outline: none;
   }
 
   .book-annotation-card-expand {
@@ -1797,10 +2021,19 @@
   @media (prefers-reduced-motion: reduce) {
     :global(.book-annotation-highlight),
     .book-annotation-card-action,
+    .book-annotation-card-comment-viewport--expanded::before,
+    .book-annotation-card-comment-viewport--expanded::after,
     .book-annotation-card-expand,
     .book-annotation-card-empty,
     .book-annotation-card-editor-action {
       transition: none;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .book-annotation-card-comment-viewport--expanded::before,
+    .book-annotation-card-comment-viewport--expanded::after {
+      display: none;
     }
   }
 </style>

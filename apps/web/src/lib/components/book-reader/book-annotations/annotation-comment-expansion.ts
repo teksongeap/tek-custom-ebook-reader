@@ -6,6 +6,11 @@
 
 export const annotationCommentCollapsedLineCount = 2;
 
+export type AnnotationCommentScrollMetrics = Pick<
+  HTMLElement,
+  'clientHeight' | 'scrollHeight' | 'scrollTop'
+>;
+
 export function shouldOfferAnnotationCommentExpansionBeforeMeasurement(
   comment: string,
   collapsedLineCount = annotationCommentCollapsedLineCount
@@ -54,6 +59,19 @@ export function hasAnnotationCommentOverflow(
     naturalHeight > collapsedHeight + 1 ||
     isCommentLikelyWrappedPastClamp(element, collapsedLineCount)
   );
+}
+
+export function getAnnotationCommentScrollEdges(
+  { clientHeight, scrollHeight, scrollTop }: AnnotationCommentScrollMetrics,
+  threshold = 1
+) {
+  const maxScrollTop = Math.max(0, scrollHeight - clientHeight);
+  const safeThreshold = Math.max(0, threshold);
+
+  return {
+    hasContentAbove: maxScrollTop > safeThreshold && scrollTop > safeThreshold,
+    hasContentBelow: maxScrollTop > safeThreshold && scrollTop < maxScrollTop - safeThreshold
+  };
 }
 
 function getCommentLineCount(comment: string) {

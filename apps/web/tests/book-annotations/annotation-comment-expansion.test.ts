@@ -7,7 +7,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { shouldOfferAnnotationCommentExpansionBeforeMeasurement } from '../../src/lib/components/book-reader/book-annotations/annotation-comment-expansion.ts';
+import {
+  getAnnotationCommentScrollEdges,
+  shouldOfferAnnotationCommentExpansionBeforeMeasurement
+} from '../../src/lib/components/book-reader/book-annotations/annotation-comment-expansion.ts';
 
 test('offers comment disclosure only after the collapsed line limit', () => {
   assert.equal(shouldOfferAnnotationCommentExpansionBeforeMeasurement(''), false);
@@ -40,5 +43,24 @@ test('respects a custom collapsed line limit', () => {
   assert.equal(
     shouldOfferAnnotationCommentExpansionBeforeMeasurement('One\nTwo\nThree\nFour', 3),
     true
+  );
+});
+
+test('reports only the scroll edges that have more comment content', () => {
+  assert.deepEqual(
+    getAnnotationCommentScrollEdges({ clientHeight: 100, scrollHeight: 300, scrollTop: 0 }),
+    { hasContentAbove: false, hasContentBelow: true }
+  );
+  assert.deepEqual(
+    getAnnotationCommentScrollEdges({ clientHeight: 100, scrollHeight: 300, scrollTop: 80 }),
+    { hasContentAbove: true, hasContentBelow: true }
+  );
+  assert.deepEqual(
+    getAnnotationCommentScrollEdges({ clientHeight: 100, scrollHeight: 300, scrollTop: 200 }),
+    { hasContentAbove: true, hasContentBelow: false }
+  );
+  assert.deepEqual(
+    getAnnotationCommentScrollEdges({ clientHeight: 100, scrollHeight: 100, scrollTop: 0 }),
+    { hasContentAbove: false, hasContentBelow: false }
   );
 });
