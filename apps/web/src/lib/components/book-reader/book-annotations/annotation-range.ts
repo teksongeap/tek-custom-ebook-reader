@@ -333,7 +333,7 @@ function wrapRangeWithAnnotation(document: Document, range: Range, annotation: B
     span.dataset.ttuAnnotationId = annotation.id;
     span.dataset.ttuAnnotationColor = annotation.color;
     span.title = '';
-    span.tabIndex = 0;
+    span.tabIndex = -1;
     span.style.setProperty('--book-annotation-base', getAnnotationColorValue(annotation.color));
 
     const parentNode = annotationTextNode.parentNode;
@@ -344,6 +344,20 @@ function wrapRangeWithAnnotation(document: Document, range: Range, annotation: B
     parentNode.insertBefore(span, annotationTextNode);
     span.appendChild(annotationTextNode);
     spans.push(span);
+  }
+
+  const keyboardSpan = spans[spans.length - 1];
+
+  if (keyboardSpan) {
+    const selectedText = annotation.selectedText.trim().replace(/\s+/g, ' ').slice(0, 80);
+
+    keyboardSpan.tabIndex = 0;
+    keyboardSpan.setAttribute('role', 'button');
+    keyboardSpan.setAttribute('aria-haspopup', 'dialog');
+    keyboardSpan.setAttribute(
+      'aria-label',
+      selectedText ? `Open annotation for: ${selectedText}` : 'Open annotation'
+    );
   }
 
   return spans;
