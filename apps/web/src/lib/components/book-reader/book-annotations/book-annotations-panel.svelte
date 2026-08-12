@@ -518,6 +518,16 @@
       return;
     }
 
+    resizeDraftTextAreaElement(textArea);
+  }
+
+  function handleDraftCommentInput(event: Event) {
+    if (event.currentTarget instanceof HTMLTextAreaElement) {
+      resizeDraftTextAreaElement(event.currentTarget);
+    }
+  }
+
+  function resizeDraftTextAreaElement(textArea: HTMLTextAreaElement) {
     textArea.style.height = 'auto';
     textArea.style.height = `${textArea.scrollHeight}px`;
   }
@@ -710,6 +720,7 @@
                   rows={canExpandAnnotationComment ? 6 : 3}
                   placeholder="Add an optional comment"
                   on:click|stopPropagation={() => {}}
+                  on:input={handleDraftCommentInput}
                   on:keydown={(event) => handleDraftCommentKeydown(event, annotation)}
                 ></textarea>
                 <span class="annotation-item-editor-actions">
@@ -1296,8 +1307,10 @@
   .annotation-item-textarea {
     box-sizing: border-box;
     width: 100%;
+    max-height: min(20rem, max(8rem, calc(100vh - 14rem)));
     resize: vertical;
-    overflow: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
     overscroll-behavior: contain;
     border: 1px solid color-mix(in srgb, var(--reader-page-text) 14%, transparent);
     border-radius: 0.5rem;

@@ -829,16 +829,28 @@
       return;
     }
 
-    draftTextAreaEl.style.height = 'auto';
-
-    const scrollHeight = draftTextAreaEl.scrollHeight;
-    const maxHeight = getDraftTextAreaMaxHeight();
-    const nextHeight = limitToRange(draftTextAreaMinHeight, maxHeight, scrollHeight + 2);
-    draftTextAreaEl.style.height = `${nextHeight}px`;
-    draftTextAreaEl.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
+    resizeDraftTextArea(draftTextAreaEl);
 
     await tick();
     await updatePopoverPosition({ preserveTop: true });
+  }
+
+  function handleDraftCommentInput(event: Event) {
+    if (!(event.currentTarget instanceof HTMLTextAreaElement)) {
+      return;
+    }
+
+    resizeDraftTextArea(event.currentTarget);
+    void fitDraftTextAreaToComment();
+  }
+
+  function resizeDraftTextArea(textArea: HTMLTextAreaElement) {
+    textArea.style.height = 'auto';
+
+    const maxHeight = getDraftTextAreaMaxHeight();
+    const nextHeight = limitToRange(draftTextAreaMinHeight, maxHeight, textArea.scrollHeight + 2);
+
+    textArea.style.height = `${nextHeight}px`;
   }
 
   function getDraftTextAreaMaxHeight() {
@@ -1107,6 +1119,7 @@
           bind:value={draftComment}
           rows="1"
           placeholder="Add an optional comment"
+          on:input={handleDraftCommentInput}
           on:keydown={handleDraftCommentKeydown}
         ></textarea>
         <div class="book-annotation-card-editor-actions">
@@ -1465,6 +1478,7 @@
     max-height: max(4.75rem, calc(100vh - 6rem));
     max-width: calc(var(--annotation-popover-max-width, calc(100vw - 1.5rem)) - 1.75rem);
     resize: none;
+    scrollbar-gutter: stable;
     overscroll-behavior: contain;
     border: 1px solid color-mix(in srgb, var(--reader-page-text) 14%, transparent);
     border-radius: 0.5rem;
