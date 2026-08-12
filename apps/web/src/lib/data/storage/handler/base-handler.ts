@@ -378,6 +378,7 @@ export abstract class BaseStorageHandler {
         lastBookOpen: 0,
         progress: 0,
         lastBookmarkModified: 0,
+        annotationCount: 0,
         isPlaceholder: false
       }),
       ...dataToAdd

@@ -7,7 +7,11 @@
 import type { BookCardProps } from '$lib/components/book-card/book-card-props';
 import { gDriveRefreshEndpoint } from '$lib/data/env';
 import { ApiStorageHandler } from '$lib/data/storage/handler/api-handler';
-import { BaseStorageHandler, type ExternalFile } from '$lib/data/storage/handler/base-handler';
+import {
+  BaseStorageHandler,
+  FilePrefix,
+  type ExternalFile
+} from '$lib/data/storage/handler/base-handler';
 import { StorageKey } from '$lib/data/storage/storage-types';
 import { database, gDriveStorageSource$ } from '$lib/data/store';
 import pLimit from 'p-limit';
@@ -342,6 +346,7 @@ export class GDriveStorageHandler extends ApiStorageHandler {
         lastBookOpen: 0,
         progress: 0,
         lastBookmarkModified: 0,
+        annotationCount: 0,
         isPlaceholder: false
       };
 
@@ -363,6 +368,9 @@ export class GDriveStorageHandler extends ApiStorageHandler {
 
           bookCard.progress = progress;
           bookCard.lastBookmarkModified = lastBookmarkModified;
+        } else if (file.name.startsWith(FilePrefix.ANNOTATIONS)) {
+          bookCard.annotationCount =
+            BaseStorageHandler.getAnnotationsMetadata(file.name).annotationCount || 0;
         } else if (file.name.startsWith('cover_') && file.thumbnailLink) {
           bookCard.imagePath = file.thumbnailLink.replace(/=s\d+$/, '=s720');
         }

@@ -592,6 +592,8 @@ export class FilesystemStorageHandler extends BaseStorageHandler {
       file,
       0.6
     );
+
+    this.addBookCard(this.currentContext.title, { annotationCount: annotationsToStore.length });
   }
 
   async saveCover(data: Blob | undefined) {
@@ -814,6 +816,7 @@ export class FilesystemStorageHandler extends BaseStorageHandler {
               lastBookOpen: 0,
               progress: 0,
               lastBookmarkModified: 0,
+              annotationCount: 0,
               isPlaceholder: false
             };
             const fileLimiter = pLimit(1);
@@ -834,6 +837,9 @@ export class FilesystemStorageHandler extends BaseStorageHandler {
 
                       bookCard.lastBookmarkModified = metadata.lastBookmarkModified;
                       bookCard.progress = metadata.progress;
+                    } else if (file.name.startsWith(FilePrefix.ANNOTATIONS)) {
+                      bookCard.annotationCount =
+                        BaseStorageHandler.getAnnotationsMetadata(file.name).annotationCount || 0;
                     } else if (file.name.startsWith('cover_')) {
                       bookCard.imagePath = await file.getFile();
                     }

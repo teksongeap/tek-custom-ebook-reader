@@ -1,11 +1,13 @@
 <script lang="ts">
   import { faImage } from '@fortawesome/free-regular-svg-icons';
+  import { faHighlighter } from '@fortawesome/free-solid-svg-icons';
   import { onDestroy } from 'svelte';
   import Fa from 'svelte-fa';
 
   export let imagePath: string | Blob;
   export let title: string;
   export let progress: number;
+  export let annotationCount = 0;
 
   let objectUrl = '';
 
@@ -63,6 +65,7 @@
 
   $: imageLoadComplete = imgEl?.complete && !imageLoading;
   $: alt = `${title}_cover`;
+  $: annotationLabel = `${annotationCount} annotation${annotationCount === 1 ? '' : 's'}`;
 </script>
 
 <div
@@ -94,6 +97,11 @@
           on:load={() => (imageLoading = false)}
         />
       {/if}
+    </div>
+
+    <div class="book-card-annotation-badge" title={annotationLabel} aria-label={annotationLabel}>
+      <Fa class="book-card-annotation-icon" icon={faHighlighter} />
+      <span>{annotationCount.toLocaleString()}</span>
     </div>
 
     <div class="absolute inset-x-0 bottom-0">

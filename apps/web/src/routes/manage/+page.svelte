@@ -60,9 +60,10 @@
   const bookCards$: Observable<BookCardProps[]> = combineLatest([
     database.dataList$,
     database.bookmarks$,
+    database.annotationCounts$,
     booklistSortOptions$
   ]).pipe(
-    map(([dataList, bookmarks]) => {
+    map(([dataList, bookmarks, annotationCounts]) => {
       const sortProp = $booklistSortOptions$[$storageSource$];
       const isTitleSort = sortProp.property === 'title';
 
@@ -74,7 +75,8 @@
             .filter((d) => $showExternalPlaceholder$ || !d.isPlaceholder)
             .map((d) => ({
               ...d,
-              ...bookmarkToProgress(bookmarkMap.get(d.id))
+              ...bookmarkToProgress(bookmarkMap.get(d.id)),
+              annotationCount: annotationCounts.get(d.id) || 0
             }))
             .sort((card1: BookCardProps, card2: BookCardProps) =>
               sortBookCards(card1, card2, sortProp, isTitleSort)

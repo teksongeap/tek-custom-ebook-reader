@@ -119,6 +119,25 @@ export class DatabaseService {
 
   annotationsChanged$ = new Subject<number>();
 
+  annotationCounts$ = this.annotationsChanged$.pipe(
+    startWith(0),
+    switchMap(() => this.db$),
+    switchMap(async (db) => {
+      const counts = new Map<number, number>();
+      let cursor = await db.transaction('annotation').store.index('dataId').openKeyCursor();
+
+      while (cursor) {
+        const dataId = cursor.key;
+
+        counts.set(dataId, (counts.get(dataId) || 0) + 1);
+        cursor = await cursor.continue();
+      }
+
+      return counts;
+    }),
+    shareReplay({ refCount: true, bufferSize: 1 })
+  );
+
   bookmarks$ = this.bookmarksChanged$.pipe(
     startWith(0),
     switchMap(() => this.db$),

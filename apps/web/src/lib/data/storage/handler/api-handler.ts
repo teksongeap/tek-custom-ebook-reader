@@ -539,6 +539,8 @@ export abstract class ApiStorageHandler extends BaseStorageHandler {
     );
 
     await this.upload(titleId, filename, files, file, JSON.stringify(annotationsToStore));
+
+    this.addBookCard(this.currentContext.title, { annotationCount: annotationsToStore.length });
   }
 
   async saveCover(data: Blob | undefined) {

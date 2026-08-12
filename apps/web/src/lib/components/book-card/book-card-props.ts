@@ -13,5 +13,6 @@ export interface BookCardProps {
   lastBookOpen: number;
   progress: number;
   lastBookmarkModified: number;
+  annotationCount: number;
   isPlaceholder: boolean;
 }
