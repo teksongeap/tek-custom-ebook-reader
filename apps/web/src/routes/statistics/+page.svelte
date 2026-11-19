@@ -127,13 +127,13 @@
 
 <StatisticsHeader currentBookId={$currentBookId$} bind:showStatisticsSettings />
 
-<div class="{pxScreen} flex flex-col pt-16 h-full xl:pt-14">
+<div class="{pxScreen} statistics-page flex flex-col h-full">
   <StatisticsContent />
 </div>
 
 {#if showStatisticsSettings}
   <div
-    class="app-side-panel writing-horizontal-tb fixed top-0 right-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
+    class="app-side-panel statistics-panel writing-horizontal-tb fixed top-0 right-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
     in:fly|local={{ x: 100, duration: 100, easing: quintInOut }}
     use:clickOutside={() => {
       if (!$statisticsActionInProgress$) {

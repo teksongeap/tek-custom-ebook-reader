@@ -168,27 +168,28 @@
 </script>
 
 {$resizeHandler$ ?? ''}
-<div class="flex items-center p-4">
+<div class="statistics-panel-header">
   <button
     title="Close Title Filter"
-    class="flex items-end md:items-center"
+    class="settings-icon-action"
     on:click={() => dispatch('close')}
   >
     <Fa icon={faXmark} />
   </button>
+  <h2 class="font-semibold">Filter titles</h2>
 </div>
 <div class="flex flex-col flex-1 px-4">
   <input
     type="search"
     placeholder="Filter Title"
-    class="w-full text-black"
+    class="settings-input"
     bind:value={titleFilter}
     on:input={handleTitleFilterChange}
   />
   <div class="flex justify-between mt-6 text-2xl">
     <button
       title="Apply Filter"
-      class="hover:text-red-500"
+      class="settings-icon-action"
       on:click={() => {
         dispatch('applyFilter', titlesToFilter);
         dispatch('close');
@@ -196,17 +197,17 @@
     >
       <Fa icon={faCircleCheck} />
     </button>
-    <button title="Select All" class="hover:text-red-500" on:click={() => handleSelectAll(true)}>
+    <button title="Select All" class="settings-icon-action" on:click={() => handleSelectAll(true)}>
       <Fa icon={faListCheck} />
     </button>
-    <button title="Remove All" class="hover:text-red-500" on:click={() => handleSelectAll(false)}>
+    <button title="Remove All" class="settings-icon-action" on:click={() => handleSelectAll(false)}>
       <Fa icon={faList} />
     </button>
     <button
       title={$lastStatisticsFilterDateRangeOnly$
         ? 'Display Titles across all Time'
         : 'Display Titles in selected Date Range only'}
-      class="hover:text-red-500"
+      class="settings-icon-action"
       on:click={() => ($lastStatisticsFilterDateRangeOnly$ = !$lastStatisticsFilterDateRangeOnly$)}
     >
       <Fa icon={$lastStatisticsFilterDateRangeOnly$ ? faCalendarXmark : faCalendar} />
@@ -215,7 +216,7 @@
       title={$lastStatisticsFilterShowSelectedTitlesOnly$
         ? 'Display all Titles'
         : 'Display selected Titles only'}
-      class="hover:text-red-500"
+      class="settings-icon-action"
       on:click={() =>
         ($lastStatisticsFilterShowSelectedTitlesOnly$ =
           !$lastStatisticsFilterShowSelectedTitlesOnly$)}
@@ -225,7 +226,7 @@
     {#if $preFilteredTitlesForStatistics$.size}
       <button
         title="Remove Prefilter"
-        class="hover:text-red-500"
+        class="settings-icon-action"
         on:click={() => dispatch('clearPrefilter')}
       >
         <Fa icon={faTrash} />

@@ -11,17 +11,22 @@
 <section class="settings-item">
   <div class="settings-item-header">
     <h2 class="settings-item-title" class:text-base={applyHeaderClasses}>
-      {#if tooltip}
-        <Popover contentText={tooltip} contentStyles="padding: 0.75rem;">
-          <Fa icon={faCircleQuestion} slot="icon" class="settings-icon-action" />
-          <span class="capitalize">{title}</span>
-        </Popover>
-      {:else}
-        <span class="capitalize">{title}</span>
-      {/if}
+      <span class="capitalize">{title}</span>
     </h2>
     <div class="settings-item-actions">
       <slot name="header" />
+      {#if tooltip}
+        <Popover contentText={tooltip} contentStyles="padding: 0.75rem;">
+          <button
+            type="button"
+            slot="icon"
+            class="settings-icon-action"
+            aria-label={`About ${title}`}
+          >
+            <Fa icon={faCircleQuestion} />
+          </button>
+        </Popover>
+      {/if}
     </div>
   </div>
   <div class="settings-item-control">

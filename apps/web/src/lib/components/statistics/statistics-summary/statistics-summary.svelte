@@ -333,15 +333,14 @@
 </script>
 
 {$resizeHandler$ ?? ''}
-<div class="my-4" class:hidden={!aggregratedStatistics.length}>
+<div class="statistics-range-label" class:hidden={!aggregratedStatistics.length}>
   Data for {statisticsDateRangeLabel}
 </div>
 <div
-  class="grow p-2 overflow-auto"
+  class="statistics-summary-card grow overflow-auto"
   class:flex={!statisticsData.length}
   class:justify-center={!statisticsData.length}
   class:items-center={!statisticsData.length}
-  class:text-4xl={!statisticsData.length}
   bind:this={statisticsSummaryTableContainerElm}
 >
   {#if statisticsData.length}
@@ -480,7 +479,7 @@
         </div>
         {#if currentRowInEdit}
           <input
-            class="w-full"
+            class="settings-input"
             type="number"
             bind:value={rowInEditTime}
             on:change={() => {
@@ -518,7 +517,7 @@
         {/if}
         {#if currentRowInEdit}
           <input
-            class="w-full"
+            class="settings-input"
             type="number"
             bind:value={rowInEditCharacters}
             on:change={() => {
@@ -598,7 +597,10 @@
       </Popover>
     {/if}
   {:else}
-    No Data found for {statisticsDateRangeLabel}
+    <div class="statistics-empty-state">
+      <h2>No reading data</h2>
+      <p>No activity recorded for {statisticsDateRangeLabel}.</p>
+    </div>
   {/if}
 </div>
 <div
@@ -640,9 +642,8 @@
     >
       {#each statisticsSummaryPages as statisticsSummaryPage, pageIndex (statisticsSummaryPage)}
         <button
-          class="hover:opacity-50 hover:bg-slate-300 hover:text-black"
-          class:bg-slate-300={statisticsSummaryPage === currentStatisticsSummaryPage}
-          class:text-black={statisticsSummaryPage === currentStatisticsSummaryPage}
+          class="app-menu-item"
+          class:app-menu-item--selected={statisticsSummaryPage === currentStatisticsSummaryPage}
           bind:this={statisticsSummaryPageRefs[pageIndex + 1]}
           on:click={({ target }) => {
             setRowInEditMode();

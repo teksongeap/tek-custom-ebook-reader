@@ -415,7 +415,7 @@
 
   .book-search-panel-search:focus-within {
     border-color: color-mix(in srgb, var(--app-accent) 62%, transparent);
-    box-shadow: var(--app-focus-ring);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--reader-page-text) 32%, transparent);
   }
 
   .book-search-panel-control-icon {
@@ -434,6 +434,12 @@
     font-size: var(--reader-ui-small-font-size);
     font-weight: 720;
     outline: none;
+  }
+
+  .book-search-panel-search input:focus {
+    border: 0;
+    outline: none;
+    box-shadow: none;
   }
 
   .book-search-panel-search input::placeholder {

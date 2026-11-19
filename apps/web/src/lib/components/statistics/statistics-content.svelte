@@ -813,25 +813,29 @@
   </div>
 {:else}
   {#if $lastStatisticsTab$ === StatisticsTab.OVERVIEW}
-    <StatisticsHeatmap
-      {statisticsData}
-      {readingGoals}
-      {statisticsTitleFilters}
-      {today}
-      {todayKey}
-      bind:heatmapAggregration={$lastReadingDataHeatmapAggregationMode$}
-    />
+    <section class="statistics-heatmap-card">
+      <StatisticsHeatmap
+        {statisticsData}
+        {readingGoals}
+        {statisticsTitleFilters}
+        {today}
+        {todayKey}
+        bind:heatmapAggregration={$lastReadingDataHeatmapAggregationMode$}
+      />
+    </section>
     {#if readingGoals.length}
       <div class="mt-8 sm:mt-16">
-        <StatisticsHeatmap
-          {statisticsData}
-          {readingGoals}
-          {statisticsTitleFilters}
-          {today}
-          {todayKey}
-          heatmapType={HeatmapType.READING_GOALS}
-          bind:heatmapAggregration={$lastReadingGoalsHeatmapAggregationMode$}
-        />
+        <section class="statistics-heatmap-card">
+          <StatisticsHeatmap
+            {statisticsData}
+            {readingGoals}
+            {statisticsTitleFilters}
+            {today}
+            {todayKey}
+            heatmapType={HeatmapType.READING_GOALS}
+            bind:heatmapAggregration={$lastReadingGoalsHeatmapAggregationMode$}
+          />
+        </section>
       </div>
     {/if}
   {/if}
@@ -846,7 +850,7 @@
 {/if}
 {#if $statisticsTitleFilterIsOpen$}
   <div
-    class="app-side-panel writing-horizontal-tb fixed top-0 right-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
+    class="app-side-panel statistics-panel writing-horizontal-tb fixed top-0 right-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
     in:fly|local={{ x: 100, duration: 100, easing: quintInOut }}
     use:clickOutside={() => ($statisticsTitleFilterIsOpen$ = false)}
   >

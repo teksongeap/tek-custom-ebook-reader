@@ -1999,7 +1999,7 @@
 
   .book-annotation-card-textarea::selection {
     background: var(--app-accent);
-    color: #ffffff;
+    color: var(--app-accent-contrast);
   }
 
   .book-annotation-card-editor-actions {
@@ -2130,13 +2130,13 @@
   .book-annotation-card-editor-action--primary {
     min-width: 4.6rem;
     background: var(--app-accent);
-    color: #ffffff;
+    color: var(--app-accent-contrast);
   }
 
   .book-annotation-card-editor-action--primary:hover,
   .book-annotation-card-editor-action--primary:focus-visible {
-    background: color-mix(in srgb, var(--app-accent) 88%, #000000);
-    color: #ffffff;
+    background: var(--app-accent-strong);
+    color: var(--app-accent-contrast);
   }
 
   .book-annotation-card-editor-action--danger {

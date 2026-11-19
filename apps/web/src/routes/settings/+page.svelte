@@ -4,8 +4,8 @@
   import { afterNavigate } from '$app/navigation';
   import SettingsContent from '$lib/components/settings/settings-content.svelte';
   import SettingsHeader from '$lib/components/settings/settings-header.svelte';
-  import { pxScreen } from '$lib/css-classes';
   import {
+    database,
     addCharactersOnCompletion$,
     adjustStatisticsAfterIdleTime$,
     annotationHoverDelay$,
@@ -73,7 +73,6 @@
     readingGoalsMergeMode$,
     hideSpoilerImageMode$
   } from '$lib/data/store';
-  import { mergeEntries } from '$lib/components/merged-header-icon/merged-entries';
   import { pagePath } from '$lib/data/env';
   import { storage } from '$lib/data/window/navigator/storage';
   import { formatPageTitle } from '$lib/functions/format-page-title';
@@ -89,7 +88,10 @@
     setStorageQuota();
   });
 
-  let prevPage = `${pagePath}${mergeEntries.MANAGE.routeId}`;
+  const lastBook$ = database.lastItem$;
+  let previousBookPage: string | undefined;
+  $: bookPageLink =
+    previousBookPage || ($lastBook$?.dataId ? `${pagePath}/b?id=${$lastBook$.dataId}` : undefined);
 
   let activeSettings = 'Reader';
 
@@ -97,8 +99,9 @@
 
   afterNavigate((navigation) => {
     const { from } = navigation;
-    if (!from) return;
-    prevPage = `${from.url.pathname}${from.url.search}`;
+    if (from?.url.pathname === `${pagePath}/b`) {
+      previousBookPage = `${from.url.pathname}${from.url.search}`;
+    }
   });
 
   const setPersistentStorage$ = persistentStorage$.pipe(
@@ -143,11 +146,11 @@
 </svelte:head>
 
 <div class="fixed inset-x-0 top-0 z-10">
-  <SettingsHeader leavePageLink={prevPage} bind:activeSettings />
+  <SettingsHeader {bookPageLink} bind:activeSettings />
 </div>
 
-<div class="{pxScreen} h-full pt-16">
-  <div class="max-w-6xl">
+<div class="settings-page-container h-full pt-16">
+  <div class="max-w-6xl mx-auto">
     <SettingsContent
       {activeSettings}
       {storageQuota}

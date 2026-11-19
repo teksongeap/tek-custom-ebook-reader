@@ -22,11 +22,13 @@
   // let book content show through headers and popovers.
   --app-surface-fill:
     linear-gradient(var(--app-surface-bg), var(--app-surface-bg)), var(--background-color);
-  --app-accent: #1c6ed0;
-  --app-accent-soft: rgba(28, 110, 208, 0.14);
-  --app-accent-strong: #134f9d;
+  // UI emphasis follows the selected theme's foreground and surface palette.
+  --app-accent: color-mix(in srgb, var(--font-color) 88%, var(--background-color));
+  --app-accent-soft: color-mix(in srgb, var(--font-color) 14%, transparent);
+  --app-accent-strong: var(--font-color);
+  --app-accent-contrast: var(--background-color);
   --app-danger: #d64545;
-  --app-focus-ring: 0 0 0 3px rgba(28, 110, 208, 0.34);
+  --app-focus-ring: 0 0 0 3px color-mix(in srgb, var(--font-color) 34%, transparent);
   --reader-page-bg: var(--background-color);
   --reader-page-text: var(--font-color);
   --reader-content-font-size: 20px;
@@ -37,7 +39,7 @@
   --reader-ui-small-font-size: 0.75rem;
   --reader-ui-xsmall-font-size: 0.6875rem;
   --reader-progress-start: var(--app-accent);
-  --reader-progress-end: #25a7a0;
+  --reader-progress-end: var(--app-accent-strong);
   --reader-control-alert: var(--app-danger);
   scrollbar-color: #c1c1c1 #c1c1c100;
 }
@@ -937,8 +939,8 @@
   .book-card-selected-icon {
     box-sizing: content-box;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--app-accent) 88%, #111827);
-    color: #ffffff;
+    background: var(--app-accent);
+    color: var(--app-accent-contrast);
     padding: 0.16rem;
     box-shadow: 0 8px 18px rgba(6, 8, 11, 0.28);
     filter: drop-shadow(0 1px 2px rgba(6, 8, 11, 0.28));
@@ -977,12 +979,8 @@
 
   .book-card-floating-action--info {
     border-color: color-mix(in srgb, var(--app-accent) 58%, transparent);
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--app-accent) 88%, #ffffff 12%),
-      color-mix(in srgb, var(--app-accent-strong) 92%, #000000 8%)
-    );
-    color: #ffffff;
+    background: linear-gradient(180deg, var(--app-accent), var(--app-accent-strong));
+    color: var(--app-accent-contrast);
     padding: 0.18rem;
   }
 
@@ -1070,6 +1068,240 @@
     font-size: 0.78rem;
   }
 
+  .statistics-toolbar {
+    display: flex;
+    min-height: 4rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    flex-wrap: wrap;
+    padding-block: 0.5rem;
+  }
+
+  .statistics-toolbar-context {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .statistics-page-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
+
+  .statistics-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+  }
+
+  .statistics-toolbar-actions .statistics-resume-divider {
+    display: block;
+    flex-shrink: 0;
+  }
+
+  .statistics-page {
+    padding-top: 5rem;
+    padding-bottom: 1.5rem;
+    gap: 1rem;
+  }
+
+  .statistics-heatmap-card,
+  .statistics-summary-card {
+    min-height: 16rem;
+    border: 1px solid var(--app-surface-border);
+    border-radius: 0.75rem;
+    background: var(--app-surface-bg);
+    padding: 1rem;
+    box-shadow: var(--app-chrome-shadow);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .statistics-heatmap-card {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+
+  .statistics-range-label {
+    color: var(--app-chrome-muted);
+    font-size: 0.875rem;
+  }
+
+  .statistics-table-heading {
+    min-height: 2.75rem;
+    border-bottom: 1px solid var(--app-surface-border);
+    color: var(--app-chrome-muted);
+    font-weight: 650;
+  }
+
+  .statistics-page button:focus-visible,
+  .statistics-panel button:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+
+  .statistics-empty-state {
+    padding: 3rem 1rem;
+    text-align: center;
+  }
+
+  .statistics-empty-state h2 {
+    margin-bottom: 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 650;
+  }
+
+  .statistics-empty-state p {
+    color: var(--app-chrome-muted);
+    font-size: 0.875rem;
+  }
+
+  .statistics-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--app-surface-border);
+    padding: 1rem;
+  }
+
+  .statistics-data-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding: 1rem 1rem 0;
+  }
+
+  .statistics-panel label {
+    margin-bottom: 0.375rem;
+    color: var(--app-chrome-muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .statistics-panel .settings-input {
+    min-width: 0;
+  }
+
+  .statistics-date-range {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: end;
+    gap: 0.5rem;
+  }
+
+  .app-button.statistics-danger-action {
+    color: var(--app-danger);
+  }
+
+  .statistics-panel input[type='checkbox'] {
+    border-color: var(--app-chrome-border);
+    border-radius: 0.25rem;
+    background-color: var(--background-color);
+    color: var(--app-accent);
+  }
+
+  .statistics-panel input[type='checkbox']:checked {
+    background-color: var(--app-accent);
+    // Use the theme's inverse color for the checkmark as well as its fill.
+    background-image: none;
+  }
+
+  .statistics-panel input[type='checkbox']:checked::after {
+    display: block;
+    width: 0.4rem;
+    height: 0.65rem;
+    margin: 0.05rem auto;
+    border: solid var(--app-accent-contrast);
+    border-width: 0 2px 2px 0;
+    content: '';
+    transform: rotate(45deg);
+  }
+
+  .statistics-panel input[type='checkbox']:focus {
+    --tw-ring-color: transparent;
+    outline: 2px solid var(--font-color);
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  .statistics-heatmap-heading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-block: 0.5rem 1rem;
+    font-weight: 650;
+  }
+
+  .statistics-heatmap-day {
+    border: 1px solid var(--app-surface-border);
+    border-radius: 0.2rem;
+    background: color-mix(in srgb, var(--font-color) 8%, var(--background-color));
+  }
+
+  .statistics-heatmap-day--outside {
+    opacity: 0.35;
+  }
+
+  .statistics-heatmap-day--selected {
+    border-color: var(--font-color);
+  }
+
+  .statistics-heatmap-day--today {
+    border-color: var(--font-color);
+    outline: 1px solid var(--font-color);
+    outline-offset: 2px;
+  }
+
+  .statistics-heatmap-day:focus-visible {
+    outline: 2px solid var(--font-color);
+    outline-offset: 2px;
+  }
+
+  @media (min-width: 640px) {
+    .statistics-date-range {
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) minmax(0, 1fr);
+    }
+  }
+
+  @media (min-width: 640px) and (max-width: 1279px) {
+    .statistics-toolbar-context {
+      width: 100%;
+    }
+
+    .statistics-page {
+      padding-top: 8rem;
+    }
+  }
+
+  @media (max-width: 639px) {
+    .statistics-toolbar-context {
+      width: 100%;
+      gap: 0.5rem;
+    }
+
+    .statistics-toolbar-actions {
+      width: 100%;
+      justify-content: space-between;
+      gap: 0;
+    }
+
+    .statistics-toolbar-actions .app-toolbar-button {
+      min-width: 2.25rem;
+      padding-inline: 0.375rem;
+    }
+
+    .statistics-toolbar-actions .app-toolbar-divider {
+      margin-inline: 0.125rem;
+    }
+
+    .statistics-page {
+      padding-top: 8rem;
+    }
+  }
+
   .settings-tabs {
     display: flex;
     gap: 0.75rem;
@@ -1083,8 +1315,13 @@
     box-shadow: var(--app-chrome-shadow);
   }
 
+  .settings-page-container {
+    @apply mx-auto w-full max-w-6xl px-4 md:px-8 lg:max-w-4xl xl:max-w-6xl;
+  }
+
   .settings-header-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     gap: 0.5rem;
     min-height: 3rem;
@@ -1114,6 +1351,13 @@
     padding: 0.5rem;
     color: var(--app-chrome-muted);
     font-size: 0.875rem;
+  }
+
+  .settings-resume-link {
+    grid-column: 3;
+    justify-self: end;
+    margin-left: auto;
+    flex-shrink: 0;
   }
 
   .settings-back-link:hover {
@@ -1166,6 +1410,9 @@
     }
     .settings-page-heading {
       gap: 0.25rem;
+    }
+    .settings-page-heading h1 {
+      display: none;
     }
     .settings-back-link span {
       display: none;
@@ -1560,14 +1807,19 @@
   .settings-icon-action:focus-visible,
   .settings-inline-action:hover,
   .settings-inline-action:focus-visible {
-    background: var(--app-accent-soft);
-    color: var(--app-accent-strong);
+    background: var(--app-chrome-hover);
+    color: var(--app-chrome-text);
+  }
+
+  .settings-icon-action:focus-visible,
+  .settings-inline-action:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
   }
 
   .settings-icon-action--boxed:hover,
   .settings-icon-action--boxed:focus-visible {
-    border-color: color-mix(in srgb, var(--app-accent) 32%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-accent) 12%, transparent);
+    border-color: var(--app-chrome-border);
     transform: translateY(-1px);
   }
 

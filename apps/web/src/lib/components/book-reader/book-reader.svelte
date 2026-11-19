@@ -1028,12 +1028,12 @@
   .book-footnote-preview-card {
     --book-content-link-color: color-mix(
       in srgb,
-      var(--app-accent, #1c6ed0) 72%,
+      var(--app-accent, var(--font-color)) 72%,
       var(--reader-page-text, currentColor) 28%
     );
     --book-content-link-visited-color: color-mix(
       in srgb,
-      var(--app-accent-strong, var(--app-accent, #1c6ed0)) 54%,
+      var(--app-accent-strong, var(--app-accent, var(--font-color))) 54%,
       var(--reader-page-text, currentColor) 46%
     );
     pointer-events: auto;

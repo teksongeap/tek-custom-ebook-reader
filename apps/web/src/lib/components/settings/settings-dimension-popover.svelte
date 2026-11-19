@@ -10,6 +10,13 @@
 </script>
 
 <Popover>
-  <Fa icon={faArrowDown19} slot="icon" class="settings-icon-action" />
+  <button
+    type="button"
+    slot="icon"
+    class="settings-icon-action"
+    aria-label="Choose dimension preset"
+  >
+    <Fa icon={faArrowDown19} />
+  </button>
   <SettingsDimensionContent slot="content" {isFirstDimension} {isVertical} bind:dimensionValue />
 </Popover>

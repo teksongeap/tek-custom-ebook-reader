@@ -1358,7 +1358,7 @@
   .annotation-item-editor-save {
     border: 1px solid color-mix(in srgb, var(--app-accent) 68%, transparent);
     background: var(--app-accent);
-    color: #ffffff;
+    color: var(--app-accent-contrast);
     box-shadow: 0 10px 22px color-mix(in srgb, var(--app-accent) 18%, transparent);
   }
 
@@ -1370,7 +1370,7 @@
 
   .annotation-item-editor-save:hover,
   .annotation-item-editor-save:focus-visible {
-    border-color: color-mix(in srgb, var(--app-accent) 82%, #ffffff 18%);
+    border-color: color-mix(in srgb, var(--app-accent) 82%, var(--font-color) 18%);
     background: color-mix(in srgb, var(--app-accent-strong) 82%, var(--app-accent));
     box-shadow: 0 12px 24px color-mix(in srgb, var(--app-accent) 24%, transparent);
     transform: translateY(-1px);

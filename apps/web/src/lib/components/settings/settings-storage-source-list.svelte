@@ -216,36 +216,50 @@
 
 <div class="settings-section sm:col-span-2 lg:col-span-3">
   <div class="settings-section-header">
-    <div class="flex grow">
-      <h1 class="settings-section-title">
-        <span class="capitalize">Storage Sources</span>
-      </h1>
-      <Popover contentText={listTooltip} contentStyles="padding: 0.5rem;">
-        <Fa icon={faCircleQuestion} slot="icon" class="settings-icon-action" />
-      </Popover>
+    <h1 class="settings-section-title">
+      <span class="capitalize">Storage Sources</span>
+    </h1>
+    <div class="settings-item-actions">
       {#if $autoReplication$ !== AutoReplicationType.Off && !$syncTarget$}
         <Popover
           contentText={'Auto import/export enabled but no source as sync target from list selected'}
           contentStyles="padding: 0.25rem;"
         >
-          <Fa icon={faTriangleExclamation} slot="icon" class="settings-icon-action" />
+          <button
+            type="button"
+            slot="icon"
+            class="settings-icon-action"
+            aria-label="Storage sync warning"
+          >
+            <Fa icon={faTriangleExclamation} />
+          </button>
         </Popover>
       {/if}
+      <button
+        class={buttonClasses}
+        class:cursor-not-allowed={!storageSources}
+        disabled={!storageSources}
+        on:click={() => {
+          modifyStorageSource();
+        }}
+      >
+        <div class="flex items-center justify-center">
+          <Fa icon={faPlus} />
+          <span class="ml-1 hidden sm:block">Add</span>
+        </div>
+        <Ripple />
+      </button>
+      <Popover contentText={listTooltip} contentStyles="padding: 0.5rem;">
+        <button
+          type="button"
+          slot="icon"
+          class="settings-icon-action"
+          aria-label="About storage sources"
+        >
+          <Fa icon={faCircleQuestion} />
+        </button>
+      </Popover>
     </div>
-    <button
-      class={buttonClasses}
-      class:cursor-not-allowed={!storageSources}
-      disabled={!storageSources}
-      on:click={() => {
-        modifyStorageSource();
-      }}
-    >
-      <div class="flex items-center justify-center">
-        <Fa icon={faPlus} />
-        <span class="ml-1 hidden sm:block">Add</span>
-      </div>
-      <Ripple />
-    </button>
   </div>
   <div class="mt-6">
     {#if !listLoading && storageSources}

@@ -24,8 +24,6 @@
     HeatmapType,
     type ReadingGoalHeatmapGlobalDayData,
     daysOfWeekShort,
-    heatmapMinValueColor,
-    heatmapMaxValueColor,
     type StatisticsHeatmapDayData
   } from '$lib/components/statistics/statistics-heatmap/statistics-heatmap';
   import type {
@@ -117,7 +115,7 @@
       colorRanges.push(
         {
           limit: 100,
-          color: `#${heatmapMaxValueColor}`
+          color: 'var(--app-accent)'
         },
         ...getColorRanges(1, 100, 100)
       );
@@ -776,20 +774,14 @@
           if (limit) {
             colorRangeslist.push({
               limit,
-              color: colorByRating(
-                heatmapMinValueColor,
-                heatmapMaxValueColor,
-                minimumValue,
-                colorMax,
-                limit
-              )
+              color: colorByRating(minimumValue, colorMax, limit)
             });
           }
         }
       } else {
         colorRangeslist.push({
           limit: minimumValue,
-          color: `#${heatmapMaxValueColor}`
+          color: 'var(--app-accent)'
         });
       }
     }
@@ -799,34 +791,9 @@
     return colorRangeslist;
   }
 
-  function colorByRating(
-    colorStart: string,
-    colorEnd: String,
-    minValue: number,
-    maxValue: number,
-    value: number
-  ) {
+  function colorByRating(minValue: number, maxValue: number, value: number) {
     const colorRatio = limitToRange(0, 1, value / (maxValue - minValue));
-    const r = Math.ceil(
-      parseInt(colorStart.substring(0, 2), 16) * (1 - colorRatio) +
-        parseInt(colorEnd.substring(0, 2), 16) * colorRatio
-    );
-    const g = Math.ceil(
-      parseInt(colorStart.substring(2, 4), 16) * (1 - colorRatio) +
-        parseInt(colorEnd.substring(2, 4), 16) * colorRatio
-    );
-    const b = Math.ceil(
-      parseInt(colorStart.substring(4, 6), 16) * (1 - colorRatio) +
-        parseInt(colorEnd.substring(4, 6), 16) * colorRatio
-    );
-
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-  }
-
-  function toHex(valueToConvert: number | string) {
-    const value = valueToConvert.toString(16);
-
-    return value.length === 1 ? `0${value}` : value;
+    return `color-mix(in srgb, var(--app-accent) ${25 + colorRatio * 75}%, var(--background-color))`;
   }
 
   function getCompletedReadingGoalsLabel(
@@ -1074,18 +1041,18 @@
 </script>
 
 {$resizeHandler$ ?? ''}
-<div class="mb-4 flex justify-center">
+<div class="statistics-heatmap-heading">
   {heatmapLabel}
   <button
     title="Return to current Year"
-    class="mx-4 hover:text-red-500"
+    class="settings-icon-action"
     on:click={() => changeHeatmapYear(today.getFullYear() - heatmapYear)}
   >
     <Fa icon={faRepeat} />
   </button>
   <button
     title="Switch (Streak) Data between 'All Time' and 'Current Year'"
-    class="text-lg hover:text-red-500"
+    class="settings-icon-action"
     on:click={() =>
       (heatmapAggregration =
         heatmapAggregration === HeatmapDataAggregration.ALL_TIME
@@ -1098,7 +1065,7 @@
 <div class="flex justify-between">
   <button
     title="Move Backwards"
-    class="hover:text-red-500"
+    class="settings-icon-action"
     on:click={() => {
       if (heatmapElement.scrollLeft === 0) {
         changeHeatmapYear(-1);
@@ -1117,17 +1084,16 @@
     class="grid items-center overflow-x-auto py-1"
     style:grid-auto-columns={`${dayElementSize}px`}
     style:grid-auto-rows={`${dayElementSize}px`}
+    style:grid-template-rows="1.75rem"
     style:gap={`${heatmapGridGapValue}px`}
     style:margin={`0 ${heatmapDayMargins}px`}
     bind:this={heatmapElement}
   >
     {#each monthLabels as label (label.monthLabel)}
       <div
-        class="text-xs md:text-sm"
+        class="whitespace-nowrap text-xs leading-normal md:text-sm"
         style:grid-row={'1/1'}
         style:grid-column={`${label.heatmapColumn}`}
-        style:height={`${dayElementSize}px`}
-        style:margin-bottom={`${dayElementSize}px`}
       >
         {label.monthLabel}
       </div>
@@ -1137,14 +1103,14 @@
       style:grid-row={'1/1'}
       style:grid-column={`1/3`}
       style:height={`${dayElementSize * 2}px`}
-      style:background-color={'var(--background-color)'}
+      style:background-color={'var(--app-surface-bg)'}
     />
     {#each dayLabels as dayLabel, index (dayLabel)}
       <div
         class="sticky left-0 text-xs sm:text-sm"
         style:grid-row={`${index + 2}/${index + 2}`}
         style:grid-column={`1/3`}
-        style:background-color={'var(--background-color)'}
+        style:background-color={'var(--app-surface-bg)'}
       >
         {dayLabel}
       </div>
@@ -1158,12 +1124,12 @@
       <div
         tabindex="0"
         role="cell"
-        class="justify-self-center fadeIn"
+        class="statistics-heatmap-day justify-self-center fadeIn"
         class:cursor-pointer={heatmapDay.isCurrentYear}
-        class:bg-slate-300={heatmapDay.isCurrentYear}
-        class:bg-slate-200={!heatmapDay.isCurrentYear}
-        class:border-amber-500={isSelected}
-        class:border-red-500={isToday}
+        class:statistics-heatmap-day--current={heatmapDay.isCurrentYear}
+        class:statistics-heatmap-day--outside={!heatmapDay.isCurrentYear}
+        class:statistics-heatmap-day--selected={isSelected}
+        class:statistics-heatmap-day--today={isToday}
         class:highlight={selectedStreakDates.has(heatmapDay.dateString)}
         style:animation-delay={`${3 * heatmapDay.heatmapColumn}ms`}
         style:height={`${dayElementSize}px`}
@@ -1214,7 +1180,7 @@
   </div>
   <button
     title="Move Forwards"
-    class="hover:text-red-500"
+    class="settings-icon-action"
     on:click={() => {
       const scrollWidth =
         heatmapElement.scrollWidth - heatmapElement.scrollLeft - heatmapDayMargins;
@@ -1389,7 +1355,7 @@
 
 <style>
   .highlight {
-    box-shadow: 0px 1px 5px 1px black;
+    box-shadow: var(--app-focus-ring);
   }
 
   @media (min-width: 1024px) {
