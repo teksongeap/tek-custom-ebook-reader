@@ -1609,15 +1609,25 @@
     right: 0.75rem;
     z-index: 10;
     display: flex;
-    min-height: 2.75rem;
+    width: 2.75rem;
+    height: 2.75rem;
     align-items: center;
-    gap: 0.5rem;
-    border: 1px solid color-mix(in srgb, var(--reader-page-text) 24%, transparent);
+    justify-content: center;
+    border: 0;
     border-radius: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    background: var(--app-surface-fill);
+    padding: 0;
+    background: transparent;
+    color: color-mix(in srgb, var(--reader-page-text) 38%, transparent);
+    font-size: 0.875rem;
+    transition:
+      color 140ms ease,
+      background-color 140ms ease;
+  }
+
+  .reader-controls-reveal:hover,
+  .reader-controls-reveal:focus-visible {
+    background: color-mix(in srgb, var(--reader-page-text) 8%, transparent);
     color: var(--reader-page-text);
-    font-size: 0.8125rem;
   }
 
   @media (max-width: 1023px) {

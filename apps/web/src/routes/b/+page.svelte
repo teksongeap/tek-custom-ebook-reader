@@ -26,7 +26,13 @@
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { faCloudBolt, faPause, faPlay, faSpinner } from '@fortawesome/free-solid-svg-icons';
+  import {
+    faChevronDown,
+    faCloudBolt,
+    faPause,
+    faPlay,
+    faSpinner
+  } from '@fortawesome/free-solid-svg-icons';
   import BookReader from '$lib/components/book-reader/book-reader.svelte';
   import type {
     AutoScroller,
@@ -2169,11 +2175,14 @@
     type="button"
     class="reader-controls-reveal"
     style={readerChromeStyle}
+    title="Show controls"
+    aria-label="Show reader controls"
     aria-expanded="false"
     aria-controls="reader-controls"
     on:click|stopPropagation={() => ($readerControlsHidden$ = false)}
-    >Show controls <span aria-hidden="true">⌄</span></button
   >
+    <Fa icon={faChevronDown} />
+  </button>
 {/if}
 {#if headerVisible}
   <div
