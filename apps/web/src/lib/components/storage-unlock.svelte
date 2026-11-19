@@ -91,7 +91,7 @@
         <Ripple />
       </button>
     {/if}
-    <button class={buttonClasses} on:click={unlock}>
+    <button class="{buttonClasses} app-button--primary" on:click={unlock}>
       Confirm
       <Ripple />
     </button>

@@ -4,7 +4,14 @@
  * All rights reserved.
  */
 
-import { filter, take, takeUntil, type BehaviorSubject, type Observable } from 'rxjs';
+import {
+  filter,
+  firstValueFrom,
+  take,
+  takeUntil,
+  type BehaviorSubject,
+  type Observable
+} from 'rxjs';
 
 import type { BookmarkManager } from '$lib/components/book-reader/types';
 import type { BooksDbBookmarkData } from '$lib/data/database/books-db/versions/books-db';
@@ -24,7 +31,7 @@ export class BookmarkManagerPaginated implements BookmarkManager {
     private destroy$: Observable<void>
   ) {}
 
-  scrollToBookmark(bookmarkData: BooksDbBookmarkData) {
+  async scrollToBookmark(bookmarkData: BooksDbBookmarkData) {
     const charCount = bookmarkData.exploredCharCount;
     if (charCount === undefined || charCount < 0) return;
 
@@ -48,16 +55,19 @@ export class BookmarkManagerPaginated implements BookmarkManager {
       return;
     }
 
-    this.sectionReady$
-      .pipe(
+    const ready = firstValueFrom(
+      this.sectionReady$.pipe(
         filter(({ index: readyIndex }) => readyIndex === index),
         take(1),
         takeUntil(this.destroy$)
-      )
-      .subscribe(({ calculator: updatedCalc }) => {
-        scroll(updatedCalc);
-      });
+      ),
+      { defaultValue: undefined }
+    );
     this.sectionIndex$.next(index);
+    const result = await ready;
+    if (result && this.sectionIndex$.getValue() === index) {
+      scroll(result.calculator);
+    }
   }
 
   formatBookmarkData(bookId: number): BooksDbBookmarkData {

@@ -25,12 +25,12 @@
   <svelte:fragment slot="content">
     <p style={contentStyles}>{dialogMessage}</p>
   </svelte:fragment>
-  <div class="flex grow justify-between" slot="footer">
+  <div class="flex grow flex-wrap justify-end gap-3" slot="footer">
     <button class={buttonClasses} class:invisible={!showCancel} on:click={() => closeDialog(true)}>
       Cancel
       <Ripple />
     </button>
-    <button class={buttonClasses} on:click={() => closeDialog()}>
+    <button class="{buttonClasses} app-button--primary" on:click={() => closeDialog()}>
       Confirm
       <Ripple />
     </button>

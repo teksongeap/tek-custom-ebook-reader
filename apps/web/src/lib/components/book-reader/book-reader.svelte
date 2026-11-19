@@ -256,7 +256,7 @@
   }
   $: readerContainerStyle = [
     readerChromeStyle,
-    'padding-top: 2.375rem',
+    'padding-top: 3.5rem',
     `padding-bottom: calc(2rem + ${bottomChromeClearance}px)`
   ].join('; ');
 

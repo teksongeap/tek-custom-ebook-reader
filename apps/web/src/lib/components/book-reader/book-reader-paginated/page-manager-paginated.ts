@@ -109,7 +109,7 @@ export class PageManagerPaginated implements PageManager {
   }
 
   scrollToBookmarkPosition(scrollPos: number, isUser: boolean) {
-    this.scrollToColumn(scrollPos, isUser);
+    this.jumpTo(this.snapToColumnStart(scrollPos), isUser);
   }
 
   scrollToColumn(scrollPos: number, isUser: boolean) {

@@ -29,7 +29,7 @@ export class BookmarkManagerContinuous implements BookmarkManager {
       scrollToData.top -= customReadingPointScrollOffset;
     }
 
-    this.window.scrollTo(scrollToData);
+    this.window.scrollTo({ ...scrollToData, behavior: 'instant' });
   }
 
   formatBookmarkData(bookId: number, customReadingPointScrollOffset = 0): BooksDbBookmarkData {

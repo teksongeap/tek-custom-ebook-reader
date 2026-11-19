@@ -7,17 +7,21 @@
 :root {
   --font-color: rgba(0, 0, 0, 0.87);
   --background-color: #eceff1;
-  --app-chrome-bg: rgba(22, 25, 29, 0.94);
-  --app-chrome-bg-strong: #16191d;
-  --app-chrome-text: rgba(255, 255, 255, 0.92);
-  --app-chrome-muted: rgba(255, 255, 255, 0.62);
-  --app-chrome-hover: rgba(255, 255, 255, 0.1);
-  --app-chrome-active: rgba(255, 255, 255, 0.16);
-  --app-chrome-border: rgba(255, 255, 255, 0.12);
-  --app-chrome-shadow: 0 14px 34px rgba(5, 7, 10, 0.2);
+  --app-chrome-bg: var(--app-surface-bg);
+  --app-chrome-bg-strong: var(--app-surface-bg);
+  --app-chrome-text: var(--font-color);
+  --app-chrome-muted: color-mix(in srgb, var(--font-color) 72%, transparent);
+  --app-chrome-hover: color-mix(in srgb, var(--font-color) 8%, transparent);
+  --app-chrome-active: color-mix(in srgb, var(--font-color) 14%, transparent);
+  --app-chrome-border: var(--app-surface-border);
+  --app-chrome-shadow: 0 4px 12px rgba(5, 7, 10, 0.08);
   --app-surface-bg: color-mix(in srgb, var(--background-color) 92%, var(--font-color) 8%);
   --app-surface-border: color-mix(in srgb, var(--font-color) 12%, transparent);
   --app-surface-shadow: 0 18px 42px rgba(12, 16, 20, 0.16);
+  // Back the mixed surface with the page color so translucent theme text cannot
+  // let book content show through headers and popovers.
+  --app-surface-fill:
+    linear-gradient(var(--app-surface-bg), var(--app-surface-bg)), var(--background-color);
   --app-accent: #1c6ed0;
   --app-accent-soft: rgba(28, 110, 208, 0.14);
   --app-accent-strong: #134f9d;
@@ -61,12 +65,15 @@
 }
 
 @layer components {
+  .app-header-content {
+    @apply mx-auto w-full px-4 md:px-8 lg:max-w-4xl xl:max-w-none 2xl:max-w-6xl;
+  }
+
   .app-header {
     border-bottom: 1px solid var(--app-chrome-border);
-    background: var(--app-chrome-bg);
+    background: var(--app-surface-fill);
     color: var(--app-chrome-text);
     box-shadow: var(--app-chrome-shadow);
-    backdrop-filter: blur(18px) saturate(130%);
   }
 
   .app-icon-button {
@@ -210,14 +217,14 @@
     overflow: hidden;
     border: 1px solid var(--app-chrome-border);
     border-radius: 0.5rem;
-    background: var(--app-chrome-bg-strong);
+    background: var(--app-surface-fill);
     box-shadow: var(--app-chrome-shadow);
   }
 
   .app-popover-panel {
     border: 1px solid var(--app-chrome-border);
     border-radius: 0.5rem;
-    background: var(--app-chrome-bg-strong);
+    background: var(--app-surface-fill);
     color: var(--app-chrome-text);
     font-size: var(--reader-ui-font-size);
     box-shadow: var(--app-chrome-shadow);
@@ -231,7 +238,7 @@
 
   .app-side-panel {
     border-left: 1px solid var(--app-chrome-border);
-    background: var(--app-chrome-bg-strong);
+    background: var(--app-surface-fill);
     color: var(--app-chrome-text);
     box-shadow: -18px 0 44px rgba(5, 7, 10, 0.2);
   }
@@ -239,7 +246,8 @@
   .app-dialog {
     border: 1px solid var(--app-surface-border);
     border-radius: 0.75rem;
-    background: var(--app-surface-bg);
+    background: var(--app-surface-fill);
+    color: var(--app-chrome-text);
     box-shadow: var(--app-surface-shadow);
   }
 
@@ -284,17 +292,12 @@
   }
 
   .reader-header {
+    --reader-toolbar-bg: color-mix(in srgb, var(--reader-page-bg) 92%, var(--reader-page-text) 8%);
     border-bottom: 1px solid color-mix(in srgb, var(--reader-page-text) 12%, transparent);
     background:
-      linear-gradient(
-        to bottom,
-        color-mix(in srgb, var(--reader-page-bg) 94%, transparent),
-        color-mix(in srgb, var(--reader-page-bg) 82%, transparent)
-      ),
-      var(--reader-page-bg);
+      linear-gradient(var(--reader-toolbar-bg), var(--reader-toolbar-bg)), var(--reader-page-bg);
     color: var(--reader-page-text);
-    box-shadow: 0 16px 34px rgba(5, 7, 10, 0.14);
-    backdrop-filter: blur(18px) saturate(130%);
+    box-shadow: var(--app-chrome-shadow);
   }
 
   .reader-header-title {
@@ -898,7 +901,7 @@
   }
 
   .book-card-annotation-icon {
-    color: color-mix(in srgb, var(--app-accent) 62%, #ffffff 38%);
+    color: #d1d5db;
     font-size: 0.7rem;
   }
 
@@ -1068,55 +1071,71 @@
   }
 
   .settings-tabs {
-    --settings-tab-count: 3;
-    --settings-tab-index: 0;
-    position: relative;
-    display: grid;
-    min-height: 2.25rem;
-    flex: 1;
-    grid-template-columns: repeat(var(--settings-tab-count), minmax(0, 1fr));
-    overflow: hidden;
-    border: 1px solid var(--app-chrome-border);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--app-chrome-bg-strong) 86%, transparent);
-    padding: 0.2rem;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    display: flex;
+    gap: 0.75rem;
+    min-height: 2.75rem;
+    align-self: stretch;
+    flex-shrink: 0;
   }
 
-  .settings-tabs-indicator {
-    position: absolute;
-    top: 0.2rem;
-    bottom: 0.2rem;
-    left: 0.2rem;
-    width: calc((100% - 0.4rem) / var(--settings-tab-count));
-    border: 1px solid color-mix(in srgb, var(--app-accent) 42%, var(--app-chrome-border));
-    border-radius: 999px;
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--app-accent) 34%, rgba(255, 255, 255, 0.18)),
-      color-mix(in srgb, var(--app-accent) 22%, rgba(255, 255, 255, 0.1))
-    );
-    box-shadow: 0 10px 24px rgba(5, 7, 10, 0.22);
-    transform: translateX(calc(var(--settings-tab-index) * 100%));
-    transition:
-      transform 180ms ease,
-      border-color 140ms ease,
-      background-color 140ms ease;
+  .settings-page-header {
+    background: var(--app-surface-fill);
+    box-shadow: var(--app-chrome-shadow);
+  }
+
+  .settings-header-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding-block: 0.125rem;
+  }
+
+  .settings-page-heading {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-shrink: 0;
+  }
+
+  .settings-page-heading h1 {
+    font-size: 1rem;
+    font-weight: 650;
+  }
+
+  .settings-back-link {
+    display: inline-flex;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+    color: var(--app-chrome-muted);
+    font-size: 0.875rem;
+  }
+
+  .settings-back-link:hover {
+    background: var(--app-chrome-hover);
+    color: var(--app-chrome-text);
+  }
+
+  .settings-back-link:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
   }
 
   .settings-tab-button {
-    position: relative;
-    z-index: 1;
     display: inline-flex;
     min-width: 0;
     cursor: pointer;
     align-items: center;
     justify-content: center;
-    gap: 0.4rem;
-    overflow: hidden;
-    border-radius: 999px;
+    padding: 0.75rem 0.5rem;
+    border-bottom: 2px solid transparent;
     color: var(--app-chrome-muted);
-    font-size: 0.75rem;
+    font-size: 0.875rem;
     font-weight: 650;
     line-height: 1;
     outline: none;
@@ -1132,19 +1151,285 @@
   }
 
   .settings-tab-button:focus-visible {
-    box-shadow: var(--app-focus-ring);
+    outline: 2px solid currentColor;
+    outline-offset: -4px;
   }
 
-  .settings-tab-icon {
-    flex: 0 0 auto;
-    font-size: 0.95rem;
+  .settings-tab-button--active {
+    border-bottom-color: var(--app-accent);
   }
 
-  .settings-tab-label {
+  @media (max-width: 767px) {
+    .settings-header-row {
+      gap: 0.5rem;
+      padding-inline: 0.5rem;
+    }
+    .settings-page-heading {
+      gap: 0.25rem;
+    }
+    .settings-back-link span {
+      display: none;
+    }
+    .settings-tabs {
+      gap: 0;
+    }
+    .settings-tab-button {
+      padding-inline: 0.375rem;
+      font-size: 0.8125rem;
+    }
+  }
+
+  .reader-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 24vw) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 3rem;
+    width: 100%;
+    padding: 0.125rem 1rem;
+  }
+
+  .reader-toolbar-actions:last-child {
+    justify-self: end;
+  }
+
+  @media (min-width: 768px) {
+    .reader-toolbar {
+      padding-inline: 2rem;
+    }
+  }
+
+  @media (max-width: 1279px) {
+    .reader-toolbar .app-toolbar-label {
+      display: none;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .reader-toolbar {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 12vw) minmax(0, 1fr);
+    }
+    .reader-toolbar .app-toolbar-button {
+      min-width: 2.25rem;
+      padding-inline: 0.375rem;
+    }
+  }
+
+  .library-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-height: 3rem;
+    padding-block: 0.125rem;
+  }
+
+  .library-toolbar-context,
+  .library-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  .library-toolbar-context {
+    gap: 1rem;
+    flex-shrink: 0;
+  }
+  .library-toolbar-context h1 {
+    font-size: 1rem;
+    font-weight: 650;
+  }
+  .library-selection-count {
+    font-size: 0.875rem;
+    opacity: 0.7;
+  }
+  .library-toolbar-actions {
+    flex: 1;
+  }
+
+  .library-toolbar-spacer {
+    flex: 1;
+  }
+
+  .library-sort-row {
+    display: grid;
+    grid-template-columns: 1fr 2.75rem 2.75rem;
+    align-items: center;
+    padding-left: 0.875rem;
+    color: var(--app-chrome-text);
+    font-size: 0.875rem;
+  }
+
+  .library-sort-row .app-menu-item {
+    justify-content: center;
+    min-height: 2.75rem;
+  }
+  .library-sort-row button[aria-pressed='true'] {
+    background: var(--app-chrome-active);
+  }
+  .library-toolbar .app-menu-item:disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+  }
+  .library-operation {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: 2.75rem;
+  }
+
+  .app-toolbar-divider {
+    height: 1.25rem;
+    margin-inline: 0.375rem;
+    border-left: 1px solid currentColor;
+    opacity: 0.18;
+  }
+
+  .reader-toolbar-title {
+    flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: center;
+  }
+
+  .reader-toolbar-actions {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 0.25rem;
+  }
+
+  .app-toolbar-button {
+    display: inline-flex;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+    color: inherit;
+    font-size: 0.875rem;
+  }
+
+  .app-toolbar-button:hover,
+  .app-toolbar-button--active {
+    background: color-mix(in srgb, currentColor 10%, transparent);
+  }
+
+  .app-toolbar-button:disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+  }
+
+  .app-toolbar-button:focus-visible,
+  .reader-controls-reveal:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: -2px;
+  }
+
+  .reader-toolbar-menu {
+    width: 16rem;
+    max-width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 4rem);
+    overflow-y: auto;
+  }
+
+  .reader-toolbar-menu .app-menu-item > :first-child {
+    flex: 0 0 1rem;
+  }
+
+  .reader-toolbar-menu-status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border-top: 1px solid var(--app-chrome-border);
+    padding: 0.875rem;
+    color: var(--app-chrome-text);
+    font-size: 0.875rem;
+  }
+
+  .reader-toolbar-menu-status {
+    color: var(--app-chrome-muted);
+  }
+
+  .reader-controls-reveal {
+    position: fixed;
+    top: 0.375rem;
+    right: 0.75rem;
+    z-index: 10;
+    display: flex;
+    min-height: 2.75rem;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid color-mix(in srgb, var(--reader-page-text) 24%, transparent);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--app-surface-fill);
+    color: var(--reader-page-text);
+    font-size: 0.8125rem;
+  }
+
+  @media (max-width: 1023px) {
+    .reader-toolbar {
+      gap: 0.25rem;
+    }
+    .app-toolbar-label {
+      display: none;
+    }
+    .reader-toolbar-title {
+      font-size: 0.75rem;
+    }
+    .reader-toolbar-actions {
+      gap: 0;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .reader-toolbar {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    .reader-toolbar .app-toolbar-button {
+      min-width: 2rem;
+      padding-inline: 0.25rem;
+    }
+    .app-toolbar-divider {
+      display: none;
+    }
+    .reader-toolbar-title {
+      display: none;
+    }
+    .app-toolbar-button {
+      min-width: 2.25rem;
+      padding-inline: 0.375rem;
+    }
+    .reader-toolbar-actions {
+      flex-shrink: 0;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .library-toolbar {
+      flex-wrap: wrap;
+      gap: 0;
+      padding-block: 0.125rem;
+    }
+    .library-toolbar-context {
+      min-height: 2.75rem;
+      width: 100%;
+      justify-content: space-between;
+    }
+    .library-toolbar-actions {
+      min-height: 2.75rem;
+      width: 100%;
+      justify-content: flex-start;
+    }
+    .library-operation {
+      min-height: 5.5rem;
+    }
   }
 
   .settings-page-grid {
@@ -1215,7 +1500,7 @@
     width: 100%;
     border: 1px solid var(--app-surface-border);
     border-radius: 0.5rem;
-    background: color-mix(in srgb, var(--background-color) 74%, #ffffff);
+    background: color-mix(in srgb, var(--background-color) 96%, var(--font-color) 4%);
     padding: 0.55rem 0.7rem;
     color: var(--font-color);
     outline: none;
@@ -1522,10 +1807,10 @@
     gap: 0.45rem;
     overflow: hidden;
     border-radius: 0.5rem;
-    border: 1px solid color-mix(in srgb, var(--app-accent) 36%, var(--app-surface-border));
-    background: var(--app-accent-soft);
+    border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+    background: color-mix(in srgb, currentColor 6%, transparent);
     padding: 0 0.85rem;
-    color: var(--app-accent-strong);
+    color: inherit;
     font-weight: 650;
     line-height: 1;
     outline: none;
@@ -1536,11 +1821,37 @@
       color 140ms ease;
   }
 
-  .app-button:hover,
+  .app-button:hover:not(:disabled) {
+    border-color: color-mix(in srgb, currentColor 40%, transparent);
+    background: color-mix(in srgb, currentColor 12%, transparent);
+  }
+
   .app-button:focus-visible {
-    border-color: color-mix(in srgb, var(--app-accent) 68%, var(--app-surface-border));
-    background: color-mix(in srgb, var(--app-accent) 18%, transparent);
-    box-shadow: 0 8px 20px rgba(12, 16, 20, 0.12);
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+  }
+
+  .app-button:active:not(:disabled) {
+    background: color-mix(in srgb, currentColor 18%, transparent);
+  }
+
+  .app-button--primary {
+    border-color: transparent;
+    background: var(--font-color);
+    color: var(--background-color);
+  }
+
+  .app-button--primary:hover:not(:disabled) {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--font-color) 88%, var(--background-color));
+  }
+
+  .app-button--primary:active:not(:disabled) {
+    background: color-mix(in srgb, var(--font-color) 76%, var(--background-color));
+  }
+
+  .app-button--primary:focus-visible {
+    outline-color: var(--font-color);
   }
 
   .app-button:disabled {

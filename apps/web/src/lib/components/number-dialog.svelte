@@ -1,7 +1,7 @@
 <script lang="ts">
   import DialogTemplate from '$lib/components/dialog-template.svelte';
   import Ripple from '$lib/components/ripple.svelte';
-  import { buttonClasses } from '$lib/css-classes';
+  import { buttonClasses, inputClasses } from '$lib/css-classes';
   import { createEventDispatcher } from 'svelte';
 
   export let dialogHeader: string;
@@ -31,6 +31,8 @@
   <svelte:fragment slot="header">{dialogHeader}</svelte:fragment>
   <div class="flex flex-col text-sm sm:text-base" slot="content">
     <input
+      class={inputClasses}
+      aria-label={dialogHeader}
       type="number"
       min={minValue}
       max={maxValue}
@@ -43,7 +45,7 @@
     />
     <div class="text-red-500 mt-4">{error}</div>
   </div>
-  <div class="flex grow justify-between" slot="footer">
+  <div class="flex grow flex-wrap justify-end gap-3" slot="footer">
     <button
       class={buttonClasses}
       class:invisible={!showCancel}
@@ -52,7 +54,7 @@
       Cancel
       <Ripple />
     </button>
-    <button class={buttonClasses} on:click={() => closeDialog(target)}>
+    <button class="{buttonClasses} app-button--primary" on:click={() => closeDialog(target)}>
       Confirm
       <Ripple />
     </button>

@@ -39,7 +39,8 @@
     waitForReaderFontLoad
   } from '$lib/functions/reader-typography';
   import { getExternalTargetElement, isMobile$ } from '$lib/functions/utils';
-  import { faBookmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
+  import { faBookmark } from '@fortawesome/free-solid-svg-icons';
+  import ReaderLoadingScreen from '../reader-loading-screen.svelte';
   import {
     BehaviorSubject,
     combineLatest,
@@ -186,6 +187,10 @@
 
   let allowDisplay = false;
 
+  let restoringPosition = false;
+
+  let contentRevision = 0;
+
   let displayedHtml = '';
 
   let displayedSectionIndex = -1;
@@ -298,6 +303,9 @@
 
   $: {
     if (htmlContent) {
+      contentRevision += 1;
+      allowDisplay = false;
+      restoringPosition = false;
       scrollWhenReady = true;
     }
   }
@@ -587,6 +595,7 @@
   /** Experimental Code - May be removed or changed any time without warning */
 
   onDestroy(() => {
+    contentRevision += 1;
     document.removeEventListener('ttu-action', handleAction, false);
     sectionNavigator = undefined;
     fontLoadAttempt += 1;
@@ -992,7 +1001,7 @@
     });
   }
 
-  function onContentDisplayChange(
+  async function onContentDisplayChange(
     _calculator: SectionCharacterStatsCalculator,
     sectionIndex: number
   ) {
@@ -1018,15 +1027,38 @@
 
     if (scrollWhenReady) {
       scrollWhenReady = false;
-      bookmarkData.then((data) => {
-        if (!data || !bookmarkManager) return;
-        exploredCharCount = data.exploredCharCount || 0;
-        bookmarkManager.scrollToBookmark(data);
-      });
+      restoringPosition = true;
+      const revision = contentRevision;
+      try {
+        const data = await bookmarkData;
+        if (revision !== contentRevision) return;
+        if (data && bookmarkManager) {
+          exploredCharCount = data.exploredCharCount || 0;
+          await bookmarkManager.scrollToBookmark(data);
+        }
+      } catch (error) {
+        logger.error(`Failed to restore reading position: ${error}`);
+      } finally {
+        if (revision === contentRevision) restoringPosition = false;
+      }
+      if (revision !== contentRevision) return;
     } else {
       bookmarkData.then(updateBookmarkScreen);
     }
-    allowDisplay = true;
+    if (restoringPosition) return;
+    const renderToken = displayedSectionRenderToken;
+    const revision = contentRevision;
+    requestAnimationFrame(() => {
+      if (
+        revision === contentRevision &&
+        renderToken === displayedSectionRenderToken &&
+        displayedSectionIndex === sectionIndex$.getValue() &&
+        calculatorSectionIndex === displayedSectionIndex &&
+        !restoringPosition
+      ) {
+        allowDisplay = true;
+      }
+    });
   }
 
   function updateBookmarkScreen(data: BooksDbBookmarkData | undefined) {
@@ -1437,13 +1469,7 @@
 </div>
 
 {#if !allowDisplay}
-  <div
-    class="reader-loading-screen fixed inset-0 flex h-full w-full items-center justify-center text-7xl"
-    style:color={fontColor}
-    style:background-color={backgroundColor}
-  >
-    <Fa class="reader-loading-icon" icon={faSpinner} spin />
-  </div>
+  <ReaderLoadingScreen {fontColor} {backgroundColor} />
 {/if}
 
 {#if isBookmarkScreen}

@@ -27,7 +27,7 @@ export interface BookmarkManager {
   scrollToBookmark: (
     bookmarkData: BooksDbBookmarkData,
     customReadingPointScrollOffset?: number
-  ) => void;
+  ) => void | Promise<void>;
 }
 
 export interface PageManager {

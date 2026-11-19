@@ -64,6 +64,10 @@ import { writableSetLocalStorageSubject } from './internal/writable-set-local-st
 import { writableStringLocalStorageSubject } from './internal/writable-string-local-storage-subject';
 
 export const theme$ = writableStringLocalStorageSubject()('theme', 'light-theme');
+export const readerControlsHidden$ = writableBooleanLocalStorageSubject()(
+  'readerControlsHidden',
+  false
+);
 export const customThemes$ = writableObjectLocalStorageSubject<Record<string, ThemeOption>>()(
   'customThemes',
   {}

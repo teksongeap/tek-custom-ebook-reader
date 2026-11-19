@@ -1,55 +1,34 @@
 <script lang="ts">
-  import { faBookOpenReader, faClock, faDatabase } from '@fortawesome/free-solid-svg-icons';
+  import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
   import Fa from 'svelte-fa';
-  import MergedHeaderIcon from '$lib/components/merged-header-icon/merged-header-icon.svelte';
-  import Ripple from '$lib/components/ripple.svelte';
-  import { baseHeaderClasses, pxScreen } from '$lib/css-classes';
+  import { pagePath } from '$lib/data/env';
 
   export let leavePageLink: string;
   export let activeSettings: string;
 
-  const settingItems = [
-    {
-      label: 'Reader',
-      icon: faBookOpenReader
-    },
-    {
-      label: 'Data',
-      icon: faDatabase
-    },
-    {
-      label: 'Statistics',
-      icon: faClock
-    }
-  ];
-
-  $: activeSettingsIndex = Math.max(
-    settingItems.findIndex((settingItem) => settingItem.label === activeSettings),
-    0
-  );
+  const settingItems = ['Reader', 'Data', 'Statistics'];
+  $: backLabel = leavePageLink.startsWith(pagePath + '/b') ? 'Back to book' : 'Back to library';
 </script>
 
-<div class={baseHeaderClasses}>
-  <div class="{pxScreen} flex items-center gap-2 px-2 md:px-5">
-    <div
-      class="settings-tabs"
-      style={`--settings-tab-count: ${settingItems.length}; --settings-tab-index: ${activeSettingsIndex};`}
-    >
-      <span class="settings-tabs-indicator" aria-hidden="true"></span>
-      {#each settingItems as settingItem (settingItem.label)}
+<header class="app-header settings-page-header">
+  <div class="app-header-content settings-header-row">
+    <div class="settings-page-heading">
+      <a class="settings-back-link" href={leavePageLink} aria-label={backLabel} title={backLabel}>
+        <Fa icon={faArrowLeft} /><span>{backLabel}</span>
+      </a>
+      <h1>Settings</h1>
+    </div>
+    <span class="app-toolbar-divider" aria-hidden="true"></span>
+    <nav class="settings-tabs" aria-label="Settings categories">
+      {#each settingItems as label (label)}
         <button
           type="button"
           class="settings-tab-button"
-          class:settings-tab-button--active={activeSettings === settingItem.label}
-          aria-pressed={activeSettings === settingItem.label}
-          on:click={() => (activeSettings = settingItem.label)}
+          class:settings-tab-button--active={activeSettings === label}
+          aria-pressed={activeSettings === label}
+          on:click={() => (activeSettings = label)}>{label}</button
         >
-          <Fa class="settings-tab-icon" icon={settingItem.icon} />
-          <span class="settings-tab-label">{settingItem.label}</span>
-          <Ripple />
-        </button>
       {/each}
-    </div>
-    <MergedHeaderIcon {leavePageLink} />
+    </nav>
   </div>
-</div>
+</header>

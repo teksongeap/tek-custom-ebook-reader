@@ -714,7 +714,7 @@
 
 {$replicator$ ?? ''}
 
-<div class="elevation-4 fixed inset-x-0 top-0 z-10">
+<div class="fixed inset-x-0 top-0 z-10">
   <BookManagerHeader
     hasBookOpened={!!$currentBookId$}
     selectedCount={selectedBookIds.size}
@@ -748,7 +748,7 @@
 <div
   tabindex="0"
   role="button"
-  class="{pxScreen} h-full pt-16 xl:pt-14"
+  class="{pxScreen} h-full pt-28 md:pt-16"
   on:dragenter={(ev) => ev.preventDefault()}
   on:dragover={(ev) => ev.preventDefault()}
   on:dragend={(ev) => ev.preventDefault()}

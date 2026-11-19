@@ -6,7 +6,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test",
+    "test": "node --experimental-transform-types --test",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "check:types": "tsc --noEmit",
     "check:watch": "svelte-check --tsconfig ./tsconfig.json --watch"

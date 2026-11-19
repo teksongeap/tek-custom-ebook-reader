@@ -95,7 +95,8 @@
     enableVerticalFontKerning$,
     enableFontVPAL$,
     verticalTextOrientation$,
-    showCharacterCounter$
+    showCharacterCounter$,
+    readerControlsHidden$
   } from '$lib/data/store';
   import BookCompletionConfetti from '$lib/components/book-reader/book-completion-confetti/book-completion-confetti.svelte';
   import AnnotationSelectionToolbar from '$lib/components/book-reader/book-annotations/annotation-selection-toolbar.svelte';
@@ -197,8 +198,8 @@
   } from '$lib/functions/range-util';
 
   let showSpinner = true;
-  let showHeader = false;
-  let readerHeaderHotzoneEl: HTMLButtonElement | undefined;
+  $: headerVisible = !$readerControlsHidden$;
+  let readerControlsToggleEl: HTMLButtonElement | undefined;
   let isBookmarkScreen = false;
   let showFooter = true;
   let exploredCharCount = 0;
@@ -633,9 +634,9 @@
       ? limitToRange(convertRemToPixels(window, 0.5), window.innerWidth, $firstDimensionMargin$)
       : ($firstDimensionMargin$ ?? 0);
 
-  $: tapButtonHeight = `calc(100% - ${showHeader ? 5 : 4}rem)`;
+  $: tapButtonHeight = `calc(100% - ${headerVisible ? 5 : 4}rem)`;
 
-  $: tapButtonTop = `${showHeader ? 3 : 2}rem`;
+  $: tapButtonTop = `${headerVisible ? 3 : 2}rem`;
 
   $: readerFooterClearance = 12;
 
@@ -817,7 +818,6 @@
     const wasAutoscrollerEnabled = autoScroller?.wasAutoScrollerEnabled$.getValue();
     const wasTrackerPausedBefore = $statisticsEnabled$ ? $isTrackerPaused$ : true;
 
-    showHeader = false;
     autoScroller?.off();
 
     if ($statisticsEnabled$) {
@@ -1519,7 +1519,6 @@
 
   async function jumpToAnnotation(annotation: BooksDbAnnotation) {
     closeAnnotationsPanel();
-    showHeader = false;
     activeAnnotationId = '';
     annotationPopoverResetKey += 1;
     await tick();
@@ -1690,20 +1689,15 @@
 
   function jumpToSearchTarget(navigation: ReaderTargetNavigation) {
     closeSearchPanel();
-    showHeader = false;
     pauseTracker(true);
     readerTargetNavigation$.next(navigation);
   }
 
-  async function bookmarkPage({ hideHeader = true }: { hideHeader?: boolean } = {}) {
+  async function bookmarkPage() {
     const bookId = getBookIdSync();
     if (!bookId || !bookmarkManager) return;
 
     let data: BooksDbBookmarkData;
-
-    if (hideHeader) {
-      showHeader = false;
-    }
 
     if (isPaginated) {
       const userSelectedRange = $selectionToBookmarkEnabled$
@@ -1741,8 +1735,6 @@
   }
 
   function onFullscreenClick() {
-    showHeader = false;
-
     if (!fullscreenManager.fullscreenElement) {
       fullscreenManager.requestFullscreen(document.documentElement);
       return;
@@ -1924,30 +1916,6 @@
     });
   }
 
-  function closeHeaderOnPointerDownOutside(node: HTMLElement) {
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target;
-
-      const isInsideHeaderArea =
-        target instanceof Node &&
-        (node.contains(target) || !!readerHeaderHotzoneEl?.contains(target));
-
-      if (event.defaultPrevented || isInsideHeaderArea) {
-        return;
-      }
-
-      showHeader = false;
-    };
-
-    document.addEventListener('pointerdown', onPointerDown, true);
-
-    return {
-      destroy() {
-        document.removeEventListener('pointerdown', onPointerDown, true);
-      }
-    };
-  }
-
   async function leaveReader(routeId: string, deleteLastItem = true) {
     let message;
 
@@ -2056,7 +2024,6 @@
       customReadingPointLeft = window.innerWidth / 2 - 2;
     }
 
-    showHeader = false;
     isSelectingCustomReadingPoint = true;
     document.body.classList.add('cursor-crosshair');
 
@@ -2190,20 +2157,36 @@
 
 {$collectReaderImageGallerySpoilerToggles$ ?? ''}
 {$handleUpdateImageGalleryPictureSpoilers$ ?? ''}
-<button
-  bind:this={readerHeaderHotzoneEl}
-  type="button"
-  class="reader-header-hotzone fixed inset-x-0 top-0 z-[9] h-8 w-full"
-  aria-label="Show reader controls"
-  on:click|stopPropagation={() => (showHeader = true)}
-></button>
-{#if showHeader}
+{#if !headerVisible}
+  <button
+    type="button"
+    class="reader-header-hotzone fixed inset-x-0 top-0 z-[9] h-8 w-full"
+    aria-label="Show reader controls"
+    on:click|stopPropagation={() => ($readerControlsHidden$ = false)}
+  ></button>
+  <button
+    bind:this={readerControlsToggleEl}
+    type="button"
+    class="reader-controls-reveal"
+    style={readerChromeStyle}
+    aria-expanded="false"
+    aria-controls="reader-controls"
+    on:click|stopPropagation={() => ($readerControlsHidden$ = false)}
+    >Show controls <span aria-hidden="true">⌄</span></button
+  >
+{/if}
+{#if headerVisible}
   <div
+    id="reader-controls"
     class="writing-horizontal-tb fixed inset-x-0 top-0 z-40 w-full"
     transition:fly|local={{ y: -300, easing: quintInOut }}
-    use:closeHeaderOnPointerDownOutside
   >
     <BookReaderHeader
+      on:hideControls={async () => {
+        $readerControlsHidden$ = true;
+        await tick();
+        readerControlsToggleEl?.focus();
+      }}
       bookTitle={$rawBookData$?.title ?? ''}
       fontSize={$fontSize$}
       fontColor={$themeOption$?.fontColor ?? ''}
@@ -2223,19 +2206,15 @@
       on:tocClick={() => {
         pauseTracker();
 
-        showHeader = false;
         tocIsOpen$.next(true);
       }}
       on:jumpClick={handleJump}
       on:completeBook={completeBook}
       on:setCustomReadingPoint={handleSetCustomReadingPoint}
       on:showCustomReadingPoint={() => {
-        showHeader = false;
         showCustomReadingPoint = true;
       }}
       on:resetCustomReadingPoint={() => {
-        showHeader = false;
-
         if ($pauseTrackerOnCustomPointChange$) {
           pauseTracker();
         }
@@ -2257,7 +2236,6 @@
       on:fullscreenClick={onFullscreenClick}
       on:bookmarkClick={() => bookmarkPage()}
       on:scrollToBookmarkClick={() => {
-        showHeader = false;
         scrollToBookmark();
       }}
       on:statisticsClick={() => {
@@ -2268,22 +2246,19 @@
         leaveReader(mergeEntries.STATISTICS.routeId, false);
       }}
       on:readerImageGalleryClick={() => {
-        showHeader = false;
         showReaderImageGallery = true;
       }}
       on:annotationsClick={() => {
-        showHeader = false;
         pauseTracker();
         showAnnotationsPanel = true;
       }}
       on:searchClick={() => {
-        showHeader = false;
         pauseTracker();
         showSearchPanel = true;
       }}
       on:settingsClick={() => leaveReader(mergeEntries.SETTINGS.routeId, false)}
       on:domainHintClick={onDomainHintClick}
-      on:bookManagerClick={() => leaveReader(mergeEntries.MANAGE.routeId)}
+      on:bookManagerClick={() => leaveReader(mergeEntries.MANAGE.routeId, false)}
     />
   </div>
 {/if}
@@ -2388,7 +2363,7 @@
     }}
     on:annotationUpdate={updateAnnotationComment}
     on:annotationDelete={({ detail }) => deleteAnnotation(detail)}
-    on:bookmark={() => bookmarkPage({ hideHeader: false })}
+    on:bookmark={() => bookmarkPage()}
     on:trackerPause={() => pauseTracker(true)}
   />
   <AnnotationSelectionToolbar

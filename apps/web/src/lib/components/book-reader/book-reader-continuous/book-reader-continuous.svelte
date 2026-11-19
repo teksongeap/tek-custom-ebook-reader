@@ -35,7 +35,8 @@
     waitForReaderFontLoad
   } from '$lib/functions/reader-typography';
   import { getExternalTargetElement } from '$lib/functions/utils';
-  import { faBookmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
+  import { faBookmark } from '@fortawesome/free-solid-svg-icons';
+  import ReaderLoadingScreen from '../reader-loading-screen.svelte';
   import {
     animationFrameScheduler,
     combineLatest,
@@ -163,6 +164,10 @@
   }>();
 
   let allowDisplay = false;
+
+  let restoringPosition = false;
+
+  let contentRevision = 0;
 
   let contentEl: HTMLElement | undefined;
 
@@ -400,6 +405,7 @@
   /** Experimental Code - May be removed any time without warning */
 
   onDestroy(() => {
+    contentRevision += 1;
     document.removeEventListener('ttu-action', handleAction, false);
     sectionNavigator = undefined;
     fontLoadAttempt += 1;
@@ -494,17 +500,27 @@
 
     if (scrollWhenReady) {
       scrollWhenReady = false;
+      restoringPosition = true;
+      const revision = contentRevision;
 
       bookmarkData
         .then((data) => {
-          if (!data || !bookmarkManager) {
+          if (revision !== contentRevision || !data || !bookmarkManager) {
             return;
           }
 
           prevIntendedCharCount = data.exploredCharCount || 0;
           bookmarkManager.scrollToBookmark(data, customReadingPointScrollOffset);
         })
+        .catch((error) => logger.error(`Failed to restore reading position: ${error}`))
         .finally(() => {
+          if (revision !== contentRevision) return;
+          requestAnimationFrame(() => {
+            if (revision !== contentRevision) return;
+            restoringPosition = false;
+            allowDisplay = true;
+          });
+
           if (autoBookmark) {
             fromEvent(window, 'scroll')
               .pipe(
@@ -558,7 +574,7 @@
         });
     }
     contentReadyEvent = {};
-    allowDisplay = true;
+    if (!restoringPosition) allowDisplay = true;
   }
 
   function updateSectionProgress() {
@@ -826,6 +842,9 @@
   }
 
   function resetContentState() {
+    contentRevision += 1;
+    allowDisplay = false;
+    restoringPosition = false;
     contentReset$.next();
     sectionToElement.clear();
     sectionData.clear();
@@ -1008,13 +1027,7 @@
 {/if}
 
 {#if !allowDisplay}
-  <div
-    class="reader-loading-screen fixed inset-0 flex h-full w-full items-center justify-center text-7xl"
-    style:color={fontColor}
-    style:background-color={backgroundColor}
-  >
-    <Fa class="reader-loading-icon" icon={faSpinner} spin />
-  </div>
+  <ReaderLoadingScreen {fontColor} {backgroundColor} />
 {/if}
 
 <svelte:body
