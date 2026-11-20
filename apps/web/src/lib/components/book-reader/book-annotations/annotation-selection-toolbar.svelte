@@ -1,8 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, tick } from 'svelte';
   import { getReaderChromeStyle } from '$lib/functions/reader-typography';
-  import Fa from 'svelte-fa';
-  import { faHighlighter } from '@fortawesome/free-solid-svg-icons';
   import { annotationColorOptions, type AnnotationColor } from './annotation-colors';
 
   export let selectionRect: DOMRect | undefined;
@@ -202,10 +200,6 @@
     style={toolbarStyle || chromeStyle}
   >
     <div class="annotation-toolbar-main">
-      <div class="annotation-toolbar-title">
-        <Fa icon={faHighlighter} />
-        <span>Highlight</span>
-      </div>
       <div class="annotation-toolbar-colors" aria-label="Highlight color">
         {#each annotationColorOptions as colorOption, index (colorOption.id)}
           <button
@@ -217,7 +211,7 @@
             on:click={() => saveAnnotation(colorOption.id)}
             on:keydown|stopPropagation={() => {}}
           >
-            <span class="annotation-toolbar-swatch-number">{index + 1}</span>
+            <span class="annotation-toolbar-swatch-color" aria-hidden="true"></span>
           </button>
         {/each}
       </div>
@@ -229,32 +223,13 @@
   .annotation-toolbar {
     width: max-content;
     max-width: calc(100vw - 1.5rem);
-    border: 1px solid color-mix(in srgb, var(--reader-page-text) 26%, var(--reader-page-bg));
-    border-radius: 0.65rem;
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--reader-page-bg) 91%, var(--reader-page-text)),
-        color-mix(in srgb, var(--reader-page-bg) 97%, var(--reader-page-text))
-      ),
-      var(--reader-page-bg);
-    box-shadow:
-      0 18px 42px rgba(5, 7, 10, 0.32),
-      inset 0 1px 0 color-mix(in srgb, #ffffff 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--reader-page-text) 12%, var(--reader-page-bg));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--reader-page-bg) 98%, var(--reader-page-text));
+    box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
     color: var(--reader-page-text);
     font-size: var(--reader-ui-font-size);
-    padding: 0.42rem;
-    backdrop-filter: blur(20px) saturate(140%);
-    transition:
-      width 160ms ease,
-      padding 160ms ease,
-      border-radius 160ms ease;
-  }
-
-  .annotation-toolbar-main {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
+    padding: 0.25rem;
   }
 
   .annotation-toolbar--vertical {
@@ -262,107 +237,50 @@
     writing-mode: vertical-rl;
   }
 
-  .annotation-toolbar-title {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    color: color-mix(in srgb, var(--reader-page-text) 78%, transparent);
-    font-size: var(--reader-ui-small-font-size);
-    font-weight: 800;
-    line-height: 1;
-    text-transform: uppercase;
-  }
-
-  .annotation-toolbar-title {
-    height: 1.65rem;
-    width: 1.65rem;
-    justify-content: center;
-    border-radius: 0.45rem;
-    background: color-mix(in srgb, var(--reader-page-text) 8%, transparent);
-  }
-
-  .annotation-toolbar-title span {
-    display: none;
-  }
-
-  .annotation-toolbar--vertical .annotation-toolbar-title,
-  .annotation-toolbar--vertical .annotation-toolbar-swatch-number {
-    writing-mode: horizontal-tb;
-  }
-
   .annotation-toolbar-colors {
     display: flex;
-    flex: 1 1 auto;
     justify-content: center;
-    gap: 0.35rem;
+    gap: 0.125rem;
     min-width: 0;
   }
 
   .annotation-toolbar-swatch {
-    --book-annotation-base: #f5c84b;
-    position: relative;
-    height: 1.5rem;
-    width: 1.5rem;
-    flex: 0 0 auto;
-    cursor: pointer;
-    overflow: hidden;
-    padding: 0;
-    border: 1px solid color-mix(in srgb, var(--reader-page-text) 18%, transparent);
-    border-radius: 999px;
-    appearance: none;
-    background: var(--book-annotation-base);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, #ffffff 10%, transparent),
-      0 8px 18px color-mix(in srgb, var(--book-annotation-base) 20%, transparent);
-    outline: none;
-    transition:
-      box-shadow 140ms ease,
-      transform 140ms ease;
-  }
-
-  .annotation-toolbar-swatch::before {
-    position: absolute;
-    inset: 1px;
-    border-radius: inherit;
-    background: linear-gradient(
-      145deg,
-      rgba(255, 255, 255, 0.34),
-      rgba(255, 255, 255, 0.08) 42%,
-      transparent 56%,
-      rgba(0, 0, 0, 0.18)
-    );
-    content: '';
-    pointer-events: none;
-  }
-
-  .annotation-toolbar-swatch:hover,
-  .annotation-toolbar-swatch:focus-visible {
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, #ffffff 16%, transparent),
-      0 0 0 2px color-mix(in srgb, var(--reader-page-bg) 82%, transparent),
-      0 0 0 4px var(--book-annotation-base),
-      0 12px 24px color-mix(in srgb, var(--book-annotation-base) 24%, transparent);
-    transform: translateY(-1px);
-  }
-
-  .annotation-toolbar-swatch-number {
-    position: absolute;
-    inset: 50% auto auto 50%;
     display: inline-flex;
-    height: 0.95rem;
-    min-width: 0.95rem;
-    transform: translate(-50%, -50%);
+    height: 2.5rem;
+    width: 2.5rem;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    border: 0;
     border-radius: 999px;
-    color: rgba(0, 0, 0, 0.84);
-    font-size: var(--reader-ui-xsmall-font-size);
-    font-weight: 900;
-    line-height: 1;
+    appearance: none;
+    background: transparent;
+    outline: none;
+    transition: background-color 140ms ease;
+  }
+
+  .annotation-toolbar-swatch-color {
+    height: 1.35rem;
+    width: 1.35rem;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--book-annotation-base) 78%, var(--reader-page-bg));
     pointer-events: none;
-    z-index: 1;
-    text-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.54),
-      0 -1px 0 rgba(255, 255, 255, 0.28);
+  }
+
+  .annotation-toolbar-swatch:hover {
+    background: color-mix(in srgb, var(--reader-page-text) 8%, transparent);
+  }
+
+  .annotation-toolbar-swatch:focus-visible {
+    outline: 2px solid var(--reader-page-text);
+    outline-offset: -2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .annotation-toolbar-swatch {
+      transition: none;
+    }
   }
 </style>

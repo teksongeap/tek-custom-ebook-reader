@@ -303,13 +303,16 @@ function getTextPointAtOffset(root: HTMLElement, targetOffset: number) {
 
 function wrapRangeWithAnnotation(document: Document, range: Range, annotation: BooksDbAnnotation) {
   const textNodes = getTextNodesInRange(document, range);
+  // A live Range changes when its ruby subtree is moved into a wrapper.
+  const { startContainer, endContainer, startOffset: rangeStart, endOffset: rangeEnd } = range;
   const spans: HTMLSpanElement[] = [];
+  const wrappedRubyElements = new Set<Element>();
 
   for (let index = textNodes.length - 1; index >= 0; index -= 1) {
     const textNode = textNodes[index];
     const textLength = textNode.textContent?.length || 0;
-    const startOffset = textNode === range.startContainer ? range.startOffset : 0;
-    const endOffset = textNode === range.endContainer ? range.endOffset : textLength;
+    const startOffset = textNode === startContainer ? rangeStart : 0;
+    const endOffset = textNode === endContainer ? rangeEnd : textLength;
     const safeStartOffset = Math.max(0, Math.min(textLength, startOffset));
     const safeEndOffset = Math.max(safeStartOffset, Math.min(textLength, endOffset));
 
@@ -317,14 +320,26 @@ function wrapRangeWithAnnotation(document: Document, range: Range, annotation: B
       continue;
     }
 
-    let annotationTextNode = textNode;
-
-    if (safeEndOffset < annotationTextNode.length) {
-      annotationTextNode.splitText(safeEndOffset);
+    // Ruby layout depends on its original base/reading children. Keep the
+    // complete ruby subtree intact and put annotation UI outside that subtree.
+    let ruby = textNode.parentElement?.closest('ruby');
+    while (ruby?.parentElement?.closest('ruby')) {
+      ruby = ruby.parentElement.closest('ruby');
+    }
+    if (ruby && wrappedRubyElements.has(ruby)) {
+      continue;
     }
 
-    if (safeStartOffset > 0) {
-      annotationTextNode = annotationTextNode.splitText(safeStartOffset);
+    let annotationNode: Node = ruby || textNode;
+    if (!ruby) {
+      let annotationTextNode = textNode;
+      if (safeEndOffset < annotationTextNode.length) {
+        annotationTextNode.splitText(safeEndOffset);
+      }
+      if (safeStartOffset > 0) {
+        annotationTextNode = annotationTextNode.splitText(safeStartOffset);
+      }
+      annotationNode = annotationTextNode;
     }
 
     const span = document.createElement('span');
@@ -336,13 +351,16 @@ function wrapRangeWithAnnotation(document: Document, range: Range, annotation: B
     span.tabIndex = -1;
     span.style.setProperty('--book-annotation-base', getAnnotationColorValue(annotation.color));
 
-    const parentNode = annotationTextNode.parentNode;
+    const parentNode = annotationNode.parentNode;
     if (!parentNode) {
       continue;
     }
 
-    parentNode.insertBefore(span, annotationTextNode);
-    span.appendChild(annotationTextNode);
+    parentNode.insertBefore(span, annotationNode);
+    span.appendChild(annotationNode);
+    if (ruby) {
+      wrappedRubyElements.add(ruby);
+    }
     spans.push(span);
   }
 

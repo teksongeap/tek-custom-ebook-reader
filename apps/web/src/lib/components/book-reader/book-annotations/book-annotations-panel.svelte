@@ -803,15 +803,10 @@
     display: flex;
     height: 100%;
     width: 100%;
+    min-width: 0;
     flex-direction: column;
     overscroll-behavior: contain;
-    background:
-      linear-gradient(
-        145deg,
-        color-mix(in srgb, var(--reader-page-bg) 94%, var(--reader-page-text) 6%),
-        color-mix(in srgb, var(--reader-page-bg) 88%, var(--reader-page-text) 12%)
-      ),
-      var(--reader-page-bg);
+    background: var(--reader-page-bg);
     color: var(--reader-page-text);
     font-size: var(--reader-ui-font-size);
   }
@@ -838,8 +833,8 @@
     align-items: center;
     justify-content: center;
     border-radius: 0.625rem;
-    background: color-mix(in srgb, var(--app-accent) 16%, transparent);
-    color: var(--app-accent);
+    background: color-mix(in srgb, var(--reader-page-text) 6%, var(--reader-page-bg));
+    color: color-mix(in srgb, var(--reader-page-text) 72%, var(--reader-page-bg));
   }
 
   .annotations-panel-title-icon {
@@ -850,8 +845,9 @@
 
   .annotations-panel-title-main {
     font-size: var(--reader-ui-title-font-size);
-    font-weight: 850;
-    line-height: 1.1;
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
   }
 
   .annotations-panel-title-sub {
@@ -917,7 +913,7 @@
   .annotations-panel-filter:focus-within,
   .annotations-panel-sort:focus-within {
     border-color: color-mix(in srgb, var(--app-accent) 62%, transparent);
-    box-shadow: var(--app-focus-ring);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--reader-page-text) 32%, transparent);
   }
 
   .annotations-panel-control-icon {
@@ -936,8 +932,16 @@
     color: var(--reader-page-text);
     font: inherit;
     font-size: var(--reader-ui-small-font-size);
-    font-weight: 720;
+    font-weight: 500;
     outline: none;
+  }
+
+  .annotations-panel-search input:focus,
+  .annotations-panel-filter select:focus,
+  .annotations-panel-sort select:focus {
+    border: 0;
+    outline: none;
+    box-shadow: none;
   }
 
   .annotations-panel-search input::placeholder {
@@ -993,6 +997,7 @@
     flex: 1;
     overflow: auto;
     overscroll-behavior: contain;
+    scrollbar-gutter: stable;
     padding: 0.75rem;
   }
 
@@ -1000,46 +1005,35 @@
     --book-annotation-base: #f5c84b;
     display: grid;
     width: 100%;
-    grid-template-columns: 0.45rem minmax(0, 1fr) auto;
+    grid-template-columns: 0.2rem minmax(0, 1fr) auto;
     gap: 0.75rem;
-    margin-bottom: 0.625rem;
-    border: 1px solid color-mix(in srgb, var(--reader-page-text) 11%, transparent);
-    border-radius: 0.75rem;
-    background:
-      linear-gradient(
-        135deg,
-        color-mix(in srgb, var(--book-annotation-base) 13%, transparent),
-        color-mix(in srgb, var(--reader-page-bg) 74%, transparent)
-      ),
-      color-mix(in srgb, var(--reader-page-bg) 90%, transparent);
+    margin-bottom: 0.65rem;
+    border: 1px solid color-mix(in srgb, var(--reader-page-text) 12%, var(--reader-page-bg));
+    border-radius: 0.625rem;
+    background: color-mix(in srgb, var(--reader-page-text) 2%, var(--reader-page-bg));
     color: inherit;
-    padding: 0.75rem;
+    padding: 0.85rem 0.65rem 0.85rem 0.75rem;
     text-align: left;
-    outline: none;
     transition:
       border-color 140ms ease,
-      box-shadow 140ms ease,
-      transform 140ms ease;
+      background-color 140ms ease;
   }
 
   .annotation-item:hover,
   .annotation-item:focus-within {
-    border-color: color-mix(in srgb, var(--book-annotation-base) 52%, transparent);
-    box-shadow: 0 16px 34px rgba(5, 7, 10, 0.16);
-    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--book-annotation-base) 40%, var(--reader-page-text) 20%);
+    background: color-mix(in srgb, var(--reader-page-text) 4%, var(--reader-page-bg));
   }
 
   .annotation-item--editing {
-    border-color: color-mix(in srgb, var(--book-annotation-base) 58%, transparent);
-    box-shadow: 0 16px 34px rgba(5, 7, 10, 0.14);
+    border-color: color-mix(in srgb, var(--book-annotation-base) 48%, var(--reader-page-text));
   }
 
   .annotation-item-swatch {
     height: 100%;
     min-height: 4.5rem;
-    border-radius: 999px;
-    background: var(--book-annotation-base);
-    box-shadow: 0 0 18px color-mix(in srgb, var(--book-annotation-base) 32%, transparent);
+    border-radius: 0.15rem;
+    background: color-mix(in srgb, var(--book-annotation-base) 72%, var(--reader-page-bg));
   }
 
   .annotation-item-content {
@@ -1058,7 +1052,7 @@
     gap: 0.3rem;
     color: color-mix(in srgb, var(--reader-page-text) 54%, transparent);
     font-size: var(--reader-ui-small-font-size);
-    font-weight: 620;
+    font-weight: 400;
     line-height: 1.25;
   }
 
@@ -1112,8 +1106,8 @@
     overflow: hidden;
     overflow-wrap: anywhere;
     font-size: var(--reader-reading-font-size);
-    font-weight: 500;
-    line-height: 1.3;
+    font-weight: 400;
+    line-height: 1.6;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
     line-clamp: 3;
@@ -1124,18 +1118,17 @@
     min-width: 0;
     flex-direction: column;
     gap: 0.45rem;
-    border: 1px solid color-mix(in srgb, var(--book-annotation-base) 16%, transparent);
-    border-radius: 0.55rem;
-    background: color-mix(in srgb, var(--reader-page-bg) 72%, transparent);
-    padding: 0.55rem;
+    border-top: 1px solid color-mix(in srgb, var(--reader-page-text) 10%, var(--reader-page-bg));
+    padding-top: 0.65rem;
+    margin-top: 0.15rem;
   }
 
   .annotation-item-comment {
-    color: color-mix(in srgb, var(--reader-page-text) 68%, transparent);
+    color: color-mix(in srgb, var(--reader-page-text) 76%, var(--reader-page-bg));
     overflow-wrap: anywhere;
-    font-size: var(--reader-reading-font-size);
-    font-weight: 250;
-    line-height: 1.35;
+    font-size: var(--reader-ui-font-size);
+    font-weight: 400;
+    line-height: 1.55;
     white-space: pre-wrap;
   }
 
@@ -1153,46 +1146,30 @@
 
   .annotation-item-comment-expand {
     display: inline-flex;
-    width: 100%;
+    align-self: flex-start;
     align-items: center;
-    justify-content: center;
     gap: 0.4rem;
     cursor: pointer;
-    border: 1px solid color-mix(in srgb, var(--book-annotation-base) 26%, transparent);
-    border-radius: 0.5rem;
-    background:
-      linear-gradient(
-        135deg,
-        color-mix(in srgb, var(--book-annotation-base) 13%, transparent),
-        color-mix(in srgb, var(--reader-page-text) 5%, transparent)
-      ),
-      color-mix(in srgb, var(--reader-page-bg) 78%, transparent);
-    color: color-mix(in srgb, var(--reader-page-text) 76%, var(--book-annotation-base));
+    border: 1px solid transparent;
+    border-radius: 0.35rem;
+    background: transparent;
+    color: color-mix(in srgb, var(--reader-page-text) 72%, var(--reader-page-bg));
     font: inherit;
     font-size: var(--reader-ui-small-font-size);
-    font-weight: 820;
+    font-weight: 500;
     outline: none;
-    padding: 0.36rem 0.55rem;
-    transition:
-      background-color 140ms ease,
-      border-color 140ms ease,
-      box-shadow 140ms ease,
-      color 140ms ease,
-      transform 140ms ease;
+    padding: 0.25rem 0.4rem;
   }
 
   .annotation-item-comment-expand:hover,
   .annotation-item-comment-expand:focus-visible {
-    border-color: color-mix(in srgb, var(--book-annotation-base) 54%, transparent);
-    background:
-      linear-gradient(
-        135deg,
-        color-mix(in srgb, var(--book-annotation-base) 20%, transparent),
-        color-mix(in srgb, var(--reader-page-text) 8%, transparent)
-      ),
-      color-mix(in srgb, var(--reader-page-bg) 72%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--book-annotation-base) 16%, transparent);
+    background: color-mix(in srgb, var(--reader-page-text) 7%, var(--reader-page-bg));
     color: var(--reader-page-text);
+  }
+
+  .annotation-item-comment-expand:focus-visible {
+    outline: 2px solid var(--reader-page-text);
+    outline-offset: 1px;
   }
 
   .annotation-item-comment-expand:active {
@@ -1202,7 +1179,7 @@
   .annotation-item-comment-expand-icon {
     display: inline-flex;
     align-items: center;
-    color: var(--book-annotation-base);
+    color: inherit;
     font-size: var(--reader-ui-xsmall-font-size);
   }
 
@@ -1416,7 +1393,7 @@
   .annotations-panel-empty-title {
     margin-top: 1rem;
     font-size: var(--reader-ui-title-font-size);
-    font-weight: 820;
+    font-weight: 600;
   }
 
   .annotations-panel-empty-copy {
@@ -1427,9 +1404,17 @@
     line-height: 1.35;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .annotation-item,
+    .annotation-item-actions button,
+    .annotation-item-editor-actions button {
+      transition: none;
+    }
+  }
+
   @media (max-width: 28rem) {
     .annotation-item {
-      grid-template-columns: 0.4rem minmax(0, 1fr) auto;
+      grid-template-columns: 0.2rem minmax(0, 1fr) auto;
       gap: 0.6rem;
     }
   }

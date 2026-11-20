@@ -65,9 +65,13 @@
   }
 
   :global(rt),
-  :global(rp) {
-    user-select: none;
-    -webkit-user-select: none;
+  :global(rt *),
+  :global(rp),
+  :global(rp *),
+  :global(rtc),
+  :global(rtc *) {
+    user-select: none !important;
+    -webkit-user-select: none !important;
   }
 
   :global(p),

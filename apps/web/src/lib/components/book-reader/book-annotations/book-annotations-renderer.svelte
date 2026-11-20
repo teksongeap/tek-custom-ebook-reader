@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shouldDeleteAnnotationFromEditor } from './annotation-editor-keyboard';
   import { BookReaderAvailableKeybind } from '$lib/data/book-reader-keybind';
   import type { BooksDbAnnotation } from '$lib/data/database/books-db/versions/books-db';
   import { bookReaderKeybindMap$ } from '$lib/data/store';
@@ -300,6 +301,15 @@
     };
     const pointerLeave = () => clearHoverOpen(annotation);
     const click = (event: MouseEvent) => {
+      // Let the reader's delegated ruby handler reveal hidden furigana.
+      // Hover, keyboard activation, and double-click still open the annotation.
+      if (
+        event.target instanceof Element &&
+        event.target.closest('.book-content--hide-furigana ruby')
+      ) {
+        return;
+      }
+
       const currentAnnotation = getCurrentAnnotation();
 
       if (!currentAnnotation) {
@@ -874,6 +884,12 @@
   function handleDraftCommentKeydown(event: KeyboardEvent) {
     event.stopPropagation();
 
+    if (shouldDeleteAnnotationFromEditor(event)) {
+      event.preventDefault();
+      deleteActiveAnnotation();
+      return;
+    }
+
     if (event.key !== 'Enter' || event.shiftKey || event.isComposing) {
       if (event.key === 'Escape' && !event.isComposing) {
         event.preventDefault();
@@ -889,6 +905,18 @@
 
   function handleAnnotationCardKeydown(event: KeyboardEvent) {
     if (!activeAnnotation || event.defaultPrevented || event.repeat || event.isComposing) {
+      return;
+    }
+
+    if (
+      isEditing &&
+      event.target instanceof Node &&
+      popoverEl?.contains(event.target) &&
+      shouldDeleteAnnotationFromEditor(event)
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      deleteActiveAnnotation();
       return;
     }
 
@@ -1446,8 +1474,9 @@
             <button
               type="button"
               class="book-annotation-card-editor-action book-annotation-card-editor-action--danger"
-              title="Delete annotation"
+              title="Delete annotation (Delete)"
               aria-label="Delete annotation"
+              aria-keyshortcuts="Delete"
               on:click|stopPropagation={deleteActiveAnnotation}
             >
               <Fa icon={faTrash} />
@@ -1533,48 +1562,40 @@
 <style lang="scss">
   :global(.book-annotation-highlight) {
     --book-annotation-base: #f5c84b;
-    border-radius: 0.18em;
-    background: linear-gradient(
-      to top,
-      color-mix(in srgb, var(--book-annotation-base) 44%, transparent) 0 62%,
-      transparent 62%
+    // Ruby makes the wrapper taller; marker depth must follow the base font,
+    // not a percentage of that wrapper's box.
+    --book-annotation-rest-size: 100% 0.65em;
+    --book-annotation-focus-size: 100% 0.74em;
+    background-image: linear-gradient(
+      color-mix(in srgb, var(--book-annotation-base) 44%, transparent),
+      color-mix(in srgb, var(--book-annotation-base) 44%, transparent)
     );
+    background-size: var(--book-annotation-rest-size);
+    background-position: center bottom 0.14em;
+    background-repeat: no-repeat;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
     cursor: pointer;
-    margin: 0 -0.02em;
-    outline: none;
-    padding: 0 0.02em;
-    transition:
-      background-color 140ms ease,
-      box-shadow 140ms ease,
-      filter 140ms ease;
+    transition: background-size var(--book-content-hover-focus-exit-duration, 300ms) ease;
   }
 
   :global(.book-annotation-highlight:hover),
+  :global(.book-annotation-highlight:focus-visible),
+  :global(.book-annotation-highlight--active),
+  :global(.book-annotation-highlight--hovered) {
+    background-size: var(--book-annotation-focus-size);
+    transition-duration: var(--book-content-hover-focus-enter-duration, 140ms);
+  }
+
   :global(.book-annotation-highlight:focus-visible) {
-    background: linear-gradient(
-      to top,
-      color-mix(in srgb, var(--book-annotation-base) 64%, transparent) 0 62%,
-      transparent 62%
-    );
-    filter: saturate(1.06);
+    outline: 1px solid currentColor;
+    outline-offset: 2px;
   }
 
   :global(.book-content--writing-vertical-rl .book-annotation-highlight) {
-    background: color-mix(in srgb, var(--book-annotation-base) 44%, transparent);
-  }
-
-  :global(.book-content--writing-vertical-rl .book-annotation-highlight:hover),
-  :global(.book-content--writing-vertical-rl .book-annotation-highlight:focus-visible) {
-    background: color-mix(in srgb, var(--book-annotation-base) 64%, transparent);
-  }
-
-  :global(.book-annotation-highlight--active),
-  :global(.book-annotation-highlight--hovered) {
-    box-shadow:
-      0 0 0 2px color-mix(in srgb, var(--book-annotation-base) 72%, transparent),
-      0 8px 24px color-mix(in srgb, var(--book-annotation-base) 22%, transparent);
+    --book-annotation-rest-size: 0.65em 100%;
+    --book-annotation-focus-size: 0.74em 100%;
+    background-position: right 0.14em center;
   }
 
   .book-annotation-card {
