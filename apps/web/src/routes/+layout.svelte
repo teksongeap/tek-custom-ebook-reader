@@ -35,7 +35,12 @@
   let userFontLoadToken = 0;
   let userFontObjectUrls: string[] = [];
 
-  const navigationWarmupRoutes = new Set(['/b', '/manage', '/settings', '/statistics']);
+  const navigationWarmupRoutes = new Map([
+    ['/b', 'Opening book'],
+    ['/manage', 'Opening library'],
+    ['/settings', 'Opening settings'],
+    ['/statistics', 'Opening statistics']
+  ]);
 
   $: if (browser) {
     isMobile$.next(isMobile(window));
@@ -237,12 +242,12 @@
 <slot />
 
 {#if showNavigationWarmup}
-  <div class="writing-horizontal-tb fixed inset-0 z-50 h-full w-full">
+  <div class="app-navigation-loading writing-horizontal-tb fixed inset-0 z-50 h-full w-full">
     <div class="tap-highlight-transparent absolute inset-0 bg-black/[.24]" />
     <div
       class="relative top-1/2 left-1/2 inline-block max-w-[80vw] -translate-x-1/2 -translate-y-1/2"
     >
-      <LoadingDialog label="Warming up" />
+      <LoadingDialog label={navigationWarmupRoutes.get(navigationRouteId || '')} />
     </div>
   </div>
 {/if}

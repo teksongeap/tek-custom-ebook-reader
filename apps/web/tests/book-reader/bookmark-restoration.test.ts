@@ -74,3 +74,16 @@ test('a stale saved-section event does not reposition a different active section
   await restoration;
   assert.deepEqual(state.scrolls, []);
 });
+
+test('changing the target cancels restoration without waiting for the abandoned section', async () => {
+  const state = setup();
+  const restoration = state.manager.scrollToBookmark(state.bookmark);
+  state.index.next(3);
+  const outcome = await Promise.race([
+    restoration.then(() => 'cancelled'),
+    new Promise((resolve) => setTimeout(() => resolve('still waiting'), 100))
+  ]);
+  assert.equal(outcome, 'cancelled');
+  assert.deepEqual(state.scrolls, []);
+  assert.equal(state.ready.observed, false);
+});

@@ -8,6 +8,7 @@
   export let title: string;
   export let progress: number;
   export let annotationCount = 0;
+  export let selected: boolean | undefined = undefined;
 
   let objectUrl = '';
 
@@ -68,12 +69,12 @@
   $: annotationLabel = `${annotationCount} annotation${annotationCount === 1 ? '' : 's'}`;
 </script>
 
-<div
-  tabindex="0"
-  role="button"
-  class="book-card-button aspect-w-2 aspect-h-3 group relative outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--app-accent-soft)]"
+<button
+  type="button"
+  aria-label={title}
+  aria-pressed={selected}
+  class="book-card-button relative w-full outline-none"
   on:click
-  on:keyup
 >
   <div class="book-card-media">
     <div class="book-card-cover-placeholder h-full w-full text-5xl sm:text-7xl">
@@ -89,7 +90,7 @@
           decoding="async"
           loading="lazy"
           referrerpolicy="no-referrer"
-          class="book-cover book-card-cover relative h-full w-full object-cover transition delay-150 duration-700 ease-out group-hover:scale-[1.018]"
+          class="book-cover book-card-cover relative h-full w-full object-cover"
           class:book-card-cover--loading={!imageLoadComplete}
           src={mapImagePath(imagePath)}
           {alt}
@@ -115,4 +116,4 @@
       </div>
     </div>
   </div>
-</div>
+</button>

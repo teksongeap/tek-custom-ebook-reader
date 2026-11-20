@@ -1,34 +1,39 @@
 <script lang="ts">
+  import LoadingDialog from '$lib/components/loading-dialog.svelte';
+
   export let fontColor: string;
   export let backgroundColor: string;
+  export let label = 'Restoring your reading position';
 </script>
 
 <div
   class="reader-loading-screen fixed inset-0 z-20 flex items-center justify-center"
   style:color={fontColor}
   style:background-color={backgroundColor}
-  role="status"
-  aria-label="Opening your reading position"
+  style:--reader-page-text={fontColor}
+  style:--reader-page-bg={backgroundColor}
 >
-  <span class="loading-indicator" aria-hidden="true">Opening your reading position…</span>
+  <div class="loading-indicator">
+    <LoadingDialog {label} framed={false} />
+  </div>
 </div>
 
 <style>
   .loading-indicator {
-    font-size: 0.875rem;
     opacity: 0;
-    animation: show-indicator 150ms ease 400ms forwards;
+    animation: show-indicator 150ms ease 200ms forwards;
   }
 
   @keyframes show-indicator {
     to {
-      opacity: 0.55;
+      opacity: 1;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .loading-indicator {
-      animation-duration: 0ms;
+      opacity: 1;
+      animation: none;
     }
   }
 </style>

@@ -7,6 +7,8 @@
 import {
   filter,
   firstValueFrom,
+  merge,
+  skip,
   take,
   takeUntil,
   type BehaviorSubject,
@@ -59,7 +61,15 @@ export class BookmarkManagerPaginated implements BookmarkManager {
       this.sectionReady$.pipe(
         filter(({ index: readyIndex }) => readyIndex === index),
         take(1),
-        takeUntil(this.destroy$)
+        takeUntil(
+          merge(
+            this.destroy$,
+            this.sectionIndex$.pipe(
+              skip(1),
+              filter((activeIndex) => activeIndex !== index)
+            )
+          )
+        )
       ),
       { defaultValue: undefined }
     );

@@ -761,6 +761,7 @@
     <BookCardList
       currentBookId={$currentBookId$}
       {selectedBookIds}
+      {selectMode}
       bookCards={$bookCards$}
       on:bookClick={(ev) => onBookClick(ev.detail.id)}
       on:removeBookClick={(ev) => removeBooks([ev.detail.id])}

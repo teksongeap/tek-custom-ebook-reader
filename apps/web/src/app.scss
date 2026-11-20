@@ -657,33 +657,51 @@
     color: var(--reader-page-text);
   }
 
-  .reader-loading-indicator {
-    display: grid;
-    place-items: center;
-    gap: 1.1rem;
-  }
-
   .app-loading-dialog {
     display: grid;
-    min-width: 8rem;
+    min-width: min(12rem, 70vw);
+    max-width: 100%;
     place-items: center;
-    gap: 1rem;
-    color: var(--app-chrome-text);
+    gap: 0.875rem;
+    padding: 1.5rem;
+    color: inherit;
+    text-align: center;
+    writing-mode: horizontal-tb;
+  }
+
+  .app-navigation-loading {
+    opacity: 0;
+    animation: show-navigation-loading 120ms ease 180ms forwards;
+  }
+
+  .app-loading-dialog--framed {
+    border: 1px solid var(--app-surface-border);
+    border-radius: 0.875rem;
+    background: var(--app-surface-fill);
+    box-shadow: var(--app-surface-shadow);
   }
 
   .app-loading-dialog__icon {
-    font-size: 3rem;
-    opacity: 0.82;
-    filter: drop-shadow(0 10px 24px rgba(6, 8, 11, 0.24));
+    font-size: 1.75rem;
+    opacity: 0.7;
+  }
+
+  .app-loading-dialog__label {
+    max-width: 18rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
   }
 
   .app-loading-dialog__bar {
     position: relative;
-    height: 0.25rem;
+    height: 0.1875rem;
     width: 7rem;
+    max-width: 100%;
     overflow: hidden;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--app-chrome-text) 18%, transparent);
+    background: color-mix(in srgb, currentColor 14%, transparent);
   }
 
   .app-loading-dialog__bar::after {
@@ -693,36 +711,23 @@
     left: -45%;
     width: 45%;
     border-radius: inherit;
-    background: linear-gradient(90deg, var(--reader-progress-start), var(--reader-progress-end));
-    animation: reader-loading-slide 1250ms ease-in-out infinite;
+    background: currentColor;
+    animation: reader-loading-slide 1600ms ease-in-out infinite;
     content: '';
   }
 
-  .reader-loading-icon {
-    font-size: 3rem;
-    opacity: 0.62;
-    filter: drop-shadow(0 10px 24px rgba(6, 8, 11, 0.18));
-  }
+  @media (prefers-reduced-motion: reduce) {
+    .app-navigation-loading {
+      opacity: 1;
+      animation: none;
+    }
 
-  .reader-loading-bar {
-    position: relative;
-    height: 0.25rem;
-    width: 7rem;
-    overflow: hidden;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--reader-page-text) 12%, transparent);
-  }
-
-  .reader-loading-bar::after {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: -45%;
-    width: 45%;
-    border-radius: inherit;
-    background: linear-gradient(90deg, var(--reader-progress-start), var(--reader-progress-end));
-    animation: reader-loading-slide 1250ms ease-in-out infinite;
-    content: '';
+    .app-loading-dialog__bar::after {
+      left: 0;
+      width: 100%;
+      opacity: 0.65;
+      animation: none;
+    }
   }
 
   .book-content.book-content--hover-focus-dim p,
@@ -772,11 +777,13 @@
       var(--background-color);
     box-shadow:
       0 1px 0 color-mix(in srgb, #ffffff 46%, transparent) inset,
-      0 10px 24px color-mix(in srgb, var(--font-color) 14%, transparent);
+      0 3px 10px rgba(6, 8, 11, 0.16);
+    outline: 1px solid transparent;
+    outline-offset: 2px;
     transition:
       border-color 170ms ease,
       box-shadow 170ms ease,
-      transform 170ms ease;
+      outline-color 170ms ease;
   }
 
   .book-card-shell::after {
@@ -789,21 +796,38 @@
     pointer-events: none;
   }
 
-  .book-card-shell:hover,
-  .book-card-shell:focus-within {
-    border-color: color-mix(in srgb, var(--app-accent) 42%, var(--font-color) 16%);
-    box-shadow:
-      0 1px 0 color-mix(in srgb, #ffffff 52%, transparent) inset,
-      0 18px 38px color-mix(in srgb, var(--font-color) 18%, transparent);
-    transform: translateY(-3px);
+  @media (hover: hover) and (pointer: fine) {
+    .book-card-item:hover .book-card-shell {
+      border-color: var(--app-accent);
+      outline-color: color-mix(in srgb, var(--app-accent) 48%, transparent);
+      box-shadow: 0 6px 18px rgba(6, 8, 11, 0.24);
+    }
+
+    .book-card-floating-action--delete {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .book-card-item:hover .book-card-floating-action--delete,
+    .book-card-item:focus-within .book-card-floating-action--delete {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
   }
 
-  .book-card-shell--active {
-    border-color: color-mix(in srgb, var(--app-accent) 68%, var(--font-color) 12%);
-    box-shadow:
-      0 0 0 2px color-mix(in srgb, var(--app-accent) 86%, transparent),
-      0 18px 38px color-mix(in srgb, var(--app-accent) 18%, transparent),
-      0 18px 38px color-mix(in srgb, var(--font-color) 14%, transparent);
+  .book-card-shell--current {
+    border-color: color-mix(in srgb, var(--app-accent) 65%, transparent);
+  }
+
+  .book-card-item .book-card-shell.book-card-shell--selected {
+    outline: 2px solid var(--app-accent);
+  }
+
+  .book-card-item:has(:focus-visible) .book-card-shell {
+    outline: 3px solid var(--app-accent-strong);
+    outline-offset: 4px;
   }
 
   .book-card-item--placeholder .book-card-shell {
@@ -811,10 +835,18 @@
   }
 
   .book-card-button {
+    display: block;
+    aspect-ratio: 2 / 3;
+    text-align: inherit;
     cursor: pointer;
     overflow: hidden;
     border-radius: calc(0.625rem - 1px);
     color: color-mix(in srgb, var(--font-color) 48%, transparent);
+  }
+
+  .book-card-media {
+    position: absolute;
+    inset: 0;
   }
 
   .book-card-media,
@@ -843,19 +875,12 @@
     opacity: 1;
     transition:
       filter 240ms ease,
-      opacity 220ms ease,
-      transform 700ms ease;
-    will-change: transform;
+      opacity 220ms ease;
   }
 
   .book-card-cover--loading {
     filter: blur(0.65rem) saturate(0.82);
     opacity: 0.38;
-  }
-
-  .book-card-shell:hover .book-card-cover,
-  .book-card-shell:focus-within .book-card-cover {
-    filter: saturate(1.04) contrast(1.02);
   }
 
   .book-card-title-scrim {
@@ -910,20 +935,28 @@
   .book-progress-track {
     position: relative;
     overflow: hidden;
-    background: color-mix(in srgb, #ffffff 70%, var(--font-color) 30%);
+    // Tint the theme surface enough to separate the track from the page.
+    // Back translucent theme colors so covers cannot affect progress contrast.
+    background:
+      linear-gradient(
+        color-mix(in srgb, var(--font-color) 24%, transparent),
+        color-mix(in srgb, var(--font-color) 24%, transparent)
+      ),
+      var(--background-color);
     box-shadow: inset 0 1px 2px rgba(6, 8, 11, 0.2);
   }
 
   .book-progress-fill {
     border-radius: 0 999px 999px 0;
-    background: linear-gradient(90deg, var(--reader-progress-start), var(--reader-progress-end));
-    box-shadow: 0 0 14px color-mix(in srgb, var(--reader-progress-end) 42%, transparent);
+    background:
+      linear-gradient(90deg, var(--reader-progress-start), var(--reader-progress-end)),
+      var(--background-color);
     transition: width 180ms ease;
   }
 
   .book-card-selected-overlay {
     z-index: 2;
-    cursor: pointer;
+    pointer-events: none;
     border-radius: inherit;
     background:
       linear-gradient(
@@ -985,10 +1018,24 @@
   }
 
   .book-card-floating-action--delete {
+    z-index: 3;
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(6, 8, 11, 0.86);
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(6, 8, 11, 0.24);
+    font-size: 0.95rem;
+    transition:
+      opacity 140ms ease,
+      visibility 140ms ease,
+      background-color 140ms ease,
+      border-color 140ms ease;
+  }
+
+  .book-card-floating-action--delete:hover,
+  .book-card-floating-action--delete:focus-visible {
     border-color: color-mix(in srgb, var(--app-danger) 72%, #ffffff 28%);
     background: var(--app-danger);
-    color: #ffffff;
-    font-size: 0.95rem;
+    transform: none;
   }
 
   .book-card-detail-popover {
@@ -1011,15 +1058,8 @@
       transition: none;
     }
 
-    .book-card-shell:hover,
-    .book-card-shell:focus-within,
     .book-card-floating-action:hover,
     .book-card-floating-action:focus-visible {
-      transform: none;
-    }
-
-    .book-card-button:hover .book-card-cover,
-    .book-card-button:focus-visible .book-card-cover {
       transform: none;
     }
   }
@@ -2169,6 +2209,12 @@
 
   100% {
     transform: translateX(320%);
+  }
+}
+
+@keyframes show-navigation-loading {
+  to {
+    opacity: 1;
   }
 }
 

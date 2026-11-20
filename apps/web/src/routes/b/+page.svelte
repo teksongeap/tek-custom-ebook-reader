@@ -26,13 +26,7 @@
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import {
-    faChevronDown,
-    faCloudBolt,
-    faPause,
-    faPlay,
-    faSpinner
-  } from '@fortawesome/free-solid-svg-icons';
+  import { faChevronDown, faCloudBolt, faPause, faPlay } from '@fortawesome/free-solid-svg-icons';
   import BookReader from '$lib/components/book-reader/book-reader.svelte';
   import type {
     AutoScroller,
@@ -111,6 +105,7 @@
   import BookSearchPanel from '$lib/components/book-reader/book-search/book-search-panel.svelte';
   import BookReaderHeader from '$lib/components/book-reader/book-reader-header.svelte';
   import LoadingDialog from '$lib/components/loading-dialog.svelte';
+  import ReaderLoadingScreen from '$lib/components/book-reader/reader-loading-screen.svelte';
   import {
     readerImageGalleryPictures$,
     toggleImageGalleryPictureSpoiler$,
@@ -2499,15 +2494,11 @@
 {/if}
 
 {#if showSpinner}
-  <div
-    class="reader-loading-screen fixed inset-0 flex h-full w-full items-center justify-center"
-    style={readerChromeStyle}
-  >
-    <div class="reader-loading-indicator">
-      <Fa class="reader-loading-icon" icon={faSpinner} spin />
-      <div class="reader-loading-bar" aria-hidden="true"></div>
-    </div>
-  </div>
+  <ReaderLoadingScreen
+    fontColor={$themeOption$?.fontColor ?? ''}
+    backgroundColor={$themeOption$?.backgroundColor ?? ''}
+    label="Opening book"
+  />
 {/if}
 
 <div

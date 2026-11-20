@@ -8,6 +8,7 @@
   } from '@fortawesome/free-solid-svg-icons';
   import { ReadingGoalFrequency } from '$lib/components/book-reader/book-reading-tracker/book-reading-tracker';
   import Popover from '$lib/components/popover/popover.svelte';
+  import { getHeatmapAccentPercentage } from './heatmap-color';
   import {
     type HeatmapMonthLabel,
     type HeatmapStreak,
@@ -792,8 +793,8 @@
   }
 
   function colorByRating(minValue: number, maxValue: number, value: number) {
-    const colorRatio = limitToRange(0, 1, value / (maxValue - minValue));
-    return `color-mix(in srgb, var(--app-accent) ${25 + colorRatio * 75}%, var(--background-color))`;
+    const percentage = getHeatmapAccentPercentage(minValue, maxValue, value);
+    return `color-mix(in srgb, var(--app-accent) ${percentage}%, var(--background-color))`;
   }
 
   function getCompletedReadingGoalsLabel(
