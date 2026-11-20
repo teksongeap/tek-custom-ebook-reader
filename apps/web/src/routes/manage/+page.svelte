@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { faUpload } from '@fortawesome/free-solid-svg-icons';
+  import { faBookOpen, faUpload } from '@fortawesome/free-solid-svg-icons';
   import BookCardList from '$lib/components/book-card/book-card-list.svelte';
   import type { BookCardProps } from '$lib/components/book-card/book-card-props';
   import BookManagerHeader from '$lib/components/book-card/book-manager-header.svelte';
@@ -431,7 +431,7 @@
     dialogManager.dialogs$.next([
       {
         component: LoadingDialog,
-        props: { label },
+        props: { label, icon: faBookOpen },
         disableCloseOnClick: true
       }
     ]);

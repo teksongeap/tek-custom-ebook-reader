@@ -23,6 +23,7 @@
   import { dummyFn, isMobile, isMobile$ } from '$lib/functions/utils';
   import { onDestroy, onMount } from 'svelte';
   import { MetaTags } from 'svelte-meta-tags';
+  import { faBookOpen, faChartLine, faFolderOpen, faGear } from '@fortawesome/free-solid-svg-icons';
   import '../app.scss';
 
   let path = '';
@@ -36,10 +37,10 @@
   let userFontObjectUrls: string[] = [];
 
   const navigationWarmupRoutes = new Map([
-    ['/b', 'Opening book'],
-    ['/manage', 'Opening library'],
-    ['/settings', 'Opening settings'],
-    ['/statistics', 'Opening statistics']
+    ['/b', { label: 'Opening book', icon: faBookOpen }],
+    ['/manage', { label: 'Opening library', icon: faFolderOpen }],
+    ['/settings', { label: 'Opening settings', icon: faGear }],
+    ['/statistics', { label: 'Opening statistics', icon: faChartLine }]
   ]);
 
   $: if (browser) {
@@ -247,7 +248,7 @@
     <div
       class="relative top-1/2 left-1/2 inline-block max-w-[80vw] -translate-x-1/2 -translate-y-1/2"
     >
-      <LoadingDialog label={navigationWarmupRoutes.get(navigationRouteId || '')} />
+      <LoadingDialog {...navigationWarmupRoutes.get(navigationRouteId || '')} />
     </div>
   </div>
 {/if}

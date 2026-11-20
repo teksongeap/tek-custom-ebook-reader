@@ -26,7 +26,17 @@
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { faChevronDown, faCloudBolt, faPause, faPlay } from '@fortawesome/free-solid-svg-icons';
+  import {
+    faBookOpen,
+    faChevronDown,
+    faCloudBolt,
+    faFlag,
+    faHourglassHalf,
+    faPause,
+    faPlay,
+    faRotate,
+    type IconDefinition
+  } from '@fortawesome/free-solid-svg-icons';
   import BookReader from '$lib/components/book-reader/book-reader.svelte';
   import type {
     AutoScroller,
@@ -858,7 +868,7 @@
       return;
     }
 
-    await openActionBackdrop('Completing book');
+    await openActionBackdrop('Completing book', faFlag);
 
     try {
       if (diffToComplete) {
@@ -1794,7 +1804,7 @@
     if (!isSilent) {
       skipKeyDownListener$.next(true);
       logger.clearHistory();
-      await openActionBackdrop('Syncing reader data');
+      await openActionBackdrop('Syncing reader data', faRotate);
     }
 
     const currentHandlerStorageSource = $rawBookData$.storageSource || $syncTarget$;
@@ -1887,11 +1897,11 @@
     }
   }
 
-  async function openActionBackdrop(label = 'Working') {
+  async function openActionBackdrop(label = 'Working', icon: IconDefinition = faHourglassHalf) {
     dialogManager.dialogs$.next([
       {
         component: LoadingDialog,
-        props: { label },
+        props: { label, icon },
         disableCloseOnClick: true
       }
     ]);
@@ -1953,7 +1963,7 @@
         await tick();
       }
 
-      await openActionBackdrop('Opening page');
+      await openActionBackdrop('Opening page', faBookOpen);
 
       if (deleteLastItem) {
         await database.deleteLastItem();
@@ -2498,6 +2508,7 @@
     fontColor={$themeOption$?.fontColor ?? ''}
     backgroundColor={$themeOption$?.backgroundColor ?? ''}
     label="Opening book"
+    icon={faBookOpen}
   />
 {/if}
 

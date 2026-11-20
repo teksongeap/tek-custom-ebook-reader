@@ -1,9 +1,11 @@
 <script lang="ts">
   import LoadingDialog from '$lib/components/loading-dialog.svelte';
+  import { faBookmark, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
 
   export let fontColor: string;
   export let backgroundColor: string;
   export let label = 'Restoring your reading position';
+  export let icon: IconDefinition = faBookmark;
 </script>
 
 <div
@@ -14,7 +16,7 @@
   style:--reader-page-bg={backgroundColor}
 >
   <div class="loading-indicator">
-    <LoadingDialog {label} framed={false} />
+    <LoadingDialog {label} {icon} framed={false} />
   </div>
 </div>
 
