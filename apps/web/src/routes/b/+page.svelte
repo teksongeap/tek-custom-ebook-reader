@@ -21,7 +21,7 @@
     tap,
     timer
   } from 'rxjs';
-  import { quintInOut } from 'svelte/easing';
+  import { cubicOut, quintInOut } from 'svelte/easing';
   import { fly } from 'svelte/transition';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
@@ -2405,7 +2405,7 @@
   <div
     class="reader-side-panel-shell writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
     style={readerSurfaceStyle}
-    in:fly|local={{ x: -100, duration: 100, easing: quintInOut }}
+    in:fly|local={{ x: -100, duration: 180, easing: cubicOut }}
     use:clickOutside={() => {
       if ($statisticsEnabled$ && !wasTrackerPaused) {
         isTrackerPaused$.next(false);
@@ -2430,7 +2430,7 @@
   <div
     class="reader-side-panel-shell writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
     style={readerSurfaceStyle}
-    in:fly|local={{ x: -100, duration: 100, easing: quintInOut }}
+    in:fly|local={{ x: -100, duration: 180, easing: cubicOut }}
     use:clickOutside={closeSearchPanel}
   >
     <BookSearchPanel
@@ -2451,7 +2451,7 @@
   <div
     class="reader-side-panel-shell writing-horizontal-tb fixed top-0 left-0 z-[60] flex h-full w-full max-w-xl flex-col justify-between"
     style={readerSurfaceStyle}
-    in:fly|local={{ x: -100, duration: 100, easing: quintInOut }}
+    in:fly|local={{ x: -100, duration: 180, easing: cubicOut }}
     use:clickOutside={closeAnnotationsPanel}
   >
     <BookAnnotationsPanel

@@ -22,7 +22,7 @@
   import { getAnnotationHighlightKey } from './annotation-index';
   import { getAnnotationColorPurposeLabel, getAnnotationColorValue } from './annotation-colors';
   import { formatAnnotationTimestamp, getAnnotationEditedAt } from './annotation-time';
-  import AnnotationLinkifiedText from './annotation-linkified-text.svelte';
+  import AnnotationMarkdown from './annotation-markdown.svelte';
   import AnnotationSaveReturnIcon from './annotation-save-return-icon.svelte';
   import {
     annotationCommentCollapsedLineCount,
@@ -300,6 +300,7 @@
       }
     };
     const pointerLeave = () => clearHoverOpen(annotation);
+    const blur = () => span.classList.remove('book-annotation-highlight--returned-focus');
     const click = (event: MouseEvent) => {
       // Let the reader's delegated ruby handler reveal hidden furigana.
       // Hover, keyboard activation, and double-click still open the annotation.
@@ -351,6 +352,7 @@
     span.addEventListener('click', click, false);
     span.addEventListener('dblclick', doubleClick, false);
     span.addEventListener('keydown', keydown, false);
+    span.addEventListener('blur', blur, false);
 
     cleanupBySpan.set(span, () => {
       span.removeEventListener('pointerenter', pointerEnter, false);
@@ -358,6 +360,8 @@
       span.removeEventListener('click', click, false);
       span.removeEventListener('dblclick', doubleClick, false);
       span.removeEventListener('keydown', keydown, false);
+      span.removeEventListener('blur', blur, false);
+      blur();
     });
   }
 
@@ -646,7 +650,12 @@
     document.removeEventListener('pointerdown', closePinnedPopover, true);
 
     if (restoreFocus && returnFocusEl?.isConnected) {
-      void tick().then(() => returnFocusEl.focus({ preventScroll: true }));
+      void tick().then(() => {
+        if (returnFocusEl.isConnected) {
+          returnFocusEl.classList.add('book-annotation-highlight--returned-focus');
+          returnFocusEl.focus({ preventScroll: true });
+        }
+      });
     }
   }
 
@@ -1519,7 +1528,7 @@
             on:scroll={updateCommentScrollEdges}
             on:keydown={handleCommentKeydown}
           >
-            <AnnotationLinkifiedText text={activeAnnotation.comment} />
+            <AnnotationMarkdown text={activeAnnotation.comment} />
           </div>
         </div>
         {#if commentCanExpand || commentCanExpandBeforeMeasurement}
@@ -1580,7 +1589,7 @@
   }
 
   :global(.book-annotation-highlight:hover),
-  :global(.book-annotation-highlight:focus-visible),
+  :global(.book-annotation-highlight:focus-visible:not(.book-annotation-highlight--returned-focus)),
   :global(.book-annotation-highlight--active),
   :global(.book-annotation-highlight--hovered) {
     background-size: var(--book-annotation-focus-size);
@@ -1588,8 +1597,33 @@
   }
 
   :global(.book-annotation-highlight:focus-visible) {
-    outline: 1px solid currentColor;
-    outline-offset: 2px;
+    outline: none;
+    text-decoration-line: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 65%, transparent);
+    text-decoration-thickness: 0.08em;
+    text-underline-offset: 0.16em;
+  }
+
+  :global(.book-annotation-highlight--returned-focus:focus-visible) {
+    animation: annotation-focus-return 1200ms ease-out forwards;
+  }
+
+  @keyframes annotation-focus-return {
+    0%,
+    40% {
+      text-decoration-color: color-mix(in srgb, currentColor 65%, transparent);
+      text-decoration-line: underline;
+    }
+
+    99% {
+      text-decoration-color: transparent;
+      text-decoration-line: underline;
+    }
+
+    100% {
+      text-decoration-color: transparent;
+      text-decoration-line: none;
+    }
   }
 
   :global(.book-content--writing-vertical-rl .book-annotation-highlight) {
@@ -1820,7 +1854,7 @@
   .book-annotation-card-comment {
     margin: 0;
     overflow-wrap: anywhere;
-    white-space: pre-wrap;
+    white-space: normal;
     font-size: var(--reader-reading-font-size);
     font-weight: 400;
     line-height: 1.5;
@@ -2190,6 +2224,11 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    :global(.book-annotation-highlight--returned-focus:focus-visible) {
+      animation: none;
+      text-decoration-line: none;
+    }
+
     :global(.book-annotation-highlight),
     .book-annotation-card,
     .book-annotation-card-action,
@@ -2207,6 +2246,9 @@
       border-color: Highlight;
     }
 
+    :global(
+      .book-annotation-highlight:focus-visible:not(.book-annotation-highlight--returned-focus)
+    ),
     .book-annotation-card:focus-visible,
     .book-annotation-card-action:focus-visible,
     .book-annotation-card-comment:focus-visible,

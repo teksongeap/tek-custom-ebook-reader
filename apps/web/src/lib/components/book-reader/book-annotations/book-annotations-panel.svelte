@@ -7,6 +7,8 @@
     faArrowUpShortWide,
     faBookOpen,
     faChevronDown,
+    faChevronLeft,
+    faChevronRight,
     faChevronUp,
     faFilter,
     faFloppyDisk,
@@ -38,7 +40,7 @@
     type AnnotationColor
   } from './annotation-colors';
   import { formatAnnotationTimestamp, getAnnotationEditedAt } from './annotation-time';
-  import AnnotationLinkifiedText from './annotation-linkified-text.svelte';
+  import AnnotationMarkdown from './annotation-markdown.svelte';
   import {
     annotationCommentCollapsedLineCount,
     hasAnnotationCommentOverflow,
@@ -79,6 +81,9 @@
   let expandedCommentIds = new Set<string>();
   let expandableCommentIds = new Set<string>();
   const collapsedCommentLineCount = annotationCommentCollapsedLineCount;
+  const annotationsPerPage = 10;
+  let annotationPage = 0;
+  let annotationsListEl: HTMLDivElement | undefined;
 
   $: panelStyle = getReaderChromeStyle({ fontSize, fontColor, backgroundColor });
   $: activeSortMode = getAnnotationSortMode($lastAnnotationSortMode$);
@@ -127,12 +132,22 @@
   $: sortedAnnotations = filteredAnnotations
     .slice()
     .sort((a, b) => compareAnnotationsForPanel(a, b, activeSortMode, activeSortDirection));
+  $: annotationPageCount = Math.max(1, Math.ceil(sortedAnnotations.length / annotationsPerPage));
+  $: if (annotationPage >= annotationPageCount) {
+    annotationPage = annotationPageCount - 1;
+  }
+  $: annotationPageStart = annotationPage * annotationsPerPage;
+  $: visibleAnnotations = sortedAnnotations.slice(
+    annotationPageStart,
+    annotationPageStart + annotationsPerPage
+  );
+  $: void scrollAnnotationPageToTop(annotationPage);
   $: isFilteringAnnotations =
     searchTerms.length > 0 ||
     selectedAnnotationColor !== 'all' ||
     selectedAnnotationSection !== 'all';
   $: panelSubtitle = isFilteringAnnotations
-    ? `${sortedAnnotations.length} of ${annotations.length} shown`
+    ? `${sortedAnnotations.length} of ${annotations.length} match`
     : `${annotations.length} saved`;
   $: if (
     editingAnnotationId &&
@@ -315,17 +330,32 @@
     return value.trim().toLocaleLowerCase();
   }
 
+  function resetAnnotationPage() {
+    annotationPage = 0;
+    void scrollAnnotationPageToTop(0);
+  }
+
+  async function scrollAnnotationPageToTop(page: number) {
+    await tick();
+
+    if (annotationsListEl && page === annotationPage) {
+      annotationsListEl.scrollTop = 0;
+    }
+  }
+
   function setAnnotationSortMode(event: Event) {
     if (!(event.currentTarget instanceof HTMLSelectElement)) {
       return;
     }
 
     $lastAnnotationSortMode$ = getAnnotationSortMode(event.currentTarget.value);
+    resetAnnotationPage();
   }
 
   function toggleAnnotationSortDirection() {
     $lastAnnotationSortDirection$ =
       activeSortDirection === SortDirection.ASC ? SortDirection.DESC : SortDirection.ASC;
+    resetAnnotationPage();
   }
 
   function setAnnotationColorFilter(event: Event) {
@@ -335,6 +365,7 @@
 
     const nextColor = event.currentTarget.value;
     selectedAnnotationColor = isAnnotationColor(nextColor) ? nextColor : 'all';
+    resetAnnotationPage();
   }
 
   function setAnnotationSectionFilter(event: Event) {
@@ -348,6 +379,7 @@
     )
       ? nextSection
       : 'all';
+    resetAnnotationPage();
   }
 
   function isAnnotationColor(value: string): value is AnnotationColor {
@@ -568,6 +600,7 @@
         bind:value={searchQuery}
         placeholder="Search annotations"
         aria-label="Search annotations"
+        on:input={resetAnnotationPage}
         on:keydown|stopPropagation={() => {}}
       />
       {#if searchQuery}
@@ -576,7 +609,10 @@
           class="annotations-panel-search-clear"
           title="Clear search"
           aria-label="Clear search"
-          on:click={() => (searchQuery = '')}
+          on:click={() => {
+            searchQuery = '';
+            resetAnnotationPage();
+          }}
           on:keydown|stopPropagation={() => {}}
         >
           <Fa icon={faXmark} />
@@ -646,9 +682,9 @@
     </div>
   </div>
 
-  <div class="annotations-panel-list">
+  <div class="annotations-panel-list" bind:this={annotationsListEl}>
     {#if sortedAnnotations.length}
-      {#each sortedAnnotations as annotation (annotation.id)}
+      {#each visibleAnnotations as annotation (annotation.id)}
         {@const chapterLabel = getChapterLabel(annotation)}
         {@const isCommentExpanded = expandedCommentIds.has(annotation.id)}
         {@const canExpandAnnotationComment =
@@ -663,7 +699,7 @@
           style:--book-annotation-base={getAnnotationColorValue(annotation.color)}
         >
           <span class="annotation-item-swatch" aria-hidden="true"></span>
-          <span class="annotation-item-content">
+          <div class="annotation-item-content">
             <span class="annotation-item-meta">
               <span class="annotation-item-location" title={chapterLabel}>{chapterLabel}</span>
               <span class="annotation-item-time-stack">
@@ -679,16 +715,16 @@
             </span>
             <span class="annotation-item-quote">{annotation.selectedText}</span>
             {#if annotation.comment && editingAnnotationId !== annotation.id}
-              <span class="annotation-item-comment-shell">
-                <span
+              <div class="annotation-item-comment-shell">
+                <div
                   use:measureCommentExpansion={{ id: annotation.id, comment: annotation.comment }}
                   class="annotation-item-comment"
                   class:annotation-item-comment--clamped={!isCommentExpanded}
                   class:annotation-item-comment--expanded={isCommentExpanded}
                   style:--annotation-item-comment-line-clamp={collapsedCommentLineCount}
                 >
-                  <AnnotationLinkifiedText text={annotation.comment} />
-                </span>
+                  <AnnotationMarkdown text={annotation.comment} />
+                </div>
                 {#if canExpandAnnotationComment}
                   <button
                     type="button"
@@ -709,7 +745,7 @@
                     </span>
                   </button>
                 {/if}
-              </span>
+              </div>
             {/if}
             {#if editingAnnotationId === annotation.id}
               <span class="annotation-item-editor">
@@ -743,7 +779,7 @@
                 </span>
               </span>
             {/if}
-          </span>
+          </div>
           <span class="annotation-item-actions">
             <button
               type="button"
@@ -796,6 +832,34 @@
       </div>
     {/if}
   </div>
+
+  {#if annotationPageCount > 1}
+    <nav class="annotations-panel-pagination" aria-label="Annotation pages">
+      <button
+        type="button"
+        aria-label="Previous annotations"
+        disabled={annotationPage === 0}
+        on:click={() => (annotationPage -= 1)}
+        on:keydown|stopPropagation={() => {}}
+      >
+        <Fa icon={faChevronLeft} />
+        <span>Previous</span>
+      </button>
+      <span class="annotations-panel-page-range" role="status" aria-live="polite">
+        {annotationPageStart + 1}–{annotationPageStart + visibleAnnotations.length} of {sortedAnnotations.length}
+      </span>
+      <button
+        type="button"
+        aria-label="Next annotations"
+        disabled={annotationPage === annotationPageCount - 1}
+        on:click={() => (annotationPage += 1)}
+        on:keydown|stopPropagation={() => {}}
+      >
+        <span>Next</span>
+        <Fa icon={faChevronRight} />
+      </button>
+    </nav>
+  {/if}
 </div>
 
 <style lang="scss">
@@ -948,6 +1012,10 @@
     color: color-mix(in srgb, var(--reader-page-text) 44%, transparent);
   }
 
+  .annotations-panel-search input::-webkit-search-cancel-button {
+    display: none;
+  }
+
   .annotations-panel-filter select,
   .annotations-panel-sort select {
     cursor: pointer;
@@ -999,6 +1067,51 @@
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
     padding: 0.75rem;
+  }
+
+  .annotations-panel-pagination {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border-top: 1px solid color-mix(in srgb, var(--reader-page-text) 9%, transparent);
+    padding: 0.65rem 0.75rem;
+    font-size: var(--reader-ui-small-font-size);
+  }
+
+  .annotations-panel-pagination button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 2.25rem;
+    border: 0;
+    border-radius: 0.5rem;
+    padding: 0.35rem 0.5rem;
+    background: transparent;
+    color: var(--reader-page-text);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .annotations-panel-pagination button:hover:not(:disabled),
+  .annotations-panel-pagination button:focus-visible {
+    background: color-mix(in srgb, var(--reader-page-text) 9%, transparent);
+  }
+
+  .annotations-panel-pagination button:focus-visible {
+    outline: 2px solid var(--app-accent);
+    outline-offset: 2px;
+  }
+
+  .annotations-panel-pagination button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .annotations-panel-page-range {
+    color: color-mix(in srgb, var(--reader-page-text) 68%, transparent);
+    font-variant-numeric: tabular-nums;
   }
 
   .annotation-item {
@@ -1129,7 +1242,7 @@
     font-size: var(--reader-ui-font-size);
     font-weight: 400;
     line-height: 1.55;
-    white-space: pre-wrap;
+    white-space: normal;
   }
 
   .annotation-item-comment--clamped {

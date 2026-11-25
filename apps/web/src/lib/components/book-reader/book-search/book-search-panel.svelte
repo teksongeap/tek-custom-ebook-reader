@@ -2,7 +2,13 @@
   import { browser } from '$app/environment';
   import { createEventDispatcher, onDestroy, onMount, tick } from 'svelte';
   import Fa from 'svelte-fa';
-  import { faArrowRight, faMagnifyingGlass, faXmark } from '@fortawesome/free-solid-svg-icons';
+  import {
+    faArrowRight,
+    faChevronLeft,
+    faChevronRight,
+    faMagnifyingGlass,
+    faXmark
+  } from '@fortawesome/free-solid-svg-icons';
   import {
     getReaderSearchExcerpt,
     getCachedReaderSearchIndex,
@@ -33,9 +39,22 @@
   let searchIndexLoading = false;
   let searchIndexBuildToken = 0;
   let hasLegacyReferenceMarkers = false;
+  const searchResultsPerPage = 10;
+  let searchPage = 0;
+  let searchResultsListEl: HTMLDivElement | undefined;
 
   $: panelStyle = getReaderChromeStyle({ fontSize, fontColor, backgroundColor });
-  $: searchResults = searchReaderIndex(searchIndex, searchQuery);
+  $: searchResults = searchReaderIndex(searchIndex, searchQuery, searchIndex.length);
+  $: searchPageCount = Math.max(1, Math.ceil(searchResults.length / searchResultsPerPage));
+  $: if (searchPage >= searchPageCount) {
+    searchPage = searchPageCount - 1;
+  }
+  $: searchPageStart = searchPage * searchResultsPerPage;
+  $: visibleSearchResults = searchResults.slice(
+    searchPageStart,
+    searchPageStart + searchResultsPerPage
+  );
+  $: void scrollSearchPageToTop(searchPage);
   $: panelSubtitle = getPanelSubtitle(
     searchQuery,
     searchResults,
@@ -80,6 +99,7 @@
     searchIndex = [];
     searchIndexLoading = !!nextHtmlContent;
     hasLegacyReferenceMarkers = false;
+    resetSearchPage();
 
     if (!nextHtmlContent) {
       searchIndexLoading = false;
@@ -121,6 +141,19 @@
       target: result.target,
       highlight: result.preciseTarget
     });
+  }
+
+  function resetSearchPage() {
+    searchPage = 0;
+    void scrollSearchPageToTop(0);
+  }
+
+  async function scrollSearchPageToTop(page: number) {
+    await tick();
+
+    if (searchResultsListEl && page === searchPage) {
+      searchResultsListEl.scrollTop = 0;
+    }
   }
 
   function getSearchResultLocationLabel(result: ReaderSearchResult) {
@@ -212,6 +245,7 @@
         bind:value={searchQuery}
         placeholder="Search book"
         aria-label="Search book"
+        on:input={resetSearchPage}
         on:keydown|stopPropagation={() => {}}
       />
       {#if searchQuery}
@@ -220,7 +254,10 @@
           class="book-search-panel-search-clear"
           title="Clear search"
           aria-label="Clear search"
-          on:click={() => (searchQuery = '')}
+          on:click={() => {
+            searchQuery = '';
+            resetSearchPage();
+          }}
           on:keydown|stopPropagation={() => {}}
         >
           <Fa icon={faXmark} />
@@ -239,9 +276,9 @@
     </div>
   {/if}
 
-  <div class="book-search-panel-list">
+  <div class="book-search-panel-list" bind:this={searchResultsListEl}>
     {#if searchResults.length}
-      {#each searchResults as result (result.id)}
+      {#each visibleSearchResults as result (result.id)}
         {@const excerpt = getReaderSearchExcerpt(result)}
         {@const locationLabel = getSearchResultLocationLabel(result)}
         <button type="button" class="book-search-result" on:click={() => jumpToResult(result)}>
@@ -277,6 +314,34 @@
       </div>
     {/if}
   </div>
+
+  {#if searchPageCount > 1}
+    <nav class="book-search-panel-pagination" aria-label="Search result pages">
+      <button
+        type="button"
+        aria-label="Previous search results"
+        disabled={searchPage === 0}
+        on:click={() => (searchPage -= 1)}
+        on:keydown|stopPropagation={() => {}}
+      >
+        <Fa icon={faChevronLeft} />
+        <span>Previous</span>
+      </button>
+      <span class="book-search-panel-page-range" role="status" aria-live="polite">
+        {searchPageStart + 1}–{searchPageStart + visibleSearchResults.length} of {searchResults.length}
+      </span>
+      <button
+        type="button"
+        aria-label="Next search results"
+        disabled={searchPage === searchPageCount - 1}
+        on:click={() => (searchPage += 1)}
+        on:keydown|stopPropagation={() => {}}
+      >
+        <span>Next</span>
+        <Fa icon={faChevronRight} />
+      </button>
+    </nav>
+  {/if}
 </div>
 
 <style lang="scss">
@@ -446,12 +511,61 @@
     color: color-mix(in srgb, var(--reader-page-text) 44%, transparent);
   }
 
+  .book-search-panel-search input::-webkit-search-cancel-button {
+    display: none;
+  }
+
   .book-search-panel-list {
     min-height: 0;
     flex: 1;
     overflow: auto;
     overscroll-behavior: contain;
     padding: 0.75rem;
+  }
+
+  .book-search-panel-pagination {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border-top: 1px solid color-mix(in srgb, var(--reader-page-text) 9%, transparent);
+    padding: 0.65rem 0.75rem;
+    font-size: var(--reader-ui-small-font-size);
+  }
+
+  .book-search-panel-pagination button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 2.25rem;
+    border: 0;
+    border-radius: 0.5rem;
+    padding: 0.35rem 0.5rem;
+    background: transparent;
+    color: var(--reader-page-text);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .book-search-panel-pagination button:hover:not(:disabled),
+  .book-search-panel-pagination button:focus-visible {
+    background: color-mix(in srgb, var(--reader-page-text) 9%, transparent);
+  }
+
+  .book-search-panel-pagination button:focus-visible {
+    outline: 2px solid var(--app-accent);
+    outline-offset: 2px;
+  }
+
+  .book-search-panel-pagination button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .book-search-panel-page-range {
+    color: color-mix(in srgb, var(--reader-page-text) 68%, transparent);
+    font-variant-numeric: tabular-nums;
   }
 
   .book-search-result {
