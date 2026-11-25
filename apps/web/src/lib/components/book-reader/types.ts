@@ -37,7 +37,7 @@ export interface PageManager {
 
   scrollTo: (pos: number, isUser: boolean) => void;
 
-  scrollToColumn: (pos: number, isUser: boolean) => void;
+  scrollToColumn: (pos: number, isUser: boolean, options?: { animate?: boolean }) => void;
 
   updateSectionDataByOffset: (offset: number) => void;
 }

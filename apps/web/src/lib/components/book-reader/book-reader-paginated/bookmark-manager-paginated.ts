@@ -38,23 +38,53 @@ export class BookmarkManagerPaginated implements BookmarkManager {
     if (charCount === undefined || charCount < 0) return;
 
     const index = this.calculator.getSectionIndexByCharCount(charCount);
+    const savedIndex = bookmarkData.sectionId
+      ? this.pageManager.getSectionIndexById(bookmarkData.sectionId)
+      : -1;
+
+    if (savedIndex >= 0) {
+      await this.restoreSection(savedIndex, bookmarkData);
+      return;
+    }
+
+    // Older bookmarks only have a count and scroll position. At a shared boundary,
+    // verify the saved column in the previous section before assuming the next one.
+    const previousIndex = this.calculator.getSectionIndexByCharCount(Math.max(0, charCount - 1));
+    if (
+      !bookmarkData.sectionId &&
+      (this.getStoredBookmarkPosition(bookmarkData) ?? 0) > 0 &&
+      previousIndex < index
+    ) {
+      const outcome = await this.restoreSection(previousIndex, bookmarkData, true);
+      if (outcome !== 'unmatched') return;
+    }
+
+    await this.restoreSection(index, bookmarkData);
+  }
+
+  private async restoreSection(
+    index: number,
+    bookmarkData: BooksDbBookmarkData,
+    storedPositionOnly = false
+  ) {
+    const charCount = bookmarkData.exploredCharCount as number;
 
     const scroll = (calc: SectionCharacterStatsCalculator) => {
-      const scrollPos = this.getBookmarkPosition(bookmarkData, calc);
+      const scrollPos = this.getBookmarkPosition(bookmarkData, calc, storedPositionOnly);
 
       if (scrollPos < 0) {
-        return;
+        return 'unmatched' as const;
       }
 
       this.pageManager.scrollToBookmarkPosition(scrollPos, false);
       this.setIntendedCharCount(charCount);
+      return 'restored' as const;
     };
 
     const currentSectionIndex = this.sectionIndex$.getValue();
 
     if (currentSectionIndex === index) {
-      scroll(this.calculator);
-      return;
+      return scroll(this.calculator);
     }
 
     const ready = firstValueFrom(
@@ -76,8 +106,9 @@ export class BookmarkManagerPaginated implements BookmarkManager {
     this.sectionIndex$.next(index);
     const result = await ready;
     if (result && this.sectionIndex$.getValue() === index) {
-      scroll(result.calculator);
+      return scroll(result.calculator);
     }
+    return 'cancelled' as const;
   }
 
   formatBookmarkData(bookId: number): BooksDbBookmarkData {
@@ -97,6 +128,7 @@ export class BookmarkManagerPaginated implements BookmarkManager {
 
     return {
       dataId: bookId,
+      sectionId: this.calculator.containerEl.id || undefined,
       exploredCharCount,
       progress: exploredCharCount / bookCharCount,
       [this.calculator.verticalMode ? 'scrollY' : 'scrollX']: bookmarkPosition,
@@ -104,9 +136,17 @@ export class BookmarkManagerPaginated implements BookmarkManager {
     };
   }
 
+  getBookmarkScrollPosition(bookmarkData: BooksDbBookmarkData) {
+    if (bookmarkData.sectionId && bookmarkData.sectionId !== this.calculator.containerEl.id) {
+      return -1;
+    }
+    return this.getBookmarkPosition(bookmarkData, this.calculator);
+  }
+
   private getBookmarkPosition(
     bookmarkData: BooksDbBookmarkData,
-    calc: SectionCharacterStatsCalculator
+    calc: SectionCharacterStatsCalculator,
+    storedPositionOnly = false
   ) {
     const charCount = bookmarkData.exploredCharCount;
     const storedPosition = this.getStoredBookmarkPosition(bookmarkData);
@@ -114,9 +154,23 @@ export class BookmarkManagerPaginated implements BookmarkManager {
     if (
       charCount !== undefined &&
       storedPosition !== undefined &&
+      storedPosition >= 0 &&
+      storedPosition <= this.pageManager.getLastBookmarkPosition() &&
       calc.getCharCountByBookmarkScrollPos(storedPosition) === charCount
     ) {
       return storedPosition;
+    }
+
+    if (storedPositionOnly) return -1;
+
+    // A reflow may invalidate the pixel position, while the section end is stable.
+    if (
+      charCount !== undefined &&
+      bookmarkData.sectionId &&
+      bookmarkData.sectionId === calc.containerEl.id &&
+      calc.isCurrentSectionEnd(charCount)
+    ) {
+      return this.pageManager.getLastBookmarkPosition();
     }
 
     return charCount === undefined ? -1 : calc.getScrollPosByCharCount(charCount);

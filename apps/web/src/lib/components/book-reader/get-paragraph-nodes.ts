@@ -13,7 +13,9 @@ export function getParagraphNodes(node: Node) {
     }
     const isHidden =
       n instanceof HTMLElement &&
-      (n.attributes.getNamedItem('aria-hidden') || n.attributes.getNamedItem('hidden'));
+      (n.attributes.getNamedItem('aria-hidden') ||
+        n.attributes.getNamedItem('hidden') ||
+        n.attributes.getNamedItem('data-ttu-reader-ui'));
     if (isHidden) {
       return false;
     }

@@ -50,6 +50,7 @@ interface BooksDbV7BookData {
 
 interface BooksDbV7BookmarkData {
   dataId: number;
+  sectionId?: string;
   scrollX?: number;
   scrollY?: number;
   exploredCharCount?: number;

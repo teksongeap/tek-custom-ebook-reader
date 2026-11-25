@@ -11,6 +11,7 @@
     share,
     shareReplay,
     startWith,
+    switchMap,
     Subject,
     tap
   } from 'rxjs';
@@ -311,20 +312,22 @@
         hideSpoilerImage,
         navigator.standalone || window.matchMedia('(display-mode: fullscreen)').matches
       );
-      return contentEl$.pipe(mergeMap((contentEl) => reactiveElementsFn(contentEl)));
+      return contentEl$.pipe(switchMap((contentEl) => reactiveElementsFn(contentEl)));
     }),
     reduceToEmptyString()
   );
 
   const imageLoadingState$ = contentEl$.pipe(
-    mergeMap((contentEl) => imageLoadingState(contentEl)),
+    switchMap((contentEl) => imageLoadingState(contentEl)),
     share()
   );
 
   const blurListener$ = contentEl$.pipe(
     tap((contentEl) => {
       mutationObserver.disconnect();
-      mutationObserver.observe(contentEl, { attributes: true });
+      mutationObserver.observe(contentEl.closest('.book-content') || contentEl, {
+        attributes: true
+      });
     }),
     reduceToEmptyString()
   );

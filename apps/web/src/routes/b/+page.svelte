@@ -25,6 +25,7 @@
   import { fly } from 'svelte/transition';
   import { browser } from '$app/environment';
   import { getReaderScrollPosition, getReaderViewportRect } from '$lib/functions/reader-viewport';
+  import { transitionReaderNavigation } from '$lib/functions/reader-navigation-transition';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import {
@@ -132,6 +133,7 @@
   import {
     flattenBookTocEntries,
     getChapterData,
+    getCurrentChapterLabel,
     nextChapter$,
     sectionList$,
     sectionProgress$,
@@ -982,32 +984,6 @@
     }
   }
 
-  function getCurrentChapterLabel(
-    sectionData: SectionWithProgress[],
-    characterPosition: number,
-    fallback = ''
-  ) {
-    if (!sectionData?.length) {
-      return fallback;
-    }
-
-    const [mainChapters, chapterIndex] = getChapterData(sectionData);
-    const chaptersByCharacter = [...mainChapters]
-      .filter((chapter) => typeof chapter.startCharacter === 'number')
-      .sort((a, b) => (a.startCharacter as number) - (b.startCharacter as number));
-    let chapterByCharacter: SectionWithProgress | undefined;
-
-    for (const chapter of chaptersByCharacter) {
-      if ((chapter.startCharacter as number) > characterPosition) {
-        break;
-      }
-
-      chapterByCharacter = chapter;
-    }
-
-    return chapterByCharacter?.label || mainChapters[chapterIndex]?.label || fallback;
-  }
-
   function getChapterTicks(sectionData: SectionWithProgress[], totalCharacters: number) {
     if (!sectionData?.length || !totalCharacters) {
       return [] as ChapterTick[];
@@ -1529,7 +1505,10 @@
     }
   }
 
+  let annotationNavigationToken = 0;
+
   async function jumpToAnnotation(annotation: BooksDbAnnotation) {
+    const navigationToken = ++annotationNavigationToken;
     closeAnnotationsPanel();
     activeAnnotationId = '';
     annotationPopoverResetKey += 1;
@@ -1539,34 +1518,46 @@
       pauseTracker(true);
     }
 
-    const sectionLoaded = annotation.anchor.sectionId
-      ? await sectionNavigator?.jumpToSectionTarget(annotation.anchor.sectionId, true)
-      : false;
+    const navigate = async () => {
+      // An annotation already on the mounted section needs no trip via its beginning.
+      const sectionLoaded =
+        getRenderedAnnotationElements(annotation.id).length > 0 ||
+        (annotation.anchor.sectionId
+          ? await sectionNavigator?.jumpToSectionTarget(annotation.anchor.sectionId, true)
+          : false);
+      if (navigationToken !== annotationNavigationToken) return;
 
-    if (!sectionLoaded && bookmarkManager) {
-      bookmarkManager.scrollToBookmark(
-        {
-          dataId: annotation.dataId,
-          exploredCharCount: annotation.exploredCharCount,
-          progress: annotation.progress,
-          lastBookmarkModified: annotation.updatedAt
-        },
-        customReadingPointScrollOffset
-      );
-    } else if (!sectionLoaded) {
-      nextChapter$.next(annotation.anchor.sectionId);
-    }
+      if (!sectionLoaded && bookmarkManager) {
+        await bookmarkManager.scrollToBookmark(
+          {
+            dataId: annotation.dataId,
+            exploredCharCount: annotation.exploredCharCount,
+            progress: annotation.progress,
+            lastBookmarkModified: annotation.updatedAt
+          },
+          customReadingPointScrollOffset
+        );
+      } else if (!sectionLoaded) {
+        nextChapter$.next(annotation.anchor.sectionId);
+      }
 
-    await scrollToRenderedAnnotation(annotation.id);
+      await scrollToRenderedAnnotation(annotation.id, navigationToken);
+    };
+
+    if (isPaginated) await transitionReaderNavigation(navigate);
+    else await navigate();
   }
 
-  async function scrollToRenderedAnnotation(annotationId: string) {
+  async function scrollToRenderedAnnotation(annotationId: string, navigationToken: number) {
     for (let attempt = 0; attempt < 18; attempt += 1) {
+      if (navigationToken !== annotationNavigationToken) return false;
       if (attempt) {
         await waitForAnnotationRenderAttempt();
       } else {
         await tick();
       }
+
+      if (navigationToken !== annotationNavigationToken) return false;
 
       const annotationElements = getRenderedAnnotationElements(annotationId);
       const annotationElement = getAnnotationNavigationElement(annotationElements);
@@ -1641,7 +1632,7 @@
       getReaderScrollPosition(readerElement, $verticalMode$) + offset
     );
 
-    pageManager.scrollToColumn(targetScroll, false);
+    pageManager.scrollToColumn(targetScroll, false, { animate: false });
   }
 
   function getPaginatedAnnotationTargetRect(annotationElements: HTMLElement[]) {

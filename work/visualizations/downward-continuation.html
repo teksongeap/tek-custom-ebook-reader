@@ -1,0 +1,195 @@
+<div id="downward-continuation">
+  <div class="viz-carousel viz-dotted-background" aria-label="Downward continuation designs">
+    <section data-variant="Anime end card" aria-label="Anime end card design">
+      <div class="reader-mock">
+        <div class="ending">The river disappeared into the morning mist.</div>
+        <button class="end-card cue" type="button" aria-label="Preview anime end card continuation">
+          <span class="japanese" lang="ja">つづく</span>
+          <span class="down-chevrons" aria-hidden="true">⌄<br />⌄</span>
+        </button>
+        <span class="next-title">The next morning</span>
+      </div>
+    </section>
+    <section data-variant="Paper talisman" aria-label="Paper talisman design" hidden>
+      <div class="reader-mock">
+        <div class="ending">The river disappeared into the morning mist.</div>
+        <button class="talisman cue" type="button" aria-label="Preview paper talisman continuation">
+          <span class="talisman-ink"
+            ><span>TO BE</span><span>CONTINUED</span
+            ><span class="tag-point" aria-hidden="true">↓</span></span
+          >
+        </button>
+        <span class="next-title">The next morning</span>
+      </div>
+    </section>
+    <section data-variant="Manga drop arrow" aria-label="Manga drop arrow design" hidden>
+      <div class="reader-mock">
+        <div class="ending">The river disappeared into the morning mist.</div>
+        <button
+          class="drop-arrow cue"
+          type="button"
+          aria-label="Preview manga drop arrow continuation"
+        >
+          <span class="drop-caption">To be continued</span>
+          <span class="drop-mark" aria-hidden="true"
+            ><span class="shards"></span><span class="arrow-body"></span
+          ></span>
+        </button>
+        <span class="next-title">The next morning</span>
+      </div>
+    </section>
+  </div>
+  <span class="sr-only" role="status" aria-live="polite"></span>
+</div>
+<style>
+  #downward-continuation .reader-mock {
+    --paper: light-dark(#fffdf8, #22221f);
+    --ink: light-dark(#302f2b, #ece9df);
+    --soft-ink: light-dark(#706d65, #b6b1a6);
+    height: 346px;
+    padding: 26px 20px 22px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    color: var(--ink);
+    background: var(--paper);
+    font-family: Georgia, 'Noto Serif JP', serif;
+    text-align: center;
+  }
+  #downward-continuation .ending {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--soft-ink);
+  }
+  #downward-continuation .cue {
+    border: 0;
+    background: none;
+    color: inherit;
+    padding: 8px 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 64px;
+    flex: 1;
+  }
+  #downward-continuation .next-title {
+    font:
+      12px/1.4 system-ui,
+      sans-serif;
+    color: var(--soft-ink);
+  }
+  #downward-continuation .japanese {
+    writing-mode: vertical-rl;
+    font-size: 27px;
+    letter-spacing: 0.25em;
+    font-family: 'Noto Serif JP', 'Hiragino Mincho ProN', serif;
+  }
+  #downward-continuation .down-chevrons {
+    font:
+      29px/13px Georgia,
+      serif;
+    padding-top: 6px;
+  }
+  #downward-continuation .talisman-ink {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 103px;
+    height: 174px;
+    box-sizing: border-box;
+    padding: 12px 6px 25px;
+    background: var(--ink);
+    color: var(--paper);
+    clip-path: polygon(3% 2%, 97% 0, 99% 81%, 50% 100%, 0 80%);
+    font:
+      12px/1.1 Georgia,
+      serif;
+    letter-spacing: 0.08em;
+  }
+  #downward-continuation .tag-point {
+    font:
+      44px/1 Georgia,
+      serif;
+  }
+  #downward-continuation .drop-caption {
+    font:
+      italic 18px/1.2 Georgia,
+      serif;
+  }
+  #downward-continuation .drop-mark {
+    position: relative;
+    display: block;
+    height: 145px;
+    width: 76px;
+  }
+  #downward-continuation .shards {
+    position: absolute;
+    top: 8px;
+    left: 27px;
+    width: 24px;
+    height: 22px;
+    background: var(--ink);
+    clip-path: polygon(0 0, 100% 18%, 0 35%, 0 49%, 100% 58%, 0 78%, 0 87%, 100% 100%, 100% 0);
+  }
+  #downward-continuation .arrow-body {
+    position: absolute;
+    inset: 38px 0 0;
+    background: var(--ink);
+    clip-path: polygon(32% 0, 68% 2%, 67% 66%, 98% 64%, 52% 100%, 0 65%, 31% 67%);
+  }
+  #downward-continuation .cue:hover > :last-child {
+    transform: translateY(3px);
+  }
+  #downward-continuation .cue > * {
+    transition: transform 140ms ease-out;
+  }
+  #downward-continuation .reader-mock.playing > * {
+    animation: continuation-peek 380ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes continuation-peek {
+    0% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    35% {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    36% {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #downward-continuation .reader-mock.playing > * {
+      animation: none;
+    }
+    #downward-continuation .cue > * {
+      transition: none;
+    }
+  }
+</style>
+<script>
+  (() => {
+    const root = document.getElementById('downward-continuation');
+    root.querySelectorAll('.cue').forEach((button) => {
+      button.addEventListener('click', () => {
+        const stage = button.closest('.reader-mock');
+        stage.classList.remove('playing');
+        requestAnimationFrame(() => stage.classList.add('playing'));
+        root.querySelector('[role="status"]').textContent = 'Continuation preview played';
+      });
+    });
+  })();
+</script>

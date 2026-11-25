@@ -1,0 +1,218 @@
+<div id="vertical-next-episode">
+  <div class="viz-dotted-background eva-stage">
+    <div class="eva-reader" aria-label="Vertical next section title">
+      <div class="eva-page" data-ending>
+        <p class="eva-last-line" lang="ja">窓の外で、朝の光が静かに揺れていた。</p>
+        <button
+          type="button"
+          class="eva-continue cursor-interaction"
+          aria-label="Continue to 川辺の朝"
+        >
+          <span class="eva-title" lang="ja">次回予告</span>
+          <span class="eva-chevrons" aria-hidden="true"><i data-lucide="chevrons-down"></i></span>
+        </button>
+        <span class="eva-destination" lang="ja">川辺の朝</span>
+      </div>
+      <div class="eva-page eva-arrival" data-arrival hidden>
+        <span class="eva-section-number">V</span>
+        <h3 lang="ja">川辺の朝</h3>
+        <p lang="ja">朝には、雨が上がっていた。<br />彼女は川へと続く細い道を歩いた。</p>
+      </div>
+    </div>
+  </div>
+  <div class="eva-playback">
+    <button type="button" class="btn" data-replay>Replay</button
+    ><span class="sr-only" role="status" aria-live="polite"></span>
+  </div>
+</div>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;900&display=swap');
+  #vertical-next-episode .eva-stage {
+    padding: 16px;
+  }
+  #vertical-next-episode .eva-reader {
+    --eva-paper: light-dark(#fffdf8, #22221f);
+    --eva-ink: light-dark(#252420, #f2efe6);
+    --eva-muted: light-dark(#706d65, #b6b1a6);
+    --eva-title-size: 42px;
+    background: var(--eva-paper);
+    color: var(--eva-ink);
+    width: 100%;
+    max-width: 580px;
+    margin: 0 auto;
+    font-family: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  }
+  #vertical-next-episode .eva-page {
+    height: 460px;
+    padding: 26px 22px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  #vertical-next-episode .eva-page[hidden] {
+    display: none;
+  }
+  #vertical-next-episode .eva-last-line {
+    margin: 0 0 24px;
+    color: var(--eva-muted);
+    font-size: 14px;
+    text-align: center;
+    line-height: 1.8;
+  }
+  #vertical-next-episode .eva-continue {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    min-width: 76px;
+    padding: 8px 18px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+  }
+  #vertical-next-episode .eva-title {
+    display: block;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    font-family: inherit;
+    font-size: var(--eva-title-size);
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  #vertical-next-episode .eva-chevrons {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 50px;
+    transition: transform 140ms ease-out;
+  }
+  #vertical-next-episode .eva-chevrons > * {
+    width: 48px;
+    height: 48px;
+  }
+  #vertical-next-episode .eva-continue:hover .eva-chevrons {
+    transform: translateY(3px);
+  }
+  #vertical-next-episode .eva-destination {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font:
+      400 16px/1.5 'Noto Serif JP',
+      'Hiragino Mincho ProN',
+      'Yu Mincho',
+      serif;
+    letter-spacing: 0.12em;
+    color: var(--eva-muted);
+    margin-top: 12px;
+    text-align: start;
+  }
+  #vertical-next-episode .eva-arrival {
+    gap: 16px;
+  }
+  #vertical-next-episode .eva-arrival h3 {
+    font:
+      400 22px/1.4 Georgia,
+      serif;
+    margin: 0;
+    text-align: center;
+  }
+  #vertical-next-episode .eva-arrival p {
+    writing-mode: vertical-rl;
+    font:
+      400 17px/2 'Noto Serif JP',
+      serif;
+    height: 195px;
+    margin: 0;
+  }
+  #vertical-next-episode .eva-section-number {
+    font:
+      12px/1 system-ui,
+      sans-serif;
+    color: var(--eva-muted);
+  }
+  #vertical-next-episode .eva-playback {
+    margin-top: 10px;
+  }
+  @media (max-width: 400px) {
+    #vertical-next-episode .eva-stage {
+      padding: 8px;
+    }
+    #vertical-next-episode .eva-page {
+      padding: 22px 16px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #vertical-next-episode .eva-chevrons {
+      transition: none;
+    }
+    #vertical-next-episode .eva-continue:hover .eva-chevrons {
+      transform: none;
+    }
+  }
+</style>
+<script>
+  (() => {
+    const root = document.getElementById('vertical-next-episode');
+    const reader = root.querySelector('.eva-reader');
+    const ending = root.querySelector('[data-ending]');
+    const arrival = root.querySelector('[data-arrival]');
+    const button = root.querySelector('.eva-continue');
+    const replay = root.querySelector('[data-replay]');
+    const status = root.querySelector('[role="status"]');
+    const state = { titleSize: 42 };
+    let running = false;
+    const render = () => reader.style.setProperty('--eva-title-size', `${state.titleSize}px`);
+    render();
+    if (globalThis.Tweak) {
+      const tweak = new Tweak({ container: reader, onChange: render });
+      tweak.addSlider(state, 'titleSize', {
+        label: 'Title size',
+        min: 32,
+        max: 48,
+        step: 1,
+        unit: 'px'
+      });
+    }
+    button.addEventListener('click', async () => {
+      if (running) return;
+      running = true;
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const animate = async (element, frames, options) => {
+        if (reduced) return;
+        try {
+          await element.animate(frames, options).finished;
+        } catch {}
+      };
+      await animate(
+        ending,
+        [
+          { opacity: 1, transform: 'translateY(0) scaleY(1)' },
+          { opacity: 0, transform: 'translateY(-12px) scaleY(.985)' }
+        ],
+        { duration: 130, easing: 'ease-in' }
+      );
+      ending.hidden = true;
+      arrival.hidden = false;
+      await animate(
+        arrival,
+        [
+          { opacity: 0, transform: 'translateY(12px) scaleY(.985)' },
+          { opacity: 1, transform: 'translateY(0) scaleY(1)' }
+        ],
+        { duration: 250, easing: 'cubic-bezier(.16,1,.3,1)' }
+      );
+      status.textContent = '川辺の朝';
+      running = false;
+    });
+    replay.addEventListener('click', () => {
+      if (running) return;
+      arrival.hidden = true;
+      ending.hidden = false;
+      status.textContent = 'Ready';
+    });
+  })();
+</script>

@@ -12,9 +12,13 @@ import {
 } from '$lib/components/book-reader/book-toc/book-toc';
 import { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
 import { setReaderAnimatedScrollPosition } from '$lib/functions/reader-viewport';
+import { transitionReaderNavigation } from '$lib/functions/reader-navigation-transition';
+import { logger } from '$lib/data/logger';
 import type { PageManager } from '../types';
 
 export class PageManagerPaginated implements PageManager {
+  private destroyed = false;
+
   private animationFrame: number | undefined;
 
   private animationTargetPos: number | undefined;
@@ -28,6 +32,8 @@ export class PageManagerPaginated implements PageManager {
   private sectionTransitionIndex: number | undefined;
 
   private sectionTransitionSubscription: Subscription | undefined;
+
+  private sectionTransitionResolve: (() => void) | undefined;
 
   private trailingBlankSpace = 0;
 
@@ -48,7 +54,8 @@ export class PageManagerPaginated implements PageManager {
     private transitionMode: PaginationTransitionMode,
     private pageChange$: Subject<boolean>,
     private sectionRenderComplete$: Subject<number>,
-    private pageBleed = 0
+    private pageBleed = 0,
+    private motionEl = contentEl
   ) {
     this.clearTrailingBlankSpace();
     this.clearContentTransform();
@@ -120,7 +127,11 @@ export class PageManagerPaginated implements PageManager {
     this.jumpTo(this.snapToColumnStart(scrollPos), isUser);
   }
 
-  scrollToColumn(scrollPos: number, isUser: boolean) {
+  scrollToColumn(scrollPos: number, isUser: boolean, options?: { animate?: boolean }) {
+    if (options?.animate === false) {
+      this.jumpTo(this.snapToColumnStart(scrollPos), isUser);
+      return;
+    }
     const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
     const viewportSize = this.verticalMode ? this.height : this.width;
     this.moveToPos(
@@ -139,6 +150,15 @@ export class PageManagerPaginated implements PageManager {
     );
 
     return this.snapToColumnStart(currentPosition);
+  }
+
+  getSectionIndexById(sectionId: string) {
+    return this.sectionIds.indexOf(sectionId);
+  }
+
+  getLastBookmarkPosition() {
+    const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
+    return this.getLastScrollPos(this.getMeasuredScrollSize(scrollSizeProp), this.getColumnPitch());
   }
 
   beginSectionTransition(index: number) {
@@ -160,6 +180,7 @@ export class PageManagerPaginated implements PageManager {
   }
 
   destroy() {
+    this.destroyed = true;
     this.cancelAnimation();
     this.clearSectionTransitionSubscription();
     this.clearTrailingBlankSpace();
@@ -179,7 +200,7 @@ export class PageManagerPaginated implements PageManager {
   }
 
   private flipBy(offset: number, multiplier: 1 | -1, boundaryOffset = offset) {
-    if (this.sectionTransitionIndex !== undefined) {
+    if (this.destroyed || this.sectionTransitionIndex !== undefined) {
       return;
     }
 
@@ -224,50 +245,67 @@ export class PageManagerPaginated implements PageManager {
     const nextPage = this.sectionIndex$.getValue() - 1;
     if (nextPage < 0) return false;
 
-    this.beginSectionTransition(nextPage);
-    this.sectionTransitionSubscription = this.updateSectionIndex(nextPage).subscribe({
-      next: () => {
-        const scrollSize = this.getMeasuredScrollSize(scrollSizeProp);
-        // Boundaries must use the newly rendered section's real scroll size.
-        this.jumpToPos(this.getLastScrollPos(scrollSize, offset), scrollSize, viewportSize, isUser);
-        this.completeSectionTransition(nextPage);
-      },
-      error: () => {
-        this.completeSectionTransition(nextPage);
-        this.clearSectionTransitionSubscription();
-      },
-      complete: () => {
-        this.clearSectionTransitionSubscription();
-      }
+    this.changeSection(nextPage, () => {
+      const scrollSize = this.getMeasuredScrollSize(scrollSizeProp);
+      this.jumpToPos(this.getLastScrollPos(scrollSize, offset), scrollSize, viewportSize, isUser);
     });
     return true;
   }
 
-  private nextSection(isUser: boolean) {
+  nextSection(isUser = true) {
+    if (this.destroyed || this.sectionTransitionIndex !== undefined) return false;
     const nextPage = this.sectionIndex$.getValue() + 1;
     if (nextPage >= this.sectionIds.length) return false;
 
-    this.beginSectionTransition(nextPage);
-    this.sectionTransitionSubscription = this.updateSectionIndex(nextPage).subscribe({
-      next: () => {
-        const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
-        const viewportSize = this.verticalMode ? this.height : this.width;
-
-        // Boundaries must use the newly rendered section's real scroll size.
-        this.jumpToPos(0, this.getMeasuredScrollSize(scrollSizeProp), viewportSize, isUser);
-        this.updateSectionData(this.sectionIds[nextPage - 1], 100, false);
-        this.updateSectionData(this.sectionIds[nextPage], 0);
-        this.completeSectionTransition(nextPage);
-      },
-      error: () => {
-        this.completeSectionTransition(nextPage);
-        this.clearSectionTransitionSubscription();
-      },
-      complete: () => {
-        this.clearSectionTransitionSubscription();
-      }
+    this.changeSection(nextPage, () => {
+      const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
+      const viewportSize = this.verticalMode ? this.height : this.width;
+      this.jumpToPos(0, this.getMeasuredScrollSize(scrollSizeProp), viewportSize, isUser);
+      this.updateSectionData(this.sectionIds[nextPage - 1], 100, false);
+      this.updateSectionData(this.sectionIds[nextPage], 0);
     });
     return true;
+  }
+
+  private changeSection(index: number, positionDestination: () => void) {
+    const direction = index < this.sectionIndex$.getValue() ? -1 : 1;
+    this.sectionTransitionIndex = index;
+    const update = () =>
+      new Promise<void>((resolve, reject) => {
+        if (this.destroyed) {
+          resolve();
+          return;
+        }
+        this.beginSectionTransition(index);
+        this.sectionTransitionResolve = resolve;
+        this.sectionTransitionSubscription = this.updateSectionIndex(index).subscribe({
+          next: () => {
+            try {
+              positionDestination();
+              this.completeSectionTransition(index);
+              resolve();
+            } catch (error) {
+              reject(error);
+            }
+          },
+          error: reject,
+          complete: () => this.clearSectionTransitionSubscription()
+        });
+      });
+
+    const navigation =
+      this.transitionMode === PaginationTransitionMode.Glide
+        ? transitionReaderNavigation(update, {
+            kind: 'section',
+            direction,
+            vertical: this.verticalMode
+          })
+        : update();
+    void navigation.catch((error) => {
+      this.completeSectionTransition(index);
+      this.clearSectionTransitionSubscription();
+      logger.error(`Failed to change reading section: ${error}`);
+    });
   }
 
   private moveToPos(pos: number, scrollSize: number, viewportSize: number, isUser: boolean) {
@@ -318,7 +356,7 @@ export class PageManagerPaginated implements PageManager {
 
     const nativeStart = this.scrollEl[this.verticalMode ? 'scrollTop' : 'scrollLeft'];
     let previousTimestamp = performance.now();
-    this.contentEl.style.willChange = 'transform';
+    this.motionEl.style.willChange = 'transform';
 
     const animate = (timestamp: number) => {
       const elapsed = Math.max(0, (timestamp - previousTimestamp) / 1000);
@@ -334,7 +372,7 @@ export class PageManagerPaginated implements PageManager {
 
       if (Math.abs(nextPos - target) > 0.25 || Math.abs(this.animationVelocity) > 8) {
         const offset = nativeStart - nextPos;
-        this.contentEl.style.transform = this.verticalMode
+        this.motionEl.style.transform = this.verticalMode
           ? `translate3d(0, ${offset}px, 0)`
           : `translate3d(${offset}px, 0, 0)`;
         this.virtualScrollPos$.next(nextPos);
@@ -453,11 +491,13 @@ export class PageManagerPaginated implements PageManager {
   private clearSectionTransitionSubscription() {
     this.sectionTransitionSubscription?.unsubscribe();
     this.sectionTransitionSubscription = undefined;
+    this.sectionTransitionResolve?.();
+    this.sectionTransitionResolve = undefined;
   }
 
   private clearContentTransform() {
-    if (this.contentEl.style.transform) this.contentEl.style.removeProperty('transform');
-    if (this.contentEl.style.willChange) this.contentEl.style.removeProperty('will-change');
+    if (this.motionEl.style.transform) this.motionEl.style.removeProperty('transform');
+    if (this.motionEl.style.willChange) this.motionEl.style.removeProperty('will-change');
     setReaderAnimatedScrollPosition(this.scrollEl, undefined);
   }
 
@@ -509,11 +549,13 @@ export class PageManagerPaginated implements PageManager {
     if (!ref || !this.sectionData.has(ref)) return;
 
     const sections = [...this.sectionData.values()];
+    const currentReference = this.sectionIds[this.sectionIndex$.getValue()];
     let currentRefSeen = false;
 
     sections.forEach((section) => {
       const entry = this.sectionData.get(section.reference) as SectionWithProgress;
       const isCurrentRef = section.reference === ref;
+      entry.isCurrent = section.reference === currentReference;
 
       if (isCurrentRef) {
         entry.progress = progress;

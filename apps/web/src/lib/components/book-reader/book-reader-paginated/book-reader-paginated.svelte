@@ -50,6 +50,7 @@
     filter,
     fromEvent,
     map,
+    merge,
     skip,
     Subject,
     switchMap,
@@ -67,8 +68,9 @@
   } from '../types';
   import { BookmarkManagerPaginated } from './bookmark-manager-paginated';
   import { PageManagerPaginated } from './page-manager-paginated';
+  import SectionContinuation from './section-continuation.svelte';
   import { SectionCharacterStatsCalculator } from './section-character-stats-calculator';
-  import { createEventDispatcher, onDestroy, onMount } from 'svelte';
+  import { createEventDispatcher, onDestroy, onMount, tick } from 'svelte';
   import { getParagraphNodes } from '../get-paragraph-nodes';
 
   export let htmlContent: string;
@@ -167,9 +169,15 @@
 
   let contentEl: HTMLElement | undefined;
 
+  let sectionContentEl: HTMLElement | undefined;
+
+  let motionEl: HTMLElement | undefined;
+
   let tailSpacerEl: HTMLElement | undefined;
 
   let calculator: SectionCharacterStatsCalculator | undefined;
+
+  let preparedCalculator: SectionCharacterStatsCalculator | undefined;
 
   let calculatorSectionIndex = -1;
 
@@ -201,8 +209,6 @@
   let displayedSectionRenderToken = 0;
 
   let displayedSectionMountKey = 0;
-
-  let skipFirstHtmlLoad = true;
 
   let previousIntendedCount = 0;
 
@@ -294,6 +300,17 @@
       ? getPageBleed(windowEl, width, height, verticalMode, paginationTransitionMode)
       : 0;
 
+  $: followingSection = sections[displayedSectionIndex + 1];
+  $: nextSectionTitle = getSectionTitle(followingSection, tocTargets);
+
+  function getSectionTitle(section: ReaderSection | undefined, targets: TocTarget[]) {
+    if (!section) return 'Next section';
+    const target =
+      targets.find((entry) => entry.id === section.id) ||
+      (section.sourceHref && targets.find((entry) => entry.sourceHref === section.sourceHref));
+    return target ? target.label : 'Next section';
+  }
+
   function getPageBleed(
     element: HTMLElement,
     pageWidth: number,
@@ -346,7 +363,7 @@
   }
 
   $: {
-    if (contentEl && scrollEl && tailSpacerEl && sections) {
+    if (contentEl && motionEl && scrollEl && tailSpacerEl && sections) {
       setPageManager(
         new PageManagerPaginated(
           contentEl,
@@ -363,23 +380,28 @@
           paginationTransitionMode,
           pageChange$,
           sectionRenderComplete$,
-          pageBleed
+          pageBleed,
+          motionEl
         )
       );
     }
   }
 
   $: {
-    if (calculator && width && height && !loadingState) {
+    if (calculator && calculator === preparedCalculator && width && height && !loadingState) {
       const c = calculator;
       const sectionIndex = calculatorSectionIndex;
 
-      requestAnimationFrame(() => {
-        if (c !== calculator || sectionIndex !== calculatorSectionIndex) {
+      void tick().then(() => {
+        if (
+          c !== calculator ||
+          c !== preparedCalculator ||
+          sectionIndex !== calculatorSectionIndex
+        ) {
           return;
         }
 
-        onContentDisplayChange(c, sectionIndex);
+        void onContentDisplayChange(c, sectionIndex);
       });
     }
   }
@@ -720,27 +742,11 @@
 
   currentSection$.pipe(takeUntil(destroy$)).subscribe(({ index, html }) => {
     const renderToken = ++displayedSectionRenderToken;
-
-    const nestAnimationFrame = (fn: () => void, count: number) => {
-      if (count === 0) {
-        fn();
-        return;
-      }
-      requestAnimationFrame(() => nestAnimationFrame(fn, count - 1));
-    };
-
-    // 2x for loading screen to render
-    nestAnimationFrame(() => {
-      if (renderToken !== displayedSectionRenderToken || sectionIndex$.getValue() !== index) {
-        return;
-      }
-
-      displayedSectionIndex = index;
-      currentSectionId = sections[index]?.id || '';
-      currentSectionSourceHref = sections[index]?.sourceHref || '';
-      displayedHtml = html;
-      displayedSectionMountKey = renderToken;
-    }, 2);
+    displayedSectionIndex = index;
+    currentSectionId = sections[index]?.id || '';
+    currentSectionSourceHref = sections[index]?.sourceHref || '';
+    displayedHtml = html;
+    displayedSectionMountKey = renderToken;
   });
 
   iffBrowser(() => fromEvent<WheelEvent>(document.body, 'wheel', { passive: true }))
@@ -801,7 +807,15 @@
         .pipe(
           filter(({ index }) => index === sectionIndex),
           take(1),
-          takeUntil(destroy$)
+          takeUntil(
+            merge(
+              destroy$,
+              sectionIndex$.pipe(
+                skip(1),
+                filter((index) => index !== sectionIndex)
+              )
+            )
+          )
         )
         .subscribe({
           next: ({ calculator: readyCalculator }) => {
@@ -955,15 +969,16 @@
   }
 
   function onHtmlLoad() {
-    if (skipFirstHtmlLoad) {
-      skipFirstHtmlLoad = false;
-      return;
-    }
-    if (!scrollEl || displayedSectionIndex < 0) return;
+    if (!scrollEl || !contentEl || !sectionContentEl || displayedSectionIndex < 0) return;
 
     const loadedSectionIndex = displayedSectionIndex;
+    if (loadedSectionIndex !== calculatorSectionIndex) {
+      // Measure the new section in its own coordinates, before resolving a destination.
+      scrollEl.scrollTo({ [verticalMode ? 'top' : 'left']: 0 });
+      virtualScrollPos$.next(0);
+    }
     const nextCalculator = new SectionCharacterStatsCalculator(
-      scrollEl,
+      sectionContentEl,
       sections.map((section) => section.characterCount),
       virtualScrollPos$,
       () => width,
@@ -975,6 +990,7 @@
     );
     calculator?.destroy();
     clearActiveTocTargetCache();
+    preparedCalculator = undefined;
     calculator = nextCalculator;
     calculatorSectionIndex = loadedSectionIndex;
     exploredCharCount = 0;
@@ -1013,6 +1029,8 @@
     if (
       !calculatorInstance ||
       !scrollEl ||
+      !contentEl ||
+      !sectionContentEl ||
       sectionIndex < 0 ||
       calculatorInstance !== calculator ||
       sectionIndex !== calculatorSectionIndex ||
@@ -1023,8 +1041,9 @@
       return;
 
     calculatorInstance.updateCurrentSection(sectionIndex);
+    preparedCalculator = calculatorInstance;
     dispatch('contentChange', {
-      contentEl: scrollEl,
+      contentEl: sectionContentEl,
       scope: 'section',
       sectionId: sections[sectionIndex].id
     });
@@ -1037,6 +1056,7 @@
     if (
       sectionIndex < 0 ||
       _calculator !== calculator ||
+      _calculator !== preparedCalculator ||
       sectionIndex !== calculatorSectionIndex ||
       displayedSectionIndex !== sectionIndex ||
       sectionIndex$.getValue() !== sectionIndex
@@ -1077,24 +1097,25 @@
     if (restoringPosition) return;
     const renderToken = displayedSectionRenderToken;
     const revision = contentRevision;
-    requestAnimationFrame(() => {
-      if (
-        revision === contentRevision &&
-        renderToken === displayedSectionRenderToken &&
-        displayedSectionIndex === sectionIndex$.getValue() &&
-        calculatorSectionIndex === displayedSectionIndex &&
-        !restoringPosition
-      ) {
-        allowDisplay = true;
-      }
-    });
+    if (
+      revision === contentRevision &&
+      renderToken === displayedSectionRenderToken &&
+      displayedSectionIndex === sectionIndex$.getValue() &&
+      calculatorSectionIndex === displayedSectionIndex &&
+      !restoringPosition
+    ) {
+      allowDisplay = true;
+    }
   }
 
   function updateBookmarkScreen(data: BooksDbBookmarkData | undefined) {
     const bookmarkCharCount = data?.exploredCharCount;
     if (!calculator || !bookmarkCharCount) return;
 
-    const result = calculator.checkBookmarkOnScreen(bookmarkCharCount);
+    const result = calculator.checkBookmarkOnScreen(
+      bookmarkCharCount,
+      concreteBookmarkManager?.getBookmarkScrollPosition(data)
+    );
 
     if (scrollEl && result.isBookmarkScreen) {
       const dimentionAdjustment = Number(
@@ -1435,6 +1456,7 @@
   bind:this={windowEl}
   style:--book-content-page-bleed="{pageBleed}px"
   style:--book-content-window-background={backgroundColor}
+  style:view-transition-name="ttu-reader-page"
   style:width="{width}px"
   style:padding-top={verticalMode ? `${pageBleed}px` : undefined}
   style:padding-bottom={verticalMode ? `${pageBleed}px` : undefined}
@@ -1512,15 +1534,26 @@
     on:mousedown={onSwipeMouseDown}
     on:swipe={onSwipe}
   >
-    <div
-      class="book-content-container"
-      id={currentSectionId || null}
-      data-ttu-source-href={currentSectionSourceHref || null}
-      bind:this={contentEl}
-    >
-      {#key displayedSectionMountKey}
-        <HtmlRenderer html={displayedHtml} on:load={onHtmlLoad} />
-      {/key}
+    <div class="book-content-motion" bind:this={motionEl}>
+      <div class="book-content-container" bind:this={contentEl}>
+        <div
+          class="book-section-text"
+          id={currentSectionId || null}
+          data-ttu-source-href={currentSectionSourceHref || null}
+          bind:this={sectionContentEl}
+        >
+          {#key displayedSectionMountKey}
+            <HtmlRenderer html={displayedHtml} on:load={onHtmlLoad} />
+          {/key}
+        </div>
+        {#if followingSection && displayedSectionIndex >= 0}
+          <SectionContinuation
+            {nextSectionTitle}
+            {verticalMode}
+            on:continue={() => concretePageManager?.nextSection()}
+          />
+        {/if}
+      </div>
     </div>
     <div class="book-content-tail-spacer" bind:this={tailSpacerEl} aria-hidden="true"></div>
   </div>
@@ -1549,18 +1582,18 @@
 
   @mixin ruby-edge-clearance($property) {
     :global(
-      .book-content-container
+      .book-section-text
         > *:not(.ttu-book-html-wrapper)
         > *:has(ruby):has(rt):not(:has(> :is(p, div, section, article, blockquote, ul, ol)))
     ),
     :global(
-      .book-content-container
+      .book-section-text
         > div.ttu-book-html-wrapper
         > div.ttu-book-body-wrapper
         > *:has(ruby):has(rt):not(:has(> :is(p, div, section, article, blockquote, ul, ol)))
     ),
     :global(
-      .book-content-container
+      .book-section-text
         > div.ttu-book-html-wrapper
         > div.ttu-book-body-wrapper
         > *
@@ -1640,6 +1673,11 @@
     }
   }
 
+  .book-content-motion {
+    position: relative;
+    width: 100%;
+  }
+
   .book-content-container {
     column-count: var(--book-content-column-count, 1);
     column-width: var(
@@ -1700,5 +1738,112 @@
 
   .book-content--writing-horizontal-rl {
     @include ruby-edge-clearance('padding-top');
+  }
+
+  :global(::view-transition-old(root)),
+  :global(::view-transition-new(root)) {
+    animation: none;
+  }
+
+  :global(::view-transition-group(ttu-reader-page)) {
+    animation-duration: 180ms;
+  }
+
+  :global(::view-transition-old(ttu-reader-page)),
+  :global(::view-transition-new(ttu-reader-page)) {
+    animation-duration: 180ms;
+    animation-timing-function: ease-in-out;
+  }
+
+  :global(
+    html:active-view-transition-type(ttu-reader-unfurl)::view-transition-group(ttu-reader-page)
+  ) {
+    animation: none;
+  }
+
+  :global(
+    html:active-view-transition-type(ttu-reader-unfurl)::view-transition-old(ttu-reader-page)
+  ),
+  :global(
+    html:active-view-transition-type(ttu-reader-unfurl)::view-transition-new(ttu-reader-page)
+  ) {
+    --unfurl-x: 12px;
+    --unfurl-y: 0px;
+    --unfurl-scale-x: 0.985;
+    --unfurl-scale-y: 1;
+    transform-origin: left center;
+    animation-fill-mode: both;
+  }
+
+  :global(
+    html:active-view-transition-type(ttu-reader-backward)::view-transition-old(ttu-reader-page)
+  ),
+  :global(
+    html:active-view-transition-type(ttu-reader-backward)::view-transition-new(ttu-reader-page)
+  ) {
+    --unfurl-x: -12px;
+  }
+
+  :global(
+    html:active-view-transition-type(ttu-reader-vertical)::view-transition-old(ttu-reader-page)
+  ),
+  :global(
+    html:active-view-transition-type(ttu-reader-vertical)::view-transition-new(ttu-reader-page)
+  ) {
+    --unfurl-x: 0px;
+    --unfurl-y: 12px;
+    --unfurl-scale-x: 1;
+    --unfurl-scale-y: 0.985;
+    transform-origin: center top;
+  }
+
+  :global(
+    html:active-view-transition-type(ttu-reader-vertical):active-view-transition-type(
+        ttu-reader-backward
+      )::view-transition-old(ttu-reader-page)
+  ),
+  :global(
+    html:active-view-transition-type(ttu-reader-vertical):active-view-transition-type(
+        ttu-reader-backward
+      )::view-transition-new(ttu-reader-page)
+  ) {
+    --unfurl-y: -12px;
+  }
+
+  :global(
+    html:active-view-transition-type(ttu-reader-unfurl)::view-transition-old(ttu-reader-page)
+  ) {
+    animation-name: ttu-reader-tuck;
+    animation-duration: 130ms;
+    animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+  }
+
+  :global(
+    html:active-view-transition-type(ttu-reader-unfurl)::view-transition-new(ttu-reader-page)
+  ) {
+    animation-name: ttu-reader-unfurl;
+    animation-duration: 250ms;
+    animation-delay: 130ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes -global-ttu-reader-tuck {
+    to {
+      opacity: 0;
+      transform: translate(calc(-1 * var(--unfurl-x)), calc(-1 * var(--unfurl-y)))
+        scale(var(--unfurl-scale-x), var(--unfurl-scale-y));
+    }
+  }
+
+  @keyframes -global-ttu-reader-unfurl {
+    from {
+      opacity: 0;
+      transform: translate(var(--unfurl-x), var(--unfurl-y))
+        scale(var(--unfurl-scale-x), var(--unfurl-scale-y));
+    }
+    to {
+      opacity: 1;
+      transform: translate(0, 0) scale(1, 1);
+    }
   }
 </style>

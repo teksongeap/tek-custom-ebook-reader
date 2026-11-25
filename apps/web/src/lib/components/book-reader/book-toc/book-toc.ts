@@ -18,6 +18,8 @@ export const tocTargets$ = new BehaviorSubject<TocTarget[]>([]);
 
 export type SectionWithProgress = Section & {
   progress: number;
+  // A paginated section remains current on its continuation page, even at 100%.
+  isCurrent?: boolean;
 };
 
 export type ActiveTocItem = {
@@ -66,11 +68,7 @@ export function getTocTargetLocationKey(target: ActiveTocItem) {
   return [target.sourceHref || '', target.targetFragment || ''].join('#');
 }
 
-function appendBookTocEntries(
-  entries: BooksDbTocEntry[],
-  targets: TocTarget[],
-  depth = 0
-) {
+function appendBookTocEntries(entries: BooksDbTocEntry[], targets: TocTarget[], depth = 0) {
   entries.forEach((entry) => {
     targets.push({
       id: entry.id,
@@ -109,7 +107,9 @@ export function getChapterData(
 ): [SectionWithProgress[], number, string] {
   const mainChapters = getChapterSections(sectionData);
 
-  let currentSection = sectionData.find((section) => section.progress < 100);
+  let currentSection =
+    sectionData.find((section) => section.isCurrent) ||
+    sectionData.find((section) => section.progress < 100);
 
   if (!currentSection) {
     currentSection = sectionData[sectionData.length - 1];
@@ -129,4 +129,34 @@ export function getChapterData(
   }
 
   return [mainChapters, currentChapterIndex, referenceId];
+}
+
+export function getCurrentChapterLabel(
+  sectionData: SectionWithProgress[],
+  characterPosition: number,
+  fallback = ''
+) {
+  if (!sectionData?.length) {
+    return fallback;
+  }
+
+  const [mainChapters, chapterIndex] = getChapterData(sectionData);
+  if (sectionData.some((section) => section.isCurrent)) {
+    return mainChapters[chapterIndex]?.label || fallback;
+  }
+
+  const chaptersByCharacter = [...mainChapters]
+    .filter((chapter) => typeof chapter.startCharacter === 'number')
+    .sort((a, b) => (a.startCharacter as number) - (b.startCharacter as number));
+  let chapterByCharacter: SectionWithProgress | undefined;
+
+  for (const chapter of chaptersByCharacter) {
+    if ((chapter.startCharacter as number) > characterPosition) {
+      break;
+    }
+
+    chapterByCharacter = chapter;
+  }
+
+  return chapterByCharacter?.label || mainChapters[chapterIndex]?.label || fallback;
 }
