@@ -41,6 +41,8 @@
   --reader-progress-start: var(--app-accent);
   --reader-progress-end: var(--app-accent-strong);
   --reader-control-alert: var(--app-danger);
+  --reader-chrome-height: 3rem;
+  --reader-chrome-gutter: clamp(0.75rem, 2vw, 1rem);
   scrollbar-color: #c1c1c1 #c1c1c100;
 }
 
@@ -285,21 +287,48 @@
     color: var(--app-chrome-muted);
   }
 
-  .reader-header-hotzone {
-    background: linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--reader-page-text) 7%, transparent),
-      transparent
-    );
+  .reader-header,
+  .reader-footer,
+  .reader-chrome-toggle {
+    --reader-chrome-bg: color-mix(in srgb, var(--reader-page-bg) 92%, var(--reader-page-text) 8%);
+    --reader-chrome-border: color-mix(in srgb, var(--reader-page-text) 12%, transparent);
   }
 
   .reader-header {
-    --reader-toolbar-bg: color-mix(in srgb, var(--reader-page-bg) 92%, var(--reader-page-text) 8%);
-    border-bottom: 1px solid color-mix(in srgb, var(--reader-page-text) 12%, transparent);
-    background:
-      linear-gradient(var(--reader-toolbar-bg), var(--reader-toolbar-bg)), var(--reader-page-bg);
+    border-bottom: 1px solid var(--reader-chrome-border);
+    background: var(--reader-chrome-bg);
     color: var(--reader-page-text);
-    box-shadow: var(--app-chrome-shadow);
+  }
+
+  .reader-chrome-toggle {
+    --reader-toggle-size: 2rem;
+    appearance: none;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: var(--reader-toggle-size);
+    height: var(--reader-toggle-size);
+    border: 0;
+    border-radius: 0.25rem;
+    padding: 0;
+    background: transparent;
+    color: color-mix(in srgb, var(--reader-page-text) 82%, var(--reader-page-bg));
+    font-size: var(--reader-ui-control-font-size);
+    cursor: pointer;
+    transition:
+      color 140ms ease,
+      background-color 140ms ease;
+  }
+
+  .reader-chrome-toggle:hover {
+    background: color-mix(in srgb, var(--reader-page-text) 8%, transparent);
+    color: var(--reader-page-text);
+  }
+
+  .reader-chrome-toggle:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--reader-page-text) 65%, transparent);
+    outline-offset: -2px;
   }
 
   .reader-header-title {
@@ -344,304 +373,243 @@
       inset -1px 0 0 color-mix(in srgb, var(--reader-page-text) 10%, transparent);
   }
 
-  .reader-footer {
-    color: color-mix(in srgb, var(--reader-page-text) 74%, transparent);
-    background: linear-gradient(
-      to top,
-      color-mix(in srgb, var(--reader-page-bg) 88%, transparent),
-      color-mix(in srgb, var(--reader-page-bg) 56%, transparent) 52%,
-      transparent
+  .reader-footer-reveal {
+    position: fixed;
+    right: var(--reader-chrome-gutter);
+    bottom: calc(
+      (var(--reader-chrome-height) - var(--reader-toggle-size)) / 2 + env(safe-area-inset-bottom)
     );
-    font-size: var(--reader-ui-small-font-size);
-    pointer-events: auto;
+    z-index: 10;
+    background: var(--reader-chrome-bg);
+    writing-mode: horizontal-tb;
   }
 
-  .reader-footer-controls,
-  .reader-footer-toggle,
-  .reader-footer-pill,
-  .reader-chapter-card,
-  .reader-progress-card {
-    pointer-events: auto;
-  }
-
-  .reader-footer-toggle {
-    border: 0;
-    background: transparent;
-    outline: none;
-  }
-
-  .reader-footer-toggle:focus-visible {
-    box-shadow: inset var(--app-focus-ring);
-  }
-
-  .reader-footer-pill,
-  .reader-chapter-card,
-  .reader-progress-card {
+  .reader-footer {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 24vw) minmax(0, 1fr);
+    grid-template-areas: 'percent chapter end';
+    align-items: center;
+    gap: 0.75rem;
+    height: calc(var(--reader-chrome-height) + 1px + env(safe-area-inset-bottom));
     box-sizing: border-box;
-    border: 1px solid color-mix(in srgb, var(--reader-page-text) 13%, transparent);
-    background: color-mix(in srgb, var(--reader-page-bg) 86%, transparent);
-    color: color-mix(in srgb, var(--reader-page-text) 82%, transparent);
-    box-shadow: 0 14px 30px rgba(5, 7, 10, 0.16);
-    backdrop-filter: blur(18px) saturate(125%);
-    outline: none;
-    transition:
-      background-color 140ms ease,
-      border-color 140ms ease,
-      box-shadow 140ms ease,
-      color 140ms ease,
-      transform 140ms ease;
+    padding: 0 var(--reader-chrome-gutter) env(safe-area-inset-bottom);
+    border-top: 1px solid var(--reader-chrome-border);
+    background: var(--reader-chrome-bg);
+    color: color-mix(in srgb, var(--reader-page-text) 82%, var(--reader-page-bg));
+    font-size: var(--reader-ui-small-font-size);
+    line-height: 1.4;
+    writing-mode: horizontal-tb;
+    pointer-events: none;
+  }
+
+  .reader-footer--empty {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .reader-footer-content,
+  .reader-footer-summary,
+  .reader-footer-progress {
+    display: contents;
+  }
+
+  .reader-footer-content[hidden] {
+    display: none;
+  }
+
+  .reader-footer-chapter,
+  .reader-footer-book-percent,
+  .reader-footer-count,
+  .reader-footer-controls {
+    pointer-events: auto;
   }
 
   .reader-footer-pill {
-    border-radius: 999px;
-    font-size: var(--reader-ui-control-font-size);
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    border-radius: 0.25rem;
   }
 
-  .reader-chapter-card {
+  .reader-footer-chapter {
+    min-width: 0;
+    min-height: 2rem;
+    padding: 0.25rem 0;
+    line-height: 1.4;
+  }
+
+  .reader-footer-chapter {
+    grid-area: chapter;
     display: flex;
-    flex: 0 1 auto;
-    min-height: 2.25rem;
-    min-width: 4.5rem;
-    max-width: min(24rem, 50vw);
-    overflow: hidden;
+    width: 100%;
+    max-width: 100%;
     align-items: center;
-    border-radius: 0.5rem;
-    padding: 0 0.85rem;
-    color: color-mix(in srgb, var(--reader-page-text) 76%, transparent);
-    font-size: var(--reader-ui-font-size);
-    font-weight: 400;
-    line-height: 1.18;
+    justify-content: center;
+    gap: 0.5rem;
+    text-align: center;
   }
 
-  .reader-chapter-card-label {
-    display: block;
-    max-width: 100%;
+  .reader-footer-chapter-label {
     min-width: 0;
     overflow: hidden;
     padding-block: 0.08em;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .reader-progress-card {
-    container-type: inline-size;
-    display: flex;
-    flex: 0 0 auto;
-    min-height: 2.25rem;
-    width: 50vw;
-    min-width: 11.5rem;
-    max-width: calc(100vw - 1.5rem);
-    align-items: center;
-    border-radius: 0.5rem;
-    font-size: var(--reader-ui-small-font-size);
-  }
-
-  .reader-progress-card--with-counter {
-    width: 58vw;
-    min-width: 17rem;
-  }
-
-  .reader-footer-pill:hover,
-  .reader-footer-pill:focus-visible,
-  .reader-progress-card:hover,
-  .reader-progress-card:focus-within {
-    border-color: color-mix(in srgb, var(--reader-page-text) 22%, transparent);
-    background: color-mix(in srgb, var(--reader-page-bg) 94%, transparent);
-    color: var(--reader-page-text);
-    box-shadow: 0 18px 34px rgba(5, 7, 10, 0.2);
-  }
-
-  .reader-footer-pill:focus-visible,
-  .reader-progress-card:focus-within {
-    box-shadow:
-      var(--app-focus-ring),
-      0 18px 34px rgba(5, 7, 10, 0.2);
-  }
-
-  .reader-footer-pill--active,
-  .reader-footer-pill--danger {
-    border-color: color-mix(in srgb, var(--reader-control-alert) 42%, transparent);
-    background: color-mix(in srgb, var(--reader-control-alert) 12%, var(--reader-page-bg));
-    color: var(--reader-control-alert);
-  }
-
-  .reader-progress-layout {
-    display: grid;
-    width: 100%;
-    min-width: 0;
-    grid-template-columns: minmax(10rem, 1fr) auto;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .reader-progress-percent {
-    appearance: none;
-    cursor: pointer;
-    border: 0;
-    border-radius: 0.25rem;
-    background: transparent;
-    display: inline-flex;
-    min-width: 0;
-    align-items: baseline;
-    gap: 0.45rem;
-    justify-content: flex-end;
-    padding: 0;
-    color: color-mix(in srgb, var(--reader-page-text) 76%, transparent);
-    font: inherit;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-    white-space: nowrap;
-  }
-
-  .reader-progress-counter {
-    display: inline-block;
-    max-width: min(12rem, 35vw);
-    overflow: hidden;
-    color: color-mix(in srgb, var(--reader-page-text) 60%, transparent);
     font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .reader-progress-percent:hover,
-  .reader-progress-percent:focus-visible {
-    color: var(--reader-page-text);
-    outline: none;
-  }
-
-  .reader-progress-track {
-    display: block;
-    position: relative;
-    height: 0.25rem;
-    min-width: 10rem;
-    overflow: visible;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--reader-page-text) 12%, transparent);
-  }
-
-  .reader-progress-fill {
-    display: block;
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    height: 100%;
-    border-radius: inherit;
-    background: linear-gradient(90deg, var(--reader-progress-start), var(--reader-progress-end));
-    transition: width 180ms ease;
-  }
-
-  .reader-progress-tick {
-    appearance: none;
-    position: absolute;
-    top: 50%;
-    z-index: 1;
-    width: 0.65rem;
-    height: 1.25rem;
-    cursor: pointer;
-    border: 0;
-    border-radius: 999px;
-    background: transparent;
-    padding: 0;
-    color: inherit;
-    font: inherit;
-    opacity: 1;
-    outline: none;
-    transform: translate(-50%, -50%);
-  }
-
-  .reader-progress-tick::after {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 1px;
-    height: 0.6rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--reader-page-text) 46%, transparent);
-    content: '';
-    opacity: 0.72;
-    transform: translate(-50%, -50%);
-    transition:
-      background-color 140ms ease,
-      height 140ms ease,
-      opacity 140ms ease;
-  }
-
-  .reader-progress-tick:hover::after,
-  .reader-progress-tick:focus-visible::after {
-    height: 1rem;
-    background: var(--reader-page-text);
-    opacity: 0.9;
-  }
-
-  .reader-progress-tick-label {
-    position: absolute;
-    bottom: calc(100% - 0.05rem);
-    left: 50%;
-    display: block;
-    max-width: min(18rem, 58vw);
-    overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--reader-page-text) 13%, transparent);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--reader-page-bg) 94%, transparent);
-    box-shadow: 0 12px 26px rgba(5, 7, 10, 0.18);
-    color: var(--reader-page-text);
-    font-size: var(--reader-ui-small-font-size);
-    font-weight: 400;
-    line-height: 1;
-    opacity: 0;
-    padding: 0.45rem 0.65rem;
-    pointer-events: none;
-    text-overflow: ellipsis;
-    transform: translate(-50%, 0.2rem);
-    transition:
-      opacity 140ms ease,
-      transform 140ms ease;
+  .reader-footer-book-percent {
+    grid-area: percent;
+    font-weight: 600;
     white-space: nowrap;
   }
 
-  .reader-progress-tick:hover .reader-progress-tick-label,
-  .reader-progress-tick:focus-visible .reader-progress-tick-label {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translate(-50%, 0);
+  .reader-footer-count {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25em;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-align: right;
+    font-size: var(--reader-ui-xsmall-font-size);
+    font-weight: 400;
+    opacity: 0.72;
   }
 
-  @container (max-width: 19rem) {
-    .reader-progress-counter {
+  .reader-footer-count-values {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .reader-footer-pill:hover {
+    color: var(--reader-page-text);
+  }
+
+  .reader-footer-pill:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--reader-page-text) 65%, transparent);
+    outline-offset: 3px;
+  }
+
+  .reader-footer-end {
+    grid-area: end;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    justify-self: end;
+    gap: 0.75rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .reader-footer-controls {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .reader-footer-pill {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    font-size: var(--reader-ui-control-font-size);
+  }
+
+  .reader-footer-pill--active,
+  .reader-footer-pill--danger {
+    color: var(--reader-control-alert);
+  }
+
+  .reader-footer-track {
+    position: absolute;
+    inset-inline: 0;
+    bottom: calc(env(safe-area-inset-bottom) + 1px);
+    min-width: 0;
+    height: 2px;
+    background: color-mix(in srgb, var(--reader-page-text) 22%, transparent);
+  }
+
+  .reader-footer-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--reader-page-text);
+    opacity: 0.7;
+    transition: width 180ms ease;
+  }
+
+  .reader-footer-chapter-mark {
+    position: absolute;
+    top: 50%;
+    width: 1px;
+    height: 6px;
+    transform: translate(-50%, -50%);
+    background: var(--reader-page-text);
+    opacity: 0.25;
+  }
+
+  @media (max-width: 767px) {
+    .reader-footer {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 12vw) minmax(0, 1fr);
+    }
+
+    .reader-footer-count {
+      flex-direction: column-reverse;
+      align-items: flex-end;
+      gap: 0;
+      line-height: 1.25;
+      font-size: min(var(--reader-ui-xsmall-font-size), 0.75rem);
+    }
+
+    .reader-footer-count-unit {
+      font-size: 0.6875rem;
+      opacity: 0.8;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .reader-footer,
+    .reader-footer-end {
+      gap: 0.25rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .reader-footer {
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-areas: 'percent end';
+    }
+
+    .reader-footer-chapter {
       display: none;
     }
   }
 
-  @container (max-width: 15rem) {
-    .reader-progress-layout {
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 0.5rem;
+  @media (pointer: coarse) {
+    .reader-footer-pill {
+      min-height: 44px;
+      width: 44px;
     }
 
-    .reader-progress-track {
-      min-width: 0;
+    .reader-chrome-toggle {
+      --reader-toggle-size: 44px;
     }
   }
 
-  @media (max-width: 520px) {
-    .reader-chapter-card {
-      display: flex;
-      flex: 1 1 50vw;
-      min-width: 3.25rem;
-      max-width: 50vw;
-      padding: 0 0.65rem;
-    }
-
-    .reader-progress-card {
-      width: 44vw;
-      min-width: 8rem;
-    }
-
-    .reader-progress-card--with-counter {
-      width: 58vw;
-      min-width: 12rem;
+  @media (prefers-reduced-motion: reduce) {
+    .reader-footer-fill {
+      transition: none;
     }
   }
 
@@ -1471,19 +1439,13 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 24vw) minmax(0, 1fr);
     align-items: center;
     gap: 0.75rem;
-    min-height: 3rem;
+    min-height: var(--reader-chrome-height);
     width: 100%;
-    padding: 0.125rem 1rem;
+    padding: 0.125rem var(--reader-chrome-gutter);
   }
 
   .reader-toolbar-actions:last-child {
     justify-self: end;
-  }
-
-  @media (min-width: 768px) {
-    .reader-toolbar {
-      padding-inline: 2rem;
-    }
   }
 
   @media (max-width: 1279px) {
@@ -1612,8 +1574,7 @@
     cursor: not-allowed;
   }
 
-  .app-toolbar-button:focus-visible,
-  .reader-controls-reveal:focus-visible {
+  .app-toolbar-button:focus-visible {
     outline: 2px solid currentColor;
     outline-offset: -2px;
   }
@@ -1645,29 +1606,10 @@
 
   .reader-controls-reveal {
     position: fixed;
-    top: 0.375rem;
-    right: 0.75rem;
+    top: calc((var(--reader-chrome-height) - var(--reader-toggle-size)) / 2);
+    right: var(--reader-chrome-gutter);
     z-index: 10;
-    display: flex;
-    width: 2.75rem;
-    height: 2.75rem;
-    align-items: center;
-    justify-content: center;
-    border: 0;
-    border-radius: 0.5rem;
-    padding: 0;
-    background: transparent;
-    color: color-mix(in srgb, var(--reader-page-text) 38%, transparent);
-    font-size: 0.875rem;
-    transition:
-      color 140ms ease,
-      background-color 140ms ease;
-  }
-
-  .reader-controls-reveal:hover,
-  .reader-controls-reveal:focus-visible {
-    background: color-mix(in srgb, var(--reader-page-text) 8%, transparent);
-    color: var(--reader-page-text);
+    background: var(--reader-chrome-bg);
   }
 
   @media (max-width: 1023px) {

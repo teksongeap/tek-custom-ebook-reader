@@ -6,7 +6,10 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getGlidePageSize } from '../../src/lib/functions/reader-viewport.ts';
+import {
+  getGlidePageSize,
+  observeReaderViewport
+} from '../../src/lib/functions/reader-viewport.ts';
 
 test('full-width glide reserves enough space to see text beyond both column gaps', () => {
   for (const availableSize of [288, 640, 1216, 1920]) {
@@ -27,4 +30,41 @@ test('tiny reading windows stay within the available space', () => {
     assert.ok(getGlidePageSize(size) >= 0);
     assert.ok(getGlidePageSize(size) <= size);
   }
+});
+
+test('popup and transient resize events do not repaginate the reader, while real resizing does', (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'Date'] });
+  class ReaderWindow extends EventTarget {
+    innerWidth = 1200;
+    innerHeight = 800;
+    visualViewport = new EventTarget();
+  }
+  const target = new ReaderWindow();
+  const sizes: { width: number; height: number }[] = [];
+  const subscription = observeReaderViewport(target as unknown as Window).subscribe((size) =>
+    sizes.push(size)
+  );
+  t.after(() => subscription.unsubscribe());
+  assert.deepEqual(sizes, [{ width: 1200, height: 800 }]);
+
+  target.visualViewport.dispatchEvent(new Event('resize'));
+  target.dispatchEvent(new Event('resize'));
+  t.mock.timers.tick(120);
+  assert.equal(sizes.length, 1);
+
+  target.innerHeight = 780;
+  target.dispatchEvent(new Event('resize'));
+  t.mock.timers.tick(30);
+  target.innerHeight = 800;
+  target.dispatchEvent(new Event('resize'));
+  t.mock.timers.tick(120);
+  assert.equal(sizes.length, 1);
+
+  target.innerWidth = 900;
+  target.innerHeight = 700;
+  target.dispatchEvent(new Event('resize'));
+  t.mock.timers.tick(119);
+  assert.equal(sizes.length, 1);
+  t.mock.timers.tick(1);
+  assert.deepEqual(sizes.at(-1), { width: 900, height: 700 });
 });

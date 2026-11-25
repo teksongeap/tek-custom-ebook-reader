@@ -225,13 +225,16 @@
         </div>
       </Popover>
       <button
+        id="reader-header-toggle"
         type="button"
-        class="app-toolbar-button"
+        class="reader-chrome-toggle"
         title="Hide controls"
         aria-label="Hide reader controls"
+        aria-expanded="true"
+        aria-controls="reader-controls"
         on:click={() => dispatch('hideControls')}
       >
-        <Fa icon={faChevronUp} /><span class="app-toolbar-label">Hide</span>
+        <Fa icon={faChevronUp} />
       </button>
     </div>
   </div>

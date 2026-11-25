@@ -4,6 +4,16 @@
  * All rights reserved.
  */
 
+import { debounceTime, distinctUntilChanged, fromEvent, map, merge, of } from 'rxjs';
+
+/** Popup focus and pinch zoom change the visual viewport without changing page layout. */
+export function observeReaderViewport(target: Window) {
+  return merge(of(undefined), fromEvent(target, 'resize').pipe(debounceTime(120))).pipe(
+    map(() => ({ width: target.innerWidth, height: target.innerHeight })),
+    distinctUntilChanged((a, b) => a.width === b.width && a.height === b.height)
+  );
+}
+
 const animatedScrollPositions = new WeakMap<HTMLElement, number>();
 
 export function setReaderAnimatedScrollPosition(

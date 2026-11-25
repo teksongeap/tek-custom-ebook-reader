@@ -12,7 +12,6 @@
     share,
     shareReplay,
     skip,
-    startWith,
     Subject,
     switchMap,
     take,
@@ -24,7 +23,11 @@
   import { cubicOut, quintInOut } from 'svelte/easing';
   import { fly } from 'svelte/transition';
   import { browser } from '$app/environment';
-  import { getReaderScrollPosition, getReaderViewportRect } from '$lib/functions/reader-viewport';
+  import {
+    getReaderScrollPosition,
+    getReaderViewportRect,
+    observeReaderViewport
+  } from '$lib/functions/reader-viewport';
   import { transitionReaderNavigation } from '$lib/functions/reader-navigation-transition';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
@@ -40,6 +43,7 @@
     type IconDefinition
   } from '@fortawesome/free-solid-svg-icons';
   import BookReader from '$lib/components/book-reader/book-reader.svelte';
+  import ReaderFooter from '$lib/components/book-reader/reader-footer.svelte';
   import type {
     AutoScroller,
     BookmarkManager,
@@ -139,8 +143,7 @@
     sectionProgress$,
     setActiveTocItem,
     tocIsOpen$,
-    tocTargets$,
-    type SectionWithProgress
+    tocTargets$
   } from '$lib/components/book-reader/book-toc/book-toc';
   import BookToc from '$lib/components/book-reader/book-toc/book-toc.svelte';
   import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
@@ -275,13 +278,6 @@
   let showReaderImageGallery = false;
   let dismissDialogs = true;
   let syncedResolver: () => void;
-
-  type ChapterTick = {
-    key: string;
-    label: string;
-    position: number;
-    startCharacter: number;
-  };
 
   const syncedPromise = new Promise<void>((resolver) => {
     syncedResolver = resolver;
@@ -465,19 +461,17 @@
     shareReplay({ refCount: true, bufferSize: 1 })
   );
 
-  const resize$ = iffBrowser(() =>
-    visualViewport ? fromEvent(visualViewport, 'resize') : of()
-  ).pipe(share());
+  const readerViewport$ = iffBrowser(() => observeReaderViewport(window)).pipe(
+    shareReplay({ bufferSize: 1, refCount: true })
+  );
 
-  const containerViewportWidth$ = resize$.pipe(
-    startWith(0),
-    map(() => visualViewport?.width || 0),
+  const containerViewportWidth$ = readerViewport$.pipe(
+    map(({ width }) => width),
     takeWhenBrowser()
   );
 
-  const containerViewportHeight$ = resize$.pipe(
-    startWith(0),
-    map(() => visualViewport?.height || 0),
+  const containerViewportHeight$ = readerViewport$.pipe(
+    map(({ height }) => height),
     takeWhenBrowser()
   );
 
@@ -652,32 +646,11 @@
 
   $: tapButtonTop = `${headerVisible ? 3 : 2}rem`;
 
-  $: readerFooterClearance = 12;
-
-  $: readerProgressPercent = bookCharCount
-    ? limitToRange(0, 100, (exploredCharCount / bookCharCount) * 100)
-    : 0;
-
-  $: readerProgressText = `${readerProgressPercent.toFixed(2)}%`;
-
-  $: readerProgressCounterText = `${formatCharacterCount(
-    exploredCharCount
-  )} / ${formatCharacterCount(bookCharCount)}`;
-
-  $: readerProgressSummaryText = [
-    $showCharacterCounter$ ? readerProgressCounterText : '',
-    readerProgressText
-  ]
-    .filter(Boolean)
-    .join(' ');
-
   $: footerChapterLabel = getCurrentChapterLabel(
     $sectionData$,
     exploredCharCount,
     $rawBookData$?.title ?? ''
   );
-
-  $: footerChapterTicks = getChapterTicks($sectionData$, bookCharCount);
 
   $: readerChromeStyle = getReaderChromeStyle({
     fontSize: $fontSize$,
@@ -982,65 +955,6 @@
         }
       ]);
     }
-  }
-
-  function getChapterTicks(sectionData: SectionWithProgress[], totalCharacters: number) {
-    if (!sectionData?.length || !totalCharacters) {
-      return [] as ChapterTick[];
-    }
-
-    const [mainChapters] = getChapterData(sectionData);
-
-    return mainChapters.flatMap((chapter) => {
-      const startCharacter = chapter.startCharacter;
-
-      if (
-        typeof startCharacter !== 'number' ||
-        startCharacter <= 0 ||
-        startCharacter >= totalCharacters
-      ) {
-        return [];
-      }
-
-      return [
-        {
-          key: chapter.reference,
-          label: chapter.label || '',
-          position: limitToRange(0, 100, (startCharacter / totalCharacters) * 100),
-          startCharacter
-        }
-      ];
-    });
-  }
-
-  function goToChapterTick(tick: ChapterTick) {
-    if (tick.startCharacter !== exploredCharCount) {
-      pauseTracker(true);
-    }
-
-    nextChapter$.next(tick.key);
-  }
-
-  function copyCurrentProgress(currentProgress: string) {
-    try {
-      navigator.clipboard.writeText(currentProgress);
-    } catch (error: any) {
-      logger.error(`Error writing Progress to Clipboard: ${error.message}`);
-    }
-  }
-
-  function copyFooterProgress(currentProgress: string, currentTarget: EventTarget | null) {
-    copyCurrentProgress(currentProgress);
-
-    if (!(currentTarget instanceof HTMLElement)) {
-      return;
-    }
-
-    pulseElement(currentTarget.closest<HTMLElement>('.reader-progress-card'), 'add', 0.5, 500);
-  }
-
-  function formatCharacterCount(characterCount: number) {
-    return Math.max(0, Math.floor(characterCount || 0)).toLocaleString();
   }
 
   function freezeTrackerPosition() {
@@ -2165,21 +2079,19 @@
 {$handleUpdateImageGalleryPictureSpoilers$ ?? ''}
 {#if !headerVisible}
   <button
-    type="button"
-    class="reader-header-hotzone fixed inset-x-0 top-0 z-[9] h-8 w-full"
-    aria-label="Show reader controls"
-    on:click|stopPropagation={() => ($readerControlsHidden$ = false)}
-  ></button>
-  <button
     bind:this={readerControlsToggleEl}
     type="button"
-    class="reader-controls-reveal"
+    class="reader-chrome-toggle reader-controls-reveal"
     style={readerChromeStyle}
     title="Show controls"
     aria-label="Show reader controls"
     aria-expanded="false"
     aria-controls="reader-controls"
-    on:click|stopPropagation={() => ($readerControlsHidden$ = false)}
+    on:click|stopPropagation={async () => {
+      $readerControlsHidden$ = false;
+      await tick();
+      document.getElementById('reader-header-toggle')?.focus({ preventScroll: true });
+    }}
   >
     <Fa icon={faChevronDown} />
   </button>
@@ -2194,7 +2106,7 @@
       on:hideControls={async () => {
         $readerControlsHidden$ = true;
         await tick();
-        readerControlsToggleEl?.focus();
+        readerControlsToggleEl?.focus({ preventScroll: true });
       }}
       bookTitle={$rawBookData$?.title ?? ''}
       fontSize={$fontSize$}
@@ -2336,7 +2248,6 @@
     viewMode={$viewMode$}
     secondDimensionMaxValue={$secondDimensionMaxValue$}
     {firstDimensionMargin}
-    bottomChromeClearance={readerFooterClearance}
     autoPositionOnResize={$autoPositionOnResize$}
     avoidPageBreak={$avoidPageBreak$}
     pageColumns={$pageColumns$}
@@ -2507,34 +2418,23 @@
   />
 {/if}
 
-<div
-  id="ttu-page-footer"
-  class="reader-footer writing-horizontal-tb fixed bottom-0 left-0 z-10 flex h-12 w-full items-end gap-2 px-3 pb-1.5 leading-none sm:px-4"
-  style={readerChromeStyle}
+<ReaderFooter
+  chapterLabel={footerChapterLabel}
+  {exploredCharCount}
+  {bookCharCount}
+  sectionData={$sectionData$ ?? []}
+  showCharacterCounter={$showCharacterCounter$}
+  expanded={showFooter}
+  chromeStyle={readerChromeStyle}
+  on:toggle={() => (showFooter = !showFooter)}
 >
-  <button
-    type="button"
-    class="reader-footer-toggle absolute inset-0 z-0"
-    aria-label="Toggle reader progress"
-    on:click={() => (showFooter = !showFooter)}
-  ></button>
-  {#if showFooter && bookCharCount}
-    {#if footerChapterLabel}
-      <div
-        class="reader-chapter-card writing-horizontal-tb relative z-10"
-        title={footerChapterLabel}
-      >
-        <span class="reader-chapter-card-label">{footerChapterLabel}</span>
-      </div>
-    {/if}
-  {/if}
-  <div class="reader-footer-controls relative z-10 ml-auto flex min-w-0 items-center gap-2">
+  <svelte:fragment slot="actions">
     {#if showTrackerIcon}
       <button
         type="button"
         title="Click to open Tracker Menu or Double Click to toggle Tracker"
         aria-label="Open or toggle reading tracker"
-        class="reader-footer-pill flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
+        class="reader-footer-pill"
         class:reader-footer-pill--active={$isTrackerPaused$}
         class:animate-pulse={frozenPosition > -1}
         use:multiClickHandler={[trackerSingleClickHandler, trackerDblClickHandler]}
@@ -2546,7 +2446,7 @@
       <button
         type="button"
         aria-label="Sync reader data"
-        class="reader-footer-pill flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10"
+        class="reader-footer-pill"
         class:reader-footer-pill--danger={externalStorageErrors > 1}
         class:animate-pulse={externalStorageErrors > 1 || isReplicating}
         on:click|stopPropagation={() => {
@@ -2554,7 +2454,6 @@
             wasTrackerPaused = $isTrackerPaused$;
             isTrackerPaused$.next(true);
           }
-
           executeReplication(false).finally(() => {
             if ($statisticsEnabled$ && !wasTrackerPaused) {
               isTrackerPaused$.next(false);
@@ -2565,47 +2464,8 @@
         <Fa icon={faCloudBolt} />
       </button>
     {/if}
-  </div>
-  {#if showFooter && bookCharCount}
-    {@const footerCopyText = [footerChapterLabel, readerProgressSummaryText]
-      .filter(Boolean)
-      .join(' - ')}
-    <div
-      class="reader-progress-card writing-horizontal-tb relative z-10 px-3 py-1.5 text-left leading-none select-none sm:px-4"
-      class:reader-progress-card--with-counter={$showCharacterCounter$}
-    >
-      <span class="reader-progress-layout">
-        <span class="reader-progress-track">
-          <span class="reader-progress-fill" style:width={`${readerProgressPercent}%`}></span>
-          {#each footerChapterTicks as tick (tick.key)}
-            <button
-              type="button"
-              class="reader-progress-tick"
-              aria-label={`Go to ${tick.label || 'chapter'}`}
-              style:left={`${tick.position}%`}
-              on:click|stopPropagation={() => goToChapterTick(tick)}
-            >
-              <span class="reader-progress-tick-label">{tick.label || 'Chapter'}</span>
-            </button>
-          {/each}
-        </span>
-        <button
-          type="button"
-          class="reader-progress-percent"
-          title="Copy reading progress"
-          aria-label="Copy reading progress"
-          on:click|stopPropagation={({ currentTarget }) =>
-            copyFooterProgress(footerCopyText, currentTarget)}
-        >
-          {#if $showCharacterCounter$}
-            <span class="reader-progress-counter">{readerProgressCounterText}</span>
-          {/if}
-          <span>{readerProgressText}</span>
-        </button>
-      </span>
-    </div>
-  {/if}
-</div>
+  </svelte:fragment>
+</ReaderFooter>
 
 {#if bookCompleted}
   <BookCompletionConfetti {confettiWidthModifier} {confettiMaxRuns} {window} />

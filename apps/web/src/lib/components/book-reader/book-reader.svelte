@@ -132,8 +132,6 @@
 
   export let firstDimensionMargin: number;
 
-  export let bottomChromeClearance = 0;
-
   export let autoPositionOnResize: boolean;
 
   export let avoidPageBreak: boolean;
@@ -259,7 +257,7 @@
   $: readerContainerStyle = [
     readerChromeStyle,
     'padding-top: 3.5rem',
-    `padding-bottom: calc(2rem + ${bottomChromeClearance}px)`
+    'padding-bottom: calc(var(--reader-footer-clearance) + env(safe-area-inset-bottom))'
   ].join('; ');
 
   $: syncWakeLock($enableReaderWakeLock$, visibilityState);
@@ -851,7 +849,8 @@
 {/if}
 <div
   bind:this={$containerEl$}
-  class={pxReader}
+  class="reader-content {pxReader}"
+  class:reader-content--paginated={viewMode === ViewMode.Paginated}
   style={readerContainerStyle}
   use:hoverFocus={$hoverFocusEnabled$}
 >
@@ -1036,6 +1035,18 @@
 <svelte:window on:scroll={handleFootnoteNavigationScroll} />
 
 <style lang="scss">
+  .reader-content {
+    // Reserve the expanded footer's space even when its controls are hidden.
+    --reader-footer-clearance: 3.5rem;
+  }
+
+  .reader-content--paginated {
+    // Extension dialogs can scroll the document when taking focus before they
+    // finish positioning. Keep the page anchored while its own scroller navigates.
+    position: fixed;
+    inset: 0;
+  }
+
   .book-footnote-preview-root {
     pointer-events: none;
     position: fixed;
