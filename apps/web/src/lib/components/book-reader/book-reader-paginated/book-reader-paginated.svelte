@@ -26,6 +26,7 @@
     userFonts$
   } from '$lib/data/store';
   import { clearRange, createRange, pulseElement } from '$lib/functions/range-util';
+  import { getReaderViewportRect } from '$lib/functions/reader-viewport';
   import {
     ReaderReferenceAttribute,
     findReaderTargetElement,
@@ -162,6 +163,8 @@
 
   let scrollEl: HTMLElement | undefined;
 
+  let windowEl: HTMLElement | undefined;
+
   let contentEl: HTMLElement | undefined;
 
   let tailSpacerEl: HTMLElement | undefined;
@@ -286,6 +289,31 @@
 
   $: columnCount = verticalMode ? 1 : pageColumns || Math.ceil(width / 1000);
 
+  $: pageBleed =
+    browser && windowEl
+      ? getPageBleed(windowEl, width, height, verticalMode, paginationTransitionMode)
+      : 0;
+
+  function getPageBleed(
+    element: HTMLElement,
+    pageWidth: number,
+    pageHeight: number,
+    vertical: boolean,
+    transitionMode: PaginationTransitionMode
+  ) {
+    if (transitionMode !== PaginationTransitionMode.Glide || !element.parentElement) return 0;
+
+    const parentStyle = getComputedStyle(element.parentElement);
+    const availableSpace = vertical
+      ? window.innerHeight -
+        parseFloat(parentStyle.paddingTop) -
+        parseFloat(parentStyle.paddingBottom) -
+        pageHeight
+      : window.innerWidth - pageWidth - 16;
+
+    return Math.max(0, Math.min(192, Math.floor(availableSpace / 2)));
+  }
+
   $: if (browser) {
     const nextActiveTocLayoutKey = [
       displayedSectionIndex,
@@ -334,7 +362,8 @@
           verticalMode,
           paginationTransitionMode,
           pageChange$,
-          sectionRenderComplete$
+          sectionRenderComplete$,
+          pageBleed
         )
       );
     }
@@ -1148,7 +1177,7 @@
     }
 
     const currentScrollPos = virtualScrollPos$.getValue();
-    const viewportRect = scrollEl.getBoundingClientRect();
+    const viewportRect = getReaderViewportRect(scrollEl);
     let closestReachedTarget: PaginatedTocTargetCandidate | undefined;
     let closestUpcomingTarget: PaginatedTocTargetCandidate | undefined;
 
@@ -1400,72 +1429,101 @@
 </script>
 
 <div
-  bind:this={scrollEl}
-  style:color={fontColor}
-  style:font-size="{fontSize}px"
-  style:line-height={lineHeight}
-  style:padding-top={!verticalMode && firstDimensionMargin
-    ? `${firstDimensionMargin}px`
-    : undefined}
-  style:padding-bottom={!verticalMode && firstDimensionMargin
-    ? `${firstDimensionMargin}px`
-    : undefined}
-  style:padding-left={verticalMode && firstDimensionMargin
-    ? `${firstDimensionMargin}px`
-    : undefined}
-  style:padding-right={verticalMode && firstDimensionMargin
-    ? `${firstDimensionMargin}px`
-    : undefined}
-  style:max-width={width ? `${width}px` : undefined}
-  style:max-height={verticalMode && height ? `${height}px` : undefined}
-  style:--font-family-serif={getReaderFontFamilyCssValue(fontFamilyGroupOne)}
-  style:--font-family-sans-serif={getReaderFontFamilyCssValue(fontFamilyGroupTwo, 'Noto Sans JP')}
-  style:--book-content-hint-furigana-font-color={hintFuriganaFontColor}
-  style:--book-content-hint-furigana-shadow-color={hintFuriganaShadowColor}
-  style:--book-content-selection-color={selectionFontColor || undefined}
-  style:--book-content-selection-background-color={selectionBackgroundColor || undefined}
-  style:--book-content-child-width="{width}px"
-  style:--book-content-child-height="{height}px"
-  style:--book-content-child-column-width={!verticalMode && columnCount === 1 ? `${width}px` : ''}
-  style:--book-content-column-count={columnCount}
-  style:--book-content-image-max-width="{verticalMode
-    ? width
-    : (width + gap) / columnCount - gap}px"
-  style:--book-content-text-margin="{textMarginValue ?? 0}rem"
-  style:--book-content-text-intendation="{textIndentation ?? 0}rem"
-  style:font-feature-settings={fontFeatureSettings}
-  style:text-orientation={verticalTextOrientation}
-  class:book-content--avoid-page-break={avoidPageBreak}
-  class:book-content--writing-vertical-rl={verticalMode}
-  class:book-content--writing-horizontal-rl={!verticalMode}
-  class:book-content--hide-furigana={hideFurigana}
-  class:book-content--hide-spoiler-image={hideSpoilerImage}
-  class:book-content--furigana-style-hide={furiganaStyle === FuriganaStyle.Hide}
-  class:book-content--furigana-style-partial={furiganaStyle === FuriganaStyle.Partial}
-  class:book-content--furigana-style-toggle={furiganaStyle === FuriganaStyle.Toggle}
-  class:book-content--furigana-style-full={furiganaStyle === FuriganaStyle.Full}
-  class:ttu-apply-important={prioritizeReaderStyles}
-  class:ttu-apply-justification={enableTextJustification}
-  class:ttu-text-wrap-pretty={enableTextWrapPretty}
-  class:book-content--ignore-publisher-text-colors={ignorePublisherFontColors}
-  class="book-content m-auto"
-  use:swipe={{ timeframe: 500, minSwipeDistance: $swipeThreshold$, touchAction: 'pan-y' }}
-  on:pointerdown={onSwipePointerDown}
-  on:touchstart={onSwipeTouchStart}
-  on:mousedown={onSwipeMouseDown}
-  on:swipe={onSwipe}
+  class="book-content-window m-auto"
+  class:book-content-window--glide={paginationTransitionMode === PaginationTransitionMode.Glide}
+  class:book-content-window--vertical={verticalMode}
+  bind:this={windowEl}
+  style:--book-content-page-bleed="{pageBleed}px"
+  style:--book-content-window-background={backgroundColor}
+  style:width="{width}px"
+  style:padding-top={verticalMode ? `${pageBleed}px` : undefined}
+  style:padding-bottom={verticalMode ? `${pageBleed}px` : undefined}
 >
   <div
-    class="book-content-container"
-    id={currentSectionId || null}
-    data-ttu-source-href={currentSectionSourceHref || null}
-    bind:this={contentEl}
+    bind:this={scrollEl}
+    data-ttu-viewport-inset-x={verticalMode ? 0 : pageBleed}
+    data-ttu-viewport-inset-y={verticalMode ? pageBleed : 0}
+    style:color={fontColor}
+    style:font-size="{fontSize}px"
+    style:line-height={lineHeight}
+    style:padding-top={!verticalMode && firstDimensionMargin
+      ? `${firstDimensionMargin}px`
+      : verticalMode && pageBleed
+        ? `${pageBleed}px`
+        : undefined}
+    style:padding-bottom={!verticalMode && firstDimensionMargin
+      ? `${firstDimensionMargin}px`
+      : verticalMode && pageBleed
+        ? `${pageBleed}px`
+        : undefined}
+    style:padding-left={verticalMode && firstDimensionMargin
+      ? `${firstDimensionMargin}px`
+      : !verticalMode && pageBleed
+        ? `${pageBleed}px`
+        : undefined}
+    style:padding-right={verticalMode && firstDimensionMargin
+      ? `${firstDimensionMargin}px`
+      : !verticalMode && pageBleed
+        ? `${pageBleed}px`
+        : undefined}
+    style:margin-left={!verticalMode && pageBleed ? `-${pageBleed}px` : undefined}
+    style:margin-right={!verticalMode && pageBleed ? `-${pageBleed}px` : undefined}
+    style:margin-top={verticalMode && pageBleed ? `-${pageBleed}px` : undefined}
+    style:margin-bottom={verticalMode && pageBleed ? `-${pageBleed}px` : undefined}
+    style:max-width={width ? `${width + (verticalMode ? 0 : pageBleed * 2)}px` : undefined}
+    style:max-height={verticalMode && height ? `${height + pageBleed * 2}px` : undefined}
+    style:--book-content-page-bleed="{pageBleed}px"
+    style:--book-content-page-bleed-x="{verticalMode ? 0 : pageBleed}px"
+    style:--font-family-serif={getReaderFontFamilyCssValue(fontFamilyGroupOne)}
+    style:--font-family-sans-serif={getReaderFontFamilyCssValue(fontFamilyGroupTwo, 'Noto Sans JP')}
+    style:--book-content-hint-furigana-font-color={hintFuriganaFontColor}
+    style:--book-content-hint-furigana-shadow-color={hintFuriganaShadowColor}
+    style:--book-content-selection-color={selectionFontColor || undefined}
+    style:--book-content-selection-background-color={selectionBackgroundColor || undefined}
+    style:--book-content-child-width="{width}px"
+    style:--book-content-child-height="{height}px"
+    style:--book-content-child-column-width={!verticalMode && columnCount === 1 ? `${width}px` : ''}
+    style:--book-content-column-count={columnCount}
+    style:--book-content-image-max-width="{verticalMode
+      ? width
+      : (width + gap) / columnCount - gap}px"
+    style:--book-content-text-margin="{textMarginValue ?? 0}rem"
+    style:--book-content-text-intendation="{textIndentation ?? 0}rem"
+    style:font-feature-settings={fontFeatureSettings}
+    style:text-orientation={verticalTextOrientation}
+    class:book-content--avoid-page-break={avoidPageBreak}
+    class:book-content--scroll-window={pageBleed > 0}
+    class:book-content--writing-vertical-rl={verticalMode}
+    class:book-content--writing-horizontal-rl={!verticalMode}
+    class:book-content--hide-furigana={hideFurigana}
+    class:book-content--hide-spoiler-image={hideSpoilerImage}
+    class:book-content--furigana-style-hide={furiganaStyle === FuriganaStyle.Hide}
+    class:book-content--furigana-style-partial={furiganaStyle === FuriganaStyle.Partial}
+    class:book-content--furigana-style-toggle={furiganaStyle === FuriganaStyle.Toggle}
+    class:book-content--furigana-style-full={furiganaStyle === FuriganaStyle.Full}
+    class:ttu-apply-important={prioritizeReaderStyles}
+    class:ttu-apply-justification={enableTextJustification}
+    class:ttu-text-wrap-pretty={enableTextWrapPretty}
+    class:book-content--ignore-publisher-text-colors={ignorePublisherFontColors}
+    class="book-content m-auto"
+    use:swipe={{ timeframe: 500, minSwipeDistance: $swipeThreshold$, touchAction: 'pan-y' }}
+    on:pointerdown={onSwipePointerDown}
+    on:touchstart={onSwipeTouchStart}
+    on:mousedown={onSwipeMouseDown}
+    on:swipe={onSwipe}
   >
-    {#key displayedSectionMountKey}
-      <HtmlRenderer html={displayedHtml} on:load={onHtmlLoad} />
-    {/key}
+    <div
+      class="book-content-container"
+      id={currentSectionId || null}
+      data-ttu-source-href={currentSectionSourceHref || null}
+      bind:this={contentEl}
+    >
+      {#key displayedSectionMountKey}
+        <HtmlRenderer html={displayedHtml} on:load={onHtmlLoad} />
+      {/key}
+    </div>
+    <div class="book-content-tail-spacer" bind:this={tailSpacerEl} aria-hidden="true"></div>
   </div>
-  <div class="book-content-tail-spacer" bind:this={tailSpacerEl} aria-hidden="true"></div>
 </div>
 
 {#if !allowDisplay}
@@ -1514,7 +1572,72 @@
 
   .book-content {
     overflow: hidden;
-    width: var(--book-content-child-width, 95vh);
+    position: relative;
+    width: calc(var(--book-content-child-width, 95vh) + var(--book-content-page-bleed-x, 0px) * 2);
+  }
+
+  .book-content-window {
+    position: relative;
+
+    &.book-content-window--glide {
+      // Paint only the small edge bands instead of masking the entire text layer.
+      &::before,
+      &::after {
+        content: '';
+        position: absolute;
+        pointer-events: none;
+        z-index: 1;
+        top: 0;
+        bottom: 0;
+        width: var(--book-content-page-bleed, 0px);
+      }
+
+      &::before {
+        left: calc(-1 * var(--book-content-page-bleed, 0px));
+        background: linear-gradient(
+          to right,
+          var(--book-content-window-background, var(--background-color)),
+          transparent
+        );
+      }
+
+      &::after {
+        right: calc(-1 * var(--book-content-page-bleed, 0px));
+        background: linear-gradient(
+          to left,
+          var(--book-content-window-background, var(--background-color)),
+          transparent
+        );
+      }
+
+      &.book-content-window--vertical {
+        &::before,
+        &::after {
+          left: 0;
+          right: 0;
+          width: auto;
+          height: var(--book-content-page-bleed, 0px);
+        }
+
+        &::before {
+          bottom: auto;
+          background: linear-gradient(
+            to bottom,
+            var(--book-content-window-background, var(--background-color)),
+            transparent
+          );
+        }
+
+        &::after {
+          top: auto;
+          background: linear-gradient(
+            to top,
+            var(--book-content-window-background, var(--background-color)),
+            transparent
+          );
+        }
+      }
+    }
   }
 
   .book-content-container {
@@ -1538,6 +1661,12 @@
     pointer-events: none;
     width: 0;
     height: 0;
+  }
+
+  .book-content--scroll-window .book-content-tail-spacer {
+    position: absolute;
+    top: 0;
+    left: 0;
   }
 
   .book-content {

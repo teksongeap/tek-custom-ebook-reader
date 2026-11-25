@@ -22,7 +22,8 @@
   } from '$lib/data/database/books-db/versions/books-db';
   import type { Section } from '$lib/data/database/books-db/versions/v3/books-db-v3';
   import type { FuriganaStyle } from '$lib/data/furigana-style';
-  import type { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
+  import { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
+  import { getGlidePageSize } from '$lib/functions/reader-viewport';
   import { BookReaderAvailableKeybind } from '$lib/data/book-reader-keybind';
   import { ViewMode } from '$lib/data/view-mode';
   import {
@@ -335,9 +336,21 @@
     reduceToEmptyString()
   );
 
-  $: width$.next(width);
+  // Mode and page-size settings also change how much room the page can use.
+  $: viewportLayout = {
+    width,
+    height,
+    viewMode,
+    verticalMode,
+    paginationTransitionMode,
+    secondDimensionMaxValue,
+    heightModifer
+  };
 
-  $: height$.next(height);
+  $: {
+    width$.next(viewportLayout.width);
+    height$.next(viewportLayout.height);
+  }
 
   $: if (htmlContent !== footnotePreviewHtmlContent) {
     footnotePreviewHtmlContent = htmlContent;
@@ -346,15 +359,27 @@
   }
 
   function getAdjustedWidth(widthValue: number) {
-    if (ViewMode.Paginated === viewMode && !verticalMode && secondDimensionMaxValue) {
-      return Math.min(secondDimensionMaxValue, widthValue);
+    if (ViewMode.Paginated === viewMode && !verticalMode) {
+      const pageWidth = secondDimensionMaxValue
+        ? Math.min(secondDimensionMaxValue, widthValue)
+        : widthValue;
+
+      return paginationTransitionMode === PaginationTransitionMode.Glide
+        ? getGlidePageSize(widthValue, pageWidth)
+        : pageWidth;
     }
     return widthValue;
   }
 
   function getAdjustedHeight(heightValue: number) {
-    if (ViewMode.Paginated === viewMode && verticalMode && secondDimensionMaxValue) {
-      return Math.min(secondDimensionMaxValue, heightValue);
+    if (ViewMode.Paginated === viewMode && verticalMode) {
+      const pageHeight = secondDimensionMaxValue
+        ? Math.min(secondDimensionMaxValue, heightValue)
+        : heightValue;
+
+      return paginationTransitionMode === PaginationTransitionMode.Glide
+        ? getGlidePageSize(heightValue, pageHeight)
+        : pageHeight;
     }
     return heightValue;
   }

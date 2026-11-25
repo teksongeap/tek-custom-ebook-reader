@@ -14,6 +14,7 @@ import { formatPos } from '$lib/functions/format-pos';
 import { getCharacterCount } from '$lib/functions/get-character-count';
 import { getNodeBoundingRect } from '$lib/functions/range-util';
 import { getParagraphNodes } from '$lib/components/book-reader/get-paragraph-nodes';
+import { getReaderViewportRect } from '$lib/functions/reader-viewport';
 
 export class CharacterStatsCalculator {
   readonly charCount: number;
@@ -68,7 +69,7 @@ export class CharacterStatsCalculator {
 
   updateParagraphPos(scrollPos = 0) {
     window.clearTimeout(this.forcedInitTimer);
-    const scrollElRect = this.scrollEl.getBoundingClientRect();
+    const scrollElRect = getReaderViewportRect(this.scrollEl);
     const scrollElRight = formatPos(
       this.verticalMode ? scrollElRect.right : scrollElRect.top,
       this.direction

@@ -11,12 +11,19 @@ import {
   type SectionWithProgress
 } from '$lib/components/book-reader/book-toc/book-toc';
 import { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
+import { setReaderAnimatedScrollPosition } from '$lib/functions/reader-viewport';
 import type { PageManager } from '../types';
 
 export class PageManagerPaginated implements PageManager {
   private animationFrame: number | undefined;
 
   private animationTargetPos: number | undefined;
+
+  private animationVelocity = 0;
+
+  private animationScrollSize: number | undefined;
+
+  private animationIsUser = false;
 
   private sectionTransitionIndex: number | undefined;
 
@@ -40,7 +47,8 @@ export class PageManagerPaginated implements PageManager {
     private verticalMode: boolean,
     private transitionMode: PaginationTransitionMode,
     private pageChange$: Subject<boolean>,
-    private sectionRenderComplete$: Subject<number>
+    private sectionRenderComplete$: Subject<number>,
+    private pageBleed = 0
   ) {
     this.clearTrailingBlankSpace();
     this.clearContentTransform();
@@ -219,7 +227,7 @@ export class PageManagerPaginated implements PageManager {
     this.beginSectionTransition(nextPage);
     this.sectionTransitionSubscription = this.updateSectionIndex(nextPage).subscribe({
       next: () => {
-        const scrollSize = this.scrollEl[scrollSizeProp];
+        const scrollSize = this.getMeasuredScrollSize(scrollSizeProp);
         // Boundaries must use the newly rendered section's real scroll size.
         this.jumpToPos(this.getLastScrollPos(scrollSize, offset), scrollSize, viewportSize, isUser);
         this.completeSectionTransition(nextPage);
@@ -296,32 +304,56 @@ export class PageManagerPaginated implements PageManager {
       return;
     }
 
-    this.cancelAnimation();
     this.animationTargetPos = pos;
+    this.animationIsUser = isUser;
+    this.animationScrollSize = scrollSize;
+    // Reserve the final extent once, before any animation frames run.
+    this.setTrailingBlankSpace(
+      Math.max(0, Math.ceil(Math.max(start, pos) + viewportSize - scrollSize)),
+      scrollSize
+    );
 
-    const startedAt = performance.now();
-    const duration = Math.min(360, Math.max(180, distance * 0.35));
+    // Retarget the running spring without losing its position or velocity.
+    if (this.animationFrame !== undefined) return;
+
+    const nativeStart = this.scrollEl[this.verticalMode ? 'scrollTop' : 'scrollLeft'];
+    let previousTimestamp = performance.now();
+    this.contentEl.style.willChange = 'transform';
 
     const animate = (timestamp: number) => {
-      const elapsed = Math.min(1, (timestamp - startedAt) / duration);
-      const eased = 1 - Math.pow(1 - elapsed, 3);
-      const nextPos = start + (pos - start) * eased;
+      const elapsed = Math.max(0, (timestamp - previousTimestamp) / 1000);
+      previousTimestamp = timestamp;
+      const target = this.animationTargetPos!;
+      const displacement = this.virtualScrollPos$.getValue() - target;
+      const stiffness = 18;
+      const decay = Math.exp(-stiffness * elapsed);
+      const coefficient = this.animationVelocity + stiffness * displacement;
+      // Exact critically damped motion stays stable even when a frame is missed.
+      const nextPos = Math.max(0, target + (displacement + coefficient * elapsed) * decay);
+      this.animationVelocity = (this.animationVelocity - stiffness * coefficient * elapsed) * decay;
 
-      this.setVisualPos(nextPos, scrollSize, viewportSize);
-
-      if (elapsed < 1) {
+      if (Math.abs(nextPos - target) > 0.25 || Math.abs(this.animationVelocity) > 8) {
+        const offset = nativeStart - nextPos;
+        this.contentEl.style.transform = this.verticalMode
+          ? `translate3d(0, ${offset}px, 0)`
+          : `translate3d(${offset}px, 0, 0)`;
+        this.virtualScrollPos$.next(nextPos);
+        setReaderAnimatedScrollPosition(this.scrollEl, nextPos);
         this.animationFrame = requestAnimationFrame(animate);
         return;
       }
 
       this.animationFrame = undefined;
       this.animationTargetPos = undefined;
-      this.setVisualPos(pos, scrollSize, viewportSize);
+      this.animationVelocity = 0;
+      this.animationScrollSize = undefined;
+      // Commit native scrolling once, removing the temporary layer in the same frame.
+      this.setVisualPos(target, scrollSize, viewportSize);
       this.updateSectionData(
         this.sectionIds[this.sectionIndex$.getValue()],
-        this.getProgressPercentage(pos, scrollSize)
+        this.getProgressPercentage(target, scrollSize)
       );
-      this.pageChange$.next(isUser);
+      this.pageChange$.next(this.animationIsUser);
     };
 
     this.animationFrame = requestAnimationFrame(animate);
@@ -375,6 +407,12 @@ export class PageManagerPaginated implements PageManager {
   }
 
   private getMeasuredScrollSize(scrollSizeProp: 'scrollWidth' | 'scrollHeight') {
+    if (this.animationScrollSize !== undefined) return this.animationScrollSize;
+    if (this.pageBleed) {
+      // The surrounding window is wider than the logical page. Measure only text.
+      return this.contentEl[scrollSizeProp];
+    }
+
     return Math.max(0, this.scrollEl[scrollSizeProp] - this.trailingBlankSpace);
   }
 
@@ -408,6 +446,8 @@ export class PageManagerPaginated implements PageManager {
 
     this.animationFrame = undefined;
     this.animationTargetPos = undefined;
+    this.animationVelocity = 0;
+    this.animationScrollSize = undefined;
   }
 
   private clearSectionTransitionSubscription() {
@@ -416,19 +456,17 @@ export class PageManagerPaginated implements PageManager {
   }
 
   private clearContentTransform() {
-    if (!this.contentEl.style.transform) {
-      return;
-    }
-
-    this.contentEl.style.removeProperty('transform');
+    if (this.contentEl.style.transform) this.contentEl.style.removeProperty('transform');
+    if (this.contentEl.style.willChange) this.contentEl.style.removeProperty('will-change');
+    setReaderAnimatedScrollPosition(this.scrollEl, undefined);
   }
 
   private setTrailingBlankSpace(size: number, scrollSize: number) {
     const nextSize = Math.max(0, size);
     this.trailingBlankSpace = nextSize;
-    const extent = Math.ceil(scrollSize + nextSize);
+    const extent = Math.ceil(scrollSize + nextSize + this.pageBleed * 2);
 
-    if (nextSize) {
+    if (nextSize || (this.pageBleed && scrollSize)) {
       this.trailingBlankEl.style.width = this.verticalMode ? '1px' : `${extent}px`;
       this.trailingBlankEl.style.height = this.verticalMode ? `${extent}px` : '1px';
       return;

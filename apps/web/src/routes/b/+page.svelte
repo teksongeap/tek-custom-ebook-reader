@@ -24,6 +24,7 @@
   import { cubicOut, quintInOut } from 'svelte/easing';
   import { fly } from 'svelte/transition';
   import { browser } from '$app/environment';
+  import { getReaderScrollPosition, getReaderViewportRect } from '$lib/functions/reader-viewport';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import {
@@ -1625,18 +1626,20 @@
       return;
     }
 
-    const readerRect = readerElement.getBoundingClientRect();
+    const readerRect = getReaderViewportRect(readerElement);
     const annotationRect = getPaginatedAnnotationTargetRect(annotationElements);
 
     if (!annotationRect) {
       return;
     }
 
-    const scrollProperty = $verticalMode$ ? 'scrollTop' : 'scrollLeft';
     const offset = $verticalMode$
       ? annotationRect.top - readerRect.top
       : annotationRect.left - readerRect.left;
-    const targetScroll = Math.max(0, readerElement[scrollProperty] + offset);
+    const targetScroll = Math.max(
+      0,
+      getReaderScrollPosition(readerElement, $verticalMode$) + offset
+    );
 
     pageManager.scrollToColumn(targetScroll, false);
   }
@@ -1671,13 +1674,14 @@
   ) {
     const annotationElements = getRenderedAnnotationElements(annotationId);
 
-    annotationElements.forEach((element) =>
-      element.classList.add('book-annotation-highlight--active')
-    );
+    annotationElements.forEach((element) => {
+      element.style.setProperty('--book-annotation-arrival-duration', `${duration}ms`);
+      element.classList.add('book-annotation-highlight--arrival');
+    });
 
     window.setTimeout(() => {
       annotationElements.forEach((element) =>
-        element.classList.remove('book-annotation-highlight--active')
+        element.classList.remove('book-annotation-highlight--arrival')
       );
     }, duration);
   }
