@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { faCheckCircle, faCircleInfo, faXmark } from '@fortawesome/free-solid-svg-icons';
+  import { faCheckCircle, faInfo } from '@fortawesome/free-solid-svg-icons';
   import BookCard from '$lib/components/book-card/book-card.svelte';
   import type { BookCardProps } from '$lib/components/book-card/book-card-props';
   import Popover from '$lib/components/popover/popover.svelte';
@@ -10,12 +10,10 @@
   export let currentBookId: number | undefined;
   export let selectedBookIds: ReadonlySet<number>;
   export let selectMode = false;
+  export let visibleCount = Infinity;
 
   const dispatch = createEventDispatcher<{
     bookClick: {
-      id: number;
-    };
-    removeBookClick: {
       id: number;
     };
   }>();
@@ -32,8 +30,10 @@
 <div
   class="book-card-grid grid grid-cols-3 justify-between gap-x-4 gap-y-6 pb-6 sm:gap-x-5 md:grid-cols-4 lg:grid-cols-5 xl:gap-x-6"
 >
-  {#each bookCards as bookCard (bookCard.id)}
+  {#each bookCards as bookCard, index (bookCard.id)}
     <div
+      inert={index >= visibleCount}
+      aria-hidden={index >= visibleCount ? 'true' : undefined}
       class="book-card-item relative"
       class:book-card-item--placeholder={bookCard.isPlaceholder}
       class:opacity-60={bookCard.isPlaceholder}
@@ -58,14 +58,22 @@
           </div>
         {/if}
       </div>
-      {#if selectedBookIds.has(bookCard.id)}
-        <div class="absolute top-10 left-2" title="Click to open details">
-          <Popover placement="right" fallbackPlacements={['bottom']} yOffset={5}>
-            <Fa
+      {#if !selectMode}
+        <div class="absolute top-2 right-2">
+          <Popover
+            placement="right-start"
+            fallbackPlacements={['left-start', 'bottom-start', 'top-start']}
+            yOffset={5}
+            portal
+          >
+            <button
               slot="icon"
-              class="book-card-floating-action book-card-floating-action--info left-2 top-10 text-xl"
-              icon={faCircleInfo}
-            />
+              type="button"
+              title="Book details"
+              aria-label={`Details for ${bookCard.title}`}
+              class="book-card-floating-action book-card-floating-action--info h-8 w-8"
+              ><Fa icon={faInfo} /></button
+            >
             <div class="book-card-detail-popover p-4" slot="content">
               <div class="book-card-detail-label">Characters:</div>
               <div class="w-40">{bookCard.characters || 'No Data'}</div>
@@ -79,15 +87,6 @@
           </Popover>
         </div>
       {/if}
-      <button
-        type="button"
-        aria-label={`Delete ${bookCard.title}`}
-        title="Delete book"
-        class="book-card-floating-action book-card-floating-action--delete absolute top-2 right-2 h-8 w-8"
-        on:click={() => dispatch('removeBookClick', { id: bookCard.id })}
-      >
-        <Fa icon={faXmark} />
-      </button>
     </div>
   {/each}
 </div>

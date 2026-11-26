@@ -119,6 +119,8 @@ export class DatabaseService {
 
   annotationsChanged$ = new Subject<number>();
 
+  statisticsChanged$ = new Subject<void>();
+
   annotationCounts$ = this.annotationsChanged$.pipe(
     startWith(0),
     switchMap(() => this.db$),
@@ -629,6 +631,16 @@ export class DatabaseService {
     return db.getFromIndex('statistic', 'completedBook', [1, bookTitle]);
   }
 
+  async getCompletedBookTitles() {
+    const db = await this.db;
+    const completed = await db.getAllFromIndex(
+      'statistic',
+      'completedBook',
+      IDBKeyRange.bound([1], [1, []])
+    );
+    return new Set(completed.map((entry) => entry.title));
+  }
+
   async getStatisticsForTimeWindow(startDate: string, endDate: string) {
     const db = await this.db;
 
@@ -728,6 +740,7 @@ export class DatabaseService {
 
       await Promise.all(tasks);
       await tx.done;
+      this.statisticsChanged$.next();
     } catch (error: any) {
       try {
         tx.abort();
@@ -761,6 +774,7 @@ export class DatabaseService {
     };
 
     await db.put('statistic', existingStatistic);
+    this.statisticsChanged$.next();
   }
 
   async clearZombieStatistics() {
@@ -853,6 +867,7 @@ export class DatabaseService {
 
       await Promise.all(tasks);
       await tx.done;
+      this.statisticsChanged$.next();
     } catch (error: any) {
       try {
         tx.abort();
@@ -955,6 +970,7 @@ export class DatabaseService {
 
       await Promise.all(tasks);
       await tx.done;
+      this.statisticsChanged$.next();
     } catch (error: any) {
       try {
         tx.abort();

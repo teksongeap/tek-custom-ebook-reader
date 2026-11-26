@@ -6,22 +6,9 @@
   import { pagePath } from '$lib/data/env';
   import { SortDirection } from '$lib/data/sort-types';
   import { FilesystemStorageHandler } from '$lib/data/storage/handler/filesystem-handler';
-  import { getStorageHandler } from '$lib/data/storage/storage-handler-factory';
   import { StorageKey } from '$lib/data/storage/storage-types';
-  import {
-    isStorageSourceAvailable,
-    storageIcon$,
-    storageSource$
-  } from '$lib/data/storage/storage-view';
-  import {
-    booklistSortOptions$,
-    cacheStorageData$,
-    fileCountData$,
-    fsStorageSource$,
-    gDriveStorageSource$,
-    isOnline$,
-    oneDriveStorageSource$
-  } from '$lib/data/store';
+  import { storageSource$ } from '$lib/data/storage/storage-view';
+  import { booklistSortOptions$, fileCountData$ } from '$lib/data/store';
   import { inputAllowDirectory } from '$lib/functions/file-dom/input-allow-directory';
   import { inputFile } from '$lib/functions/file-dom/input-file';
   import { dummyFn, isMobile$, isOnOldUrl } from '$lib/functions/utils';
@@ -31,7 +18,6 @@
     faEllipsisVertical,
     faArrowDownShortWide,
     faArrowDownWideShort,
-    faCalendarXmark,
     faChartLine,
     faCircleXmark,
     faCloudArrowUp,
@@ -54,6 +40,10 @@
   export let replicationProgress: number;
   export let replicationToProgress: number;
   export let replicationProgressRemaining: string;
+  export let showAll = false;
+  export let bookCount = 0;
+
+  $: showLibraryViews = $storageSource$ === StorageKey.BROWSER && hasBooks;
 
   const dispatch = createEventDispatcher<{
     selectAllClick: void;
@@ -63,8 +53,6 @@
     backToBookClick: void;
     filesChange: FileList;
     importBackup: File;
-    selectionToStatistics: void;
-    deleteStatistics: void;
     replicateData: void;
     replicateAllData: void;
     cancelReplication: void;
@@ -82,16 +70,8 @@
   };
 
   type MergeEntry = (typeof mergeEntries)[keyof typeof mergeEntries];
-  type StorageSourceMenuItem = {
-    label: string;
-    key: StorageKey;
-    requiresConnectivity: boolean;
-  };
 
   let importMenuItems: MergeEntry[] = [mergeEntries.FILE_IMPORT];
-  let storageSourceMenuItems: StorageSourceMenuItem[] = [
-    { label: 'Browser', key: StorageKey.BROWSER, requiresConnectivity: false }
-  ];
 
   let fileImportElm: HTMLElement;
   let folderImportElm: HTMLElement;
@@ -99,7 +79,6 @@
   let countImportElm: HTMLInputElement;
   let importMenuElm: Popover;
   let moreMenuElm: Popover;
-  let storageSourceElm: Popover;
   let sortOptionsElm: Popover;
   let isOldUrl = false;
   let showLoadCount = false;
@@ -121,37 +100,6 @@
       ...($isMobile$
         ? [mergeEntries.BACKUP_IMPORT]
         : [mergeEntries.FOLDER_IMPORT, mergeEntries.BACKUP_IMPORT])
-    ];
-
-    storageSourceMenuItems = [
-      { label: 'Browser', key: StorageKey.BROWSER, requiresConnectivity: false },
-      ...(isStorageSourceAvailable(StorageKey.GDRIVE, $gDriveStorageSource$, window)
-        ? [
-            {
-              label: 'GDrive',
-              key: StorageKey.GDRIVE,
-              requiresConnectivity: true
-            }
-          ]
-        : []),
-      ...(isStorageSourceAvailable(StorageKey.ONEDRIVE, $oneDriveStorageSource$, window)
-        ? [
-            {
-              label: 'OneDrive',
-              key: StorageKey.ONEDRIVE,
-              requiresConnectivity: true
-            }
-          ]
-        : []),
-      ...(isStorageSourceAvailable(StorageKey.FS, $fsStorageSource$, window)
-        ? [
-            {
-              label: 'Filesystem',
-              key: StorageKey.FS,
-              requiresConnectivity: false
-            }
-          ]
-        : [])
     ];
   }
 
@@ -251,207 +199,189 @@
 />
 
 <div class="app-header library-header">
-  <div class="app-header-content library-toolbar">
+  <div
+    class="app-header-content library-toolbar"
+    class:library-toolbar--select={selectMode && $storageSource$ !== StorageKey.BROWSER}
+    class:library-toolbar--all={showAll && $storageSource$ !== StorageKey.BROWSER}
+  >
     {#if !replicationToProgress}
-      <div class="library-toolbar-context">
-        <h1>Library</h1>
-        {#if selectMode}
-          <span class="library-selection-count">{selectedCount} selected</span>
+      <div class="library-toolbar-primary">
+        {#if selectMode && $storageSource$ !== StorageKey.BROWSER}
+          <div class="library-toolbar-context">
+            <span class="library-selection-count">{selectedCount} selected</span>
+          </div>
         {/if}
-      </div>
-      <nav class="library-toolbar-actions" aria-label="Library controls">
-        {#if selectMode}
-          <button
-            type="button"
-            class="app-toolbar-button"
-            aria-pressed={selectMode}
-            disabled={!hasBooks}
-            title={selectMode ? 'Done selecting books' : 'Select books'}
-            on:click={() => (selectMode = !selectMode)}
-          >
-            <Fa icon={selectMode ? faTimes : faCheckDouble} /><span class="app-toolbar-label"
-              >{selectMode ? 'Done' : 'Select'}</span
-            >
-          </button>
-          <button
-            type="button"
-            class="app-toolbar-button"
-            title="Select all books"
-            on:click={() => dispatch('selectAllClick')}
-          >
-            <Fa icon={faCheckDouble} /><span class="app-toolbar-label">Select all</span>
-          </button>
-          {#if selectedCount > 0}
+        <nav class="library-toolbar-actions" aria-label="Library controls">
+          {#if selectMode && $storageSource$ !== StorageKey.BROWSER}
             <button
               type="button"
               class="app-toolbar-button"
-              title="Export selected books"
-              on:click={() => dispatch('replicateData')}
+              aria-pressed={selectMode}
+              disabled={!hasBooks}
+              title={selectMode ? 'Done selecting books' : 'Select books'}
+              on:click={() => (selectMode = !selectMode)}
             >
-              <Fa icon={faCloudArrowUp} /><span class="app-toolbar-label">Export</span>
+              <Fa icon={selectMode ? faTimes : faCheckDouble} /><span class="app-toolbar-label"
+                >{selectMode ? 'Done' : 'Select'}</span
+              >
             </button>
-            {#if $storageSource$ === StorageKey.BROWSER}
+            <button
+              type="button"
+              class="app-toolbar-button"
+              title="Select all books"
+              on:click={() => dispatch('selectAllClick')}
+            >
+              <Fa icon={faCheckDouble} /><span class="app-toolbar-label">Select all</span>
+            </button>
+            {#if selectedCount > 0}
               <button
                 type="button"
                 class="app-toolbar-button"
-                title="Statistics for selected books"
-                on:click={() => dispatch('selectionToStatistics')}
+                title="Export selected books"
+                on:click={() => dispatch('replicateData')}
               >
-                <Fa icon={faChartLine} /><span class="app-toolbar-label">Statistics</span>
+                <Fa icon={faCloudArrowUp} /><span class="app-toolbar-label">Export</span>
               </button>
               <button
                 type="button"
                 class="app-toolbar-button"
-                title="Delete statistics for selected books"
-                on:click={() => dispatch('deleteStatistics')}
+                title="Delete selected books"
+                on:click={() => dispatch('removeClick')}
               >
-                <Fa icon={faCalendarXmark} /><span class="app-toolbar-label">Delete statistics</span
-                >
+                <Fa icon={faTrash} /><span class="app-toolbar-label">Delete</span>
               </button>
             {/if}
-            <button
-              type="button"
-              class="app-toolbar-button"
-              title="Delete selected books"
-              on:click={() => dispatch('removeClick')}
-            >
-              <Fa icon={faTrash} /><span class="app-toolbar-label">Delete</span>
-            </button>
-          {/if}
-        {:else}
-          <Popover
-            placement="bottom-end"
-            fallbackPlacements={['bottom-end', 'bottom-start']}
-            yOffset={4}
-            bind:this={importMenuElm}
-          >
-            <button type="button" slot="icon" class="app-toolbar-button" title="Import books">
-              <Fa icon={mergeEntries.FILE_IMPORT.icon} /><span class="app-toolbar-label"
-                >Import</span
+          {:else}
+            <div class="library-import-control">
+              <Popover
+                placement="bottom-end"
+                fallbackPlacements={['bottom-end', 'bottom-start']}
+                yOffset={4}
+                bind:this={importMenuElm}
               >
-            </button>
-            <div class="app-menu w-48" slot="content">
-              {#each importMenuItems as item (item.label)}
-                <button
-                  type="button"
-                  class="app-menu-item"
-                  on:click={() => {
-                    importMenuElm.toggleOpen();
-                    triggerInput(new CustomEvent('action', { detail: item.label }));
-                  }}><Fa icon={item.icon} /><span>{item.label}</span></button
-                >
-              {/each}
-            </div>
-          </Popover>
-          <button
-            type="button"
-            class="app-toolbar-button"
-            aria-pressed={selectMode}
-            disabled={!hasBooks}
-            title={selectMode ? 'Done selecting books' : 'Select books'}
-            on:click={() => (selectMode = !selectMode)}
-          >
-            <Fa icon={selectMode ? faTimes : faCheckDouble} /><span class="app-toolbar-label"
-              >{selectMode ? 'Done' : 'Select'}</span
-            >
-          </button>
-
-          <Popover
-            placement="bottom-end"
-            fallbackPlacements={['bottom-end', 'bottom-start']}
-            yOffset={4}
-            bind:this={sortOptionsElm}
-          >
-            <button type="button" slot="icon" class="app-toolbar-button" title="Sort library">
-              <Fa
-                icon={$booklistSortOptions$[$storageSource$].direction === SortDirection.ASC
-                  ? faArrowDownShortWide
-                  : faArrowDownWideShort}
-              /><span class="app-toolbar-label">Sort</span>
-            </button>
-            <div class="app-menu w-64" slot="content">
-              {#each sortMenuItems as item (item.property)}
-                {@const isCurrent =
-                  $booklistSortOptions$[$storageSource$].property === item.property}
-                <div class="library-sort-row" class:app-menu-item--selected={isCurrent}>
-                  <span>{item.label}</span>
-                  <button
-                    type="button"
-                    class="app-menu-item"
-                    title={item.label + ': ascending'}
-                    aria-label={item.label + ': ascending'}
-                    aria-pressed={isCurrent &&
-                      $booklistSortOptions$[$storageSource$].direction === SortDirection.ASC}
-                    on:click={() => changeSortOptions(item.property, SortDirection.ASC)}
-                    ><Fa icon={faSortUp} /></button
+                <button type="button" slot="icon" class="app-toolbar-button" title="Import books">
+                  <Fa icon={mergeEntries.FILE_IMPORT.icon} /><span class="app-toolbar-label"
+                    >Import</span
                   >
-                  <button
-                    type="button"
-                    class="app-menu-item"
-                    title={item.label + ': descending'}
-                    aria-label={item.label + ': descending'}
-                    aria-pressed={isCurrent &&
-                      $booklistSortOptions$[$storageSource$].direction === SortDirection.DESC}
-                    on:click={() => changeSortOptions(item.property, SortDirection.DESC)}
-                    ><Fa icon={faSortDown} /></button
-                  >
+                </button>
+                <div class="app-menu w-48" slot="content">
+                  {#each importMenuItems as item (item.label)}
+                    <button
+                      type="button"
+                      class="app-menu-item"
+                      on:click={() => {
+                        importMenuElm.toggleOpen();
+                        triggerInput(new CustomEvent('action', { detail: item.label }));
+                      }}><Fa icon={item.icon} /><span>{item.label}</span></button
+                    >
+                  {/each}
                 </div>
-              {/each}
+              </Popover>
             </div>
-          </Popover>
-          <Popover
-            placement="bottom-end"
-            fallbackPlacements={['bottom-end', 'bottom-start']}
-            yOffset={4}
-            bind:this={storageSourceElm}
-          >
             <button
               type="button"
-              slot="icon"
               class="app-toolbar-button"
-              title="Select storage source"
+              title="Export library"
+              aria-label="Export library"
+              disabled={!hasBooks}
+              on:click={() => dispatch('replicateAllData')}
+              ><Fa icon={faFileExport} /><span class="app-toolbar-label">Export</span></button
             >
-              <svg
-                aria-hidden="true"
-                class="h-4 w-4"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox={$storageIcon$.viewBox}
-                ><path class="fill-current" d={$storageIcon$.d} /></svg
+            {#if $storageSource$ !== StorageKey.BROWSER}
+              <button
+                type="button"
+                class="app-toolbar-button"
+                aria-pressed={selectMode}
+                disabled={!hasBooks}
+                title={selectMode ? 'Done selecting books' : 'Select books'}
+                on:click={() => (selectMode = !selectMode)}
               >
-              <span class="app-toolbar-label">Storage</span>
-            </button>
-            <div class="app-menu w-40" slot="content">
-              {#each storageSourceMenuItems as item (item.key)}
-                <button
-                  type="button"
-                  class="app-menu-item"
-                  class:app-menu-item--selected={item.key === $storageSource$}
-                  aria-pressed={item.key === $storageSource$}
-                  disabled={item.requiresConnectivity && !$isOnline$}
-                  on:click={() => {
-                    if (item.key !== $storageSource$) {
-                      if (!$cacheStorageData$) getStorageHandler(window, item.key).clearData();
-                      storageSource$.next(item.key);
-                    }
-                    storageSourceElm.toggleOpen();
-                  }}>{item.label}</button
+                <Fa icon={selectMode ? faTimes : faCheckDouble} /><span class="app-toolbar-label"
+                  >{selectMode ? 'Done' : 'Select'}</span
                 >
-              {/each}
-            </div>
-          </Popover>
-          <span class="library-toolbar-spacer" aria-hidden="true"></span>
+              </button>
+
+              <Popover
+                placement="bottom-end"
+                fallbackPlacements={['bottom-end', 'bottom-start']}
+                yOffset={4}
+                bind:this={sortOptionsElm}
+              >
+                <button type="button" slot="icon" class="app-toolbar-button" title="Sort library">
+                  <Fa
+                    icon={$booklistSortOptions$[$storageSource$].direction === SortDirection.ASC
+                      ? faArrowDownShortWide
+                      : faArrowDownWideShort}
+                  /><span class="app-toolbar-label">Sort</span>
+                </button>
+                <div class="app-menu w-64" slot="content">
+                  {#each sortMenuItems as item (item.property)}
+                    {@const isCurrent =
+                      $booklistSortOptions$[$storageSource$].property === item.property}
+                    <div class="library-sort-row" class:app-menu-item--selected={isCurrent}>
+                      <span>{item.label}</span>
+                      <button
+                        type="button"
+                        class="app-menu-item"
+                        title={item.label + ': ascending'}
+                        aria-label={item.label + ': ascending'}
+                        aria-pressed={isCurrent &&
+                          $booklistSortOptions$[$storageSource$].direction === SortDirection.ASC}
+                        on:click={() => changeSortOptions(item.property, SortDirection.ASC)}
+                        ><Fa icon={faSortUp} /></button
+                      >
+                      <button
+                        type="button"
+                        class="app-menu-item"
+                        title={item.label + ': descending'}
+                        aria-label={item.label + ': descending'}
+                        aria-pressed={isCurrent &&
+                          $booklistSortOptions$[$storageSource$].direction === SortDirection.DESC}
+                        on:click={() => changeSortOptions(item.property, SortDirection.DESC)}
+                        ><Fa icon={faSortDown} /></button
+                      >
+                    </div>
+                  {/each}
+                </div>
+              </Popover>
+            {/if}
+          {/if}
+        </nav>
+      </div>
+      {#if showLibraryViews}
+        <nav class="library-view-bar" aria-label="Library views">
+          <div class="settings-tabs library-view-switch">
+            <button
+              type="button"
+              class="settings-tab-button"
+              class:settings-tab-button--active={!showAll}
+              aria-pressed={!showAll}
+              on:click={() => (showAll = false)}>Your shelves</button
+            >
+            <button
+              type="button"
+              class="settings-tab-button"
+              class:settings-tab-button--active={showAll}
+              aria-pressed={showAll}
+              on:click={() => (showAll = true)}>All books <span>{bookCount}</span></button
+            >
+          </div>
+        </nav>
+      {/if}
+      {#if !selectMode || $storageSource$ === StorageKey.BROWSER}
+        <nav class="library-toolbar-secondary" aria-label="More library controls">
           {#if hasBookOpened}
             <button
               type="button"
-              class="app-toolbar-button"
+              class="app-toolbar-button library-resume-control"
               title="Resume reading"
               aria-label="Resume reading"
               on:click={() => dispatch('backToBookClick')}
             >
               <Fa icon={faBookOpen} /><span class="app-toolbar-label">Resume reading</span>
             </button>
+            <span class="app-toolbar-divider" aria-hidden="true"></span>
           {/if}
-          <span class="app-toolbar-divider" aria-hidden="true"></span>
           <a
             class="app-toolbar-button"
             href={pagePath + mergeEntries.SETTINGS.routeId}
@@ -473,16 +403,29 @@
               aria-label="More library actions"><Fa icon={faEllipsisVertical} /></button
             >
             <div class="app-menu w-52" slot="content">
-              {#if hasBooks}
+              <div class="library-compact-browse">
+                {#each importMenuItems as item (item.label)}
+                  <button
+                    type="button"
+                    class="app-menu-item"
+                    on:click={() => {
+                      moreMenuElm.toggleOpen();
+                      triggerInput(new CustomEvent('action', { detail: item.label }));
+                    }}><Fa icon={item.icon} /><span>{item.label}</span></button
+                  >
+                {/each}
+              </div>
+              {#if hasBookOpened}
                 <button
                   type="button"
-                  class="app-menu-item"
+                  class="app-menu-item library-compact-resume"
                   on:click={() => {
                     moreMenuElm.toggleOpen();
-                    dispatch('replicateAllData');
-                  }}><Fa icon={faFileExport} /><span>Export library</span></button
+                    dispatch('backToBookClick');
+                  }}><Fa icon={faBookOpen} /><span>Resume reading</span></button
                 >
               {/if}
+
               <a class="app-menu-item" href={pagePath + mergeEntries.STATISTICS.routeId}
                 ><Fa icon={faChartLine} /><span>Statistics</span></a
               >
@@ -514,8 +457,8 @@
               on:click={() => countImportElm.click()}>C</button
             >
           {/if}
-        {/if}
-      </nav>
+        </nav>
+      {/if}
     {:else}
       <div
         title="Cancel Operation"

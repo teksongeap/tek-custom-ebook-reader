@@ -2,6 +2,8 @@
   import { goto } from '$app/navigation';
   import { faBookOpen, faUpload } from '@fortawesome/free-solid-svg-icons';
   import BookCardList from '$lib/components/book-card/book-card-list.svelte';
+  import LibraryHome from '$lib/components/book-card/library-home.svelte';
+  import { getUpNext } from '$lib/components/book-card/library-organization';
   import type { BookCardProps } from '$lib/components/book-card/book-card-props';
   import BookManagerHeader from '$lib/components/book-card/book-manager-header.svelte';
   import BookExportDialog from '$lib/components/book-export/book-export-dialog.svelte';
@@ -51,7 +53,16 @@
   import { pluralize } from '$lib/functions/utils';
   import { reduceToEmptyString } from '$lib/functions/rxjs/reduce-to-empty-string';
   import pLimit from 'p-limit';
-  import { combineLatest, map, Observable, share, Subject, switchMap, takeUntil } from 'rxjs';
+  import {
+    combineLatest,
+    map,
+    Observable,
+    share,
+    startWith,
+    Subject,
+    switchMap,
+    takeUntil
+  } from 'rxjs';
   import { onDestroy, tick } from 'svelte';
   import Fa from 'svelte-fa';
 
@@ -98,8 +109,30 @@
     share()
   );
 
+  const upNext$ = combineLatest([
+    bookCards$,
+    database.statisticsChanged$.pipe(startWith(undefined))
+  ]).pipe(
+    switchMap(async ([books]) => {
+      if ($storageSource$ !== StorageKey.BROWSER) return [];
+      const completedTitles = await database.getCompletedBookTitles();
+      return getUpNext(books, completedTitles);
+    }),
+    share()
+  );
+
   let selectedBookIds: ReadonlySet<number> = new Set();
   let selectMode = false;
+  let showAll = false;
+  let libraryQuery = '';
+  let headerHeight = 96;
+
+  function measureHeader(node: HTMLDivElement) {
+    const observer = new ResizeObserver(() => (headerHeight = node.getBoundingClientRect().height));
+    observer.observe(node);
+    return { destroy: () => observer.disconnect() };
+  }
+
   let cancelToken = new AbortController();
   let cancelSignal = cancelToken.signal;
   let cancelTooltip = '';
@@ -376,10 +409,21 @@
   }
 
   function onSelectAllBooks() {
-    const bookCards = $bookCards$;
+    const searchTerm = libraryQuery.trim().toLocaleLowerCase();
+    const bookCards =
+      $storageSource$ === StorageKey.BROWSER
+        ? $bookCards$.filter((book) => book.title.toLocaleLowerCase().includes(searchTerm))
+        : $bookCards$;
     selectedBookIds = cloneMutateSet(selectedBookIds, (set) => {
       bookCards.forEach((x) => set.add(x.id));
     });
+  }
+
+  function selectedToStatistics() {
+    $preFilteredTitlesForStatistics$ = new Set(
+      $bookCards$.filter((card) => selectedBookIds.has(card.id)).map((book) => book.title)
+    );
+    goto(`${pagePath}${mergeEntries.STATISTICS.routeId}`);
   }
 
   function backToCurrentBook() {
@@ -389,7 +433,7 @@
   }
 
   async function removeBooks(bookIds: number[]) {
-    if (!operationAllowed()) {
+    if (!selectMode || !bookIds.length || !operationAllowed()) {
       return;
     }
 
@@ -714,7 +758,7 @@
 
 {$replicator$ ?? ''}
 
-<div class="fixed inset-x-0 top-0 z-10">
+<div class="fixed inset-x-0 top-0 z-10" use:measureHeader>
   <BookManagerHeader
     hasBookOpened={!!$currentBookId$}
     selectedCount={selectedBookIds.size}
@@ -724,6 +768,8 @@
     {replicationToProgress}
     {replicationProgressRemaining}
     bind:selectMode
+    bind:showAll
+    bookCount={$bookCards$?.length || 0}
     on:selectAllClick={onSelectAllBooks}
     on:backToBookClick={backToCurrentBook}
     on:removeClick={() => removeBooks(Array.from(selectedBookIds))}
@@ -731,14 +777,6 @@
     on:domainHintClick={onDomainHintClick}
     on:bugReportClick={onBugReportClick}
     on:cancelReplication={cancelCurrentReplication}
-    on:selectionToStatistics={() => {
-      $preFilteredTitlesForStatistics$ = new Set(
-        $bookCards$.filter((card) => selectedBookIds.has(card.id)).map((book) => book.title)
-      );
-
-      goto(`${pagePath}${mergeEntries.STATISTICS.routeId}`);
-    }}
-    on:deleteStatistics={onDeleteStatistics}
     on:replicateData={onReplicateData}
     on:replicateAllData={onReplicateAllData}
     on:importBackup={(ev) => onImportBackup(ev.detail)}
@@ -748,7 +786,9 @@
 <div
   tabindex="0"
   role="button"
-  class="{pxScreen} h-full pt-28 md:pt-16"
+  class="{pxScreen} h-full"
+  style:padding-top={`${headerHeight + 20}px`}
+  style:--library-header-height={`${headerHeight}px`}
   on:dragenter={(ev) => ev.preventDefault()}
   on:dragover={(ev) => ev.preventDefault()}
   on:dragend={(ev) => ev.preventDefault()}
@@ -758,14 +798,31 @@
   {#if !$bookCards$ || $booksAreLoading$}
     Loading...
   {:else if $bookCards$.length}
-    <BookCardList
-      currentBookId={$currentBookId$}
-      {selectedBookIds}
-      {selectMode}
-      bookCards={$bookCards$}
-      on:bookClick={(ev) => onBookClick(ev.detail.id)}
-      on:removeBookClick={(ev) => removeBooks([ev.detail.id])}
-    />
+    {#if $storageSource$ === StorageKey.BROWSER}
+      <LibraryHome
+        bind:showAll
+        bind:query={libraryQuery}
+        bind:selectMode
+        {selectedBookIds}
+        books={$bookCards$}
+        upNext={$upNext$ || []}
+        currentBookId={$currentBookId$}
+        on:selectAllClick={onSelectAllBooks}
+        on:removeClick={() => removeBooks(Array.from(selectedBookIds))}
+        on:selectionToStatistics={selectedToStatistics}
+        on:deleteStatistics={onDeleteStatistics}
+        on:replicateData={onReplicateData}
+        on:bookClick={(ev) => onBookClick(ev.detail.id)}
+      />
+    {:else}
+      <BookCardList
+        currentBookId={$currentBookId$}
+        {selectedBookIds}
+        {selectMode}
+        bookCards={$bookCards$}
+        on:bookClick={(ev) => onBookClick(ev.detail.id)}
+      />
+    {/if}
   {:else}
     <div class="flex justify-center pt-44 text-gray-400 text-opacity-40">
       <div class="flex w-3/6 justify-center xl:w-3/12">

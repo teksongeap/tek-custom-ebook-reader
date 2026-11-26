@@ -99,7 +99,7 @@ test('cards retain a 2:3 size without depending on button padding for height', a
   assert.match(html, /class="book-card-button [^"]*w-full/);
 });
 
-test('opening and deleting books use separate named native buttons', () => {
+test('book cards offer separate reading and metadata buttons without a delete action', () => {
   const { html } = render({ bookCards: [book], selectedBookIds: new Set() });
   const buttons = html.match(/<button\b[^>]*>/g) || [];
   assert.equal(buttons.length, 2);
@@ -107,7 +107,8 @@ test('opening and deleting books use separate named native buttons', () => {
   assert.match(buttons[0], /aria-label="A book to read"/);
   assert.doesNotMatch(buttons[0], /aria-pressed/);
   assert.match(buttons[1], /type="button"/);
-  assert.match(buttons[1], /aria-label="Delete A book to read"/);
+  assert.match(buttons[1], /aria-label="Details for A book to read"/);
+  assert.doesNotMatch(html, /Delete book|Delete A book to read/);
   assert.ok(html.indexOf('</button>') < html.indexOf(buttons[1]));
 });
 
@@ -122,6 +123,8 @@ test('selection mode exposes both selected and unselected toggle states', () => 
     // The visual selection overlay must not add a second keyboard stop.
     assert.doesNotMatch(html, /role="button"|tabindex="0"/);
     assert.equal(html.includes('book-card-shell--selected'), selected);
+    assert.doesNotMatch(html, /Details for|Book details|Delete book/);
+    assert.equal((html.match(/<button\b/g) || []).length, 1);
   }
 });
 

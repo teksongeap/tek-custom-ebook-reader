@@ -771,14 +771,17 @@
       box-shadow: 0 6px 18px rgba(6, 8, 11, 0.24);
     }
 
-    .book-card-floating-action--delete {
+    .book-card-floating-action--info,
+    .book-card-annotation-badge {
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
     }
 
-    .book-card-item:hover .book-card-floating-action--delete,
-    .book-card-item:focus-within .book-card-floating-action--delete {
+    .book-card-item:hover .book-card-floating-action--info,
+    .book-card-item:focus-within .book-card-floating-action--info,
+    .book-card-item:hover .book-card-annotation-badge,
+    .book-card-item:focus-within .book-card-annotation-badge {
       opacity: 1;
       visibility: visible;
       pointer-events: auto;
@@ -878,25 +881,21 @@
     left: 0.5rem;
     z-index: 2;
     display: inline-flex;
-    min-width: 1.75rem;
+    min-width: 2rem;
+    min-height: 2rem;
     align-items: center;
     justify-content: center;
-    gap: 0.3rem;
-    border: 1px solid rgba(255, 255, 255, 0.26);
-    border-radius: 999px;
-    background: rgba(6, 8, 11, 0.78);
-    color: #ffffff;
-    padding: 0.22rem 0.48rem;
-    box-shadow: 0 5px 14px rgba(6, 8, 11, 0.3);
+    gap: 0.35rem;
+    padding: 0.35rem 0.55rem;
     font-size: 0.75rem;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1;
+    font-variant-numeric: tabular-nums;
     pointer-events: none;
-    backdrop-filter: blur(6px);
   }
 
   .book-card-annotation-icon {
-    color: #d1d5db;
+    color: var(--app-chrome-muted);
     font-size: 0.7rem;
   }
 
@@ -947,63 +946,41 @@
     filter: drop-shadow(0 1px 2px rgba(6, 8, 11, 0.28));
   }
 
+  .book-card-annotation-badge,
+  .book-card-floating-action--info {
+    border: 1px solid var(--app-surface-border);
+    border-radius: 0.5rem;
+    background: var(--app-surface-fill);
+    color: var(--app-chrome-text);
+    box-shadow: var(--app-chrome-shadow);
+  }
+
   .book-card-floating-action {
     display: inline-flex;
     cursor: pointer;
     align-items: center;
     justify-content: center;
-    border: 1px solid color-mix(in srgb, var(--font-color) 14%, transparent);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--background-color) 82%, var(--font-color) 18%);
-    color: var(--font-color);
-    box-shadow: 0 10px 20px color-mix(in srgb, var(--font-color) 18%, transparent);
     outline: none;
     transition:
       background-color 140ms ease,
       border-color 140ms ease,
-      box-shadow 140ms ease,
-      color 140ms ease,
-      transform 140ms ease;
+      box-shadow 140ms ease;
   }
 
   .book-card-floating-action:hover,
   .book-card-floating-action:focus-visible {
-    transform: scale(1.06);
-    box-shadow: 0 14px 26px color-mix(in srgb, var(--font-color) 22%, transparent);
+    border-color: color-mix(in srgb, var(--font-color) 28%, transparent);
+    background:
+      linear-gradient(var(--app-chrome-hover), var(--app-chrome-hover)), var(--app-surface-fill);
   }
 
   .book-card-floating-action:focus-visible {
-    box-shadow:
-      var(--app-focus-ring),
-      0 14px 26px color-mix(in srgb, var(--font-color) 22%, transparent);
+    box-shadow: var(--app-focus-ring), var(--app-chrome-shadow);
   }
 
   .book-card-floating-action--info {
-    border-color: color-mix(in srgb, var(--app-accent) 58%, transparent);
-    background: linear-gradient(180deg, var(--app-accent), var(--app-accent-strong));
-    color: var(--app-accent-contrast);
-    padding: 0.18rem;
-  }
-
-  .book-card-floating-action--delete {
-    z-index: 3;
-    border-color: rgba(255, 255, 255, 0.28);
-    background: rgba(6, 8, 11, 0.86);
-    color: #ffffff;
-    box-shadow: 0 2px 6px rgba(6, 8, 11, 0.24);
-    font-size: 0.95rem;
-    transition:
-      opacity 140ms ease,
-      visibility 140ms ease,
-      background-color 140ms ease,
-      border-color 140ms ease;
-  }
-
-  .book-card-floating-action--delete:hover,
-  .book-card-floating-action--delete:focus-visible {
-    border-color: color-mix(in srgb, var(--app-danger) 72%, #ffffff 28%);
-    background: var(--app-danger);
-    transform: none;
+    font-size: 0.875rem;
+    padding: 0;
   }
 
   .book-card-detail-popover {
@@ -1465,39 +1442,72 @@
   }
 
   .library-toolbar {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
     min-height: 3rem;
     padding-block: 0.125rem;
   }
-
+  .library-toolbar-primary,
   .library-toolbar-context,
-  .library-toolbar-actions {
+  .library-toolbar-actions,
+  .library-toolbar-secondary {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
     min-width: 0;
+    gap: 0.25rem;
   }
-
+  .library-toolbar-primary {
+    grid-column: 1;
+    gap: 0.75rem;
+  }
   .library-toolbar-context {
-    gap: 1rem;
     flex-shrink: 0;
-  }
-  .library-toolbar-context h1 {
-    font-size: 1rem;
-    font-weight: 650;
+    gap: 0.75rem;
   }
   .library-selection-count {
     font-size: 0.875rem;
     opacity: 0.7;
+    white-space: nowrap;
   }
-  .library-toolbar-actions {
-    flex: 1;
+  .library-toolbar-secondary {
+    grid-column: 3;
+    justify-self: end;
   }
-
-  .library-toolbar-spacer {
-    flex: 1;
+  .library-view-bar {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: stretch;
+    display: flex;
+    align-items: stretch;
+  }
+  .library-view-switch span {
+    margin-left: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 400;
+    opacity: 0.7;
+  }
+  .library-toolbar--select .library-toolbar-primary,
+  .library-toolbar .library-operation {
+    grid-column: 1 / -1;
+  }
+  .library-toolbar--select .library-toolbar-actions {
+    flex-wrap: wrap;
+  }
+  .library-compact-browse,
+  .library-compact-resume {
+    display: none;
+  }
+  @media (max-width: 1279px) {
+    .library-toolbar .app-toolbar-label {
+      display: none;
+    }
+  }
+  @media (max-width: 1023px) {
+    .library-toolbar-primary {
+      gap: 0;
+    }
   }
 
   .library-sort-row {
@@ -1652,22 +1662,35 @@
 
   @media (max-width: 767px) {
     .library-toolbar {
-      flex-wrap: wrap;
-      gap: 0;
-      padding-block: 0.125rem;
+      gap: 0.25rem;
+      padding-inline: 0.5rem;
     }
-    .library-toolbar-context {
-      min-height: 2.75rem;
-      width: 100%;
-      justify-content: space-between;
+    .library-toolbar .app-toolbar-button {
+      min-width: 2.25rem;
+      padding-inline: 0.375rem;
     }
-    .library-toolbar-actions {
-      min-height: 2.75rem;
-      width: 100%;
-      justify-content: flex-start;
+    .library-toolbar .app-toolbar-divider,
+    .library-resume-control {
+      display: none;
     }
-    .library-operation {
-      min-height: 5.5rem;
+    .library-toolbar--all .library-import-control {
+      display: none;
+    }
+    .library-toolbar--all .library-compact-browse {
+      display: block;
+    }
+    .library-compact-resume {
+      display: flex;
+    }
+  }
+
+  @media (max-width: 359px) {
+    .library-view-switch .settings-tab-button {
+      font-size: 0.75rem;
+      padding-inline: 0.25rem;
+    }
+    .library-view-switch span {
+      display: none;
     }
   }
 

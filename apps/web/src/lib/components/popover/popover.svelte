@@ -6,6 +6,7 @@
   import type { Instance, Placement } from '@popperjs/core';
   import flip from '@popperjs/core/lib/modifiers/flip';
   import offset from '@popperjs/core/lib/modifiers/offset';
+  import preventOverflow from '@popperjs/core/lib/modifiers/preventOverflow';
   import { createPopper } from '@popperjs/core/lib/popper-lite';
   import { createEventDispatcher, tick } from 'svelte';
 
@@ -19,6 +20,7 @@
   export let singlePopover = true;
   export let xOffset = 0;
   export let yOffset = 10;
+  export let portal = false;
 
   const dispatch = createEventDispatcher<{
     open: void;
@@ -71,6 +73,7 @@
             }
           },
           offset,
+          ...(portal ? [{ ...preventOverflow, options: { padding: 8 } }] : []),
           {
             name: 'offset',
             options: {
@@ -126,6 +129,15 @@
     };
   }
 
+  function portalToBody(node: HTMLElement, enabled: boolean) {
+    if (enabled) document.body.appendChild(node);
+    return {
+      destroy() {
+        if (enabled) node.remove();
+      }
+    };
+  }
+
   function getTargetElement(referenceElement?: HTMLElement | Event) {
     let targetElement;
 
@@ -158,6 +170,7 @@
     class="app-popover-panel max-w-60vw absolute z-10 font-medium md:max-w-lg"
     class:whitespace-pre-wrap={contentText}
     bind:this={popoverElement}
+    use:portalToBody={portal}
   >
     <div
       style={contentStyles}
