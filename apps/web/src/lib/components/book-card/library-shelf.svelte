@@ -32,7 +32,7 @@
       if (!grid || !first) return;
       columns = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
       const gap = parseFloat(getComputedStyle(grid).rowGap) || 24;
-      closedHeight = first.getBoundingClientRect().height + gap + 20;
+      closedHeight = first.getBoundingClientRect().height + gap / 2;
       fullHeight = content.getBoundingClientRect().height;
     };
     const observer = new ResizeObserver(measure);
@@ -42,19 +42,15 @@
   }
 
   async function toggleShelf() {
-    // Return to the shelf before removing the space below it.
     const headingInset = parseFloat(getComputedStyle(heading).scrollMarginTop) || 128;
-    if (expanded && heading.getBoundingClientRect().top < headingInset) {
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      window.scrollBy({
-        top: heading.getBoundingClientRect().top - headingInset,
-        behavior: 'instant'
-      });
-      if (!reducedMotion) heading.animate([{ opacity: 0.7 }, { opacity: 1 }], { duration: 240 });
-    }
+    const returnToHeading = expanded && heading.getBoundingClientRect().top < headingInset;
     expanded = !expanded;
     await tick();
     toggle?.focus({ preventScroll: true });
+    if (returnToHeading) {
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      heading.scrollIntoView({ block: 'start', behavior: reducedMotion ? 'instant' : 'smooth' });
+    }
   }
 </script>
 
@@ -64,7 +60,11 @@
         >Edit collection</button
       >{/if}
     <h2 id="{id}-heading" bind:this={heading}>
-      {title}{#if showCount}{' '}<span>{books.length}</span>{/if}
+      {title}{#if showCount}{' '}<span
+          class="collection-count"
+          aria-label={`${books.length} ${books.length === 1 ? 'book' : 'books'}`}
+          >{books.length}</span
+        >{/if}
     </h2>
     <div class="shelf-actions">
       <slot name="controls" />
@@ -107,11 +107,7 @@
 
 <style>
   .library-shelf {
-    margin-bottom: 1.25rem;
-  }
-  :global(.library-shelf) + .library-shelf {
-    padding-top: 1.25rem;
-    border-top: 1px solid color-mix(in srgb, var(--font-color) 8%, transparent);
+    margin-bottom: 2.5rem;
   }
   header {
     display: grid;
@@ -138,7 +134,7 @@
     min-height: 44px;
     white-space: nowrap;
   }
-  header.editable h2 {
+  header h2 {
     grid-column: 2;
     grid-row: 1;
     text-align: center;
@@ -147,7 +143,7 @@
     header {
       gap: 0.6rem;
     }
-    header.editable h2 {
+    header h2 {
       grid-column: 1 / -1;
     }
     header.editable .quiet-button {
@@ -166,11 +162,23 @@
     font-weight: 550;
     letter-spacing: -0.025em;
   }
-  h2 span {
-    margin-left: 0.55rem;
+  .collection-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.75rem;
+    min-height: 1.5rem;
+    margin-left: 0.5rem;
+    padding: 0.15rem 0.45rem;
+    vertical-align: middle;
+    border-radius: 0.45rem;
+    background: var(--app-chrome-hover);
     color: var(--app-chrome-muted);
     font-size: 0.75rem;
-    font-weight: 400;
+    font-weight: 550;
+    line-height: 1;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
   }
   .quiet-button,
   .shelf-fold {
@@ -195,11 +203,8 @@
   }
   .shelf-viewport {
     overflow: clip;
-    transition: height 440ms cubic-bezier(0.22, 0.68, 0.22, 1);
-    mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 46px), transparent 100%);
-  }
-  .shelf-content {
-    padding-bottom: 24px;
+    overflow-clip-margin: 8px;
+    transition: height 440ms cubic-bezier(0.4, 0, 0.2, 1);
   }
   .shelf-fold {
     width: fit-content;
@@ -218,7 +223,7 @@
     display: inline-block;
     font-size: 0.6rem;
     margin-left: 0.15rem;
-    transition: transform 440ms ease;
+    transition: transform 440ms cubic-bezier(0.4, 0, 0.2, 1);
   }
   .chevron.up {
     transform: rotate(180deg);

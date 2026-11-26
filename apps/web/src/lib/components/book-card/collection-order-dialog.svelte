@@ -198,16 +198,16 @@
       <li data-collection-id={collection.id} class:grabbed={grabbedId === collection.id}>
         <button
           type="button"
-          class="drag-handle"
+          class="reorder-row"
           aria-label={`Reorder ${collection.name}`}
           aria-describedby="collection-drag-keys"
           aria-pressed={grabbedId === collection.id}
           on:pointerdown={(event) => startDrag(event, collection.id)}
           on:keydown={(event) => keyboardReorder(event, collection.id)}
-          ><Fa icon={faGripVertical} /></button
+          ><span class="drag-grip" aria-hidden="true"><Fa icon={faGripVertical} /></span>
+          <span class="collection-name">{collection.name}</span>
+          <span class="position" aria-hidden="true">{index + 1}</span></button
         >
-        <span class="collection-name">{collection.name}</span>
-        <span class="position" aria-hidden="true">{index + 1}</span>
       </li>
     {/each}
   </ol>
@@ -273,7 +273,7 @@
     color: var(--app-chrome-muted);
   }
   .close-button:hover,
-  .drag-handle:hover {
+  .reorder-row:hover {
     background: var(--app-chrome-hover);
     color: var(--font-color);
   }
@@ -292,7 +292,7 @@
     margin: 1.25rem 0;
     padding: 3px;
   }
-  li,
+  .reorder-row,
   .drag-preview {
     display: flex;
     align-items: center;
@@ -307,23 +307,28 @@
   li {
     flex-shrink: 0;
   }
-  li.grabbed {
+  .grabbed .reorder-row {
     border-color: var(--app-accent);
     background: var(--app-accent-soft);
   }
-  .drag-handle {
+  .reorder-row {
+    width: 100%;
+    text-align: left;
+    touch-action: none;
+    cursor: grab;
+    user-select: none;
+  }
+  .drag-grip {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     width: 44px;
     height: 44px;
-    touch-action: none;
-    cursor: grab;
     border-radius: 0.35rem;
     color: var(--app-chrome-muted);
   }
-  .grabbed .drag-handle {
+  .grabbed .reorder-row {
     cursor: grabbing;
   }
   .collection-name {

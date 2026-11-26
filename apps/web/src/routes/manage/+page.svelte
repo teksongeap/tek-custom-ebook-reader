@@ -783,9 +783,7 @@
   />
 </div>
 
-<div
-  tabindex="0"
-  role="button"
+<main
   class="{pxScreen} h-full"
   style:padding-top={`${headerHeight + 20}px`}
   style:--library-header-height={`${headerHeight}px`}
@@ -839,4 +837,4 @@
       />
     </label>
   {/if}
-</div>
+</main>

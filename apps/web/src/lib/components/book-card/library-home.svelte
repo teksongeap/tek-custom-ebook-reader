@@ -147,7 +147,6 @@
     {#if showAll || selectMode || searchTerm}
       <LibraryBookActions
         bind:selectMode
-        showSelect={showAll || selectMode}
         selectedCount={selectedBookIds.size}
         hasBooks={!!books.length}
         on:selectAllClick
