@@ -10,7 +10,11 @@ import { writableStorageSubject } from '$lib/data/internal/writable-storage-subj
 function createWritableObjectLocalStorageSubject<T>(fallback: string, storage = localStorage) {
   return writableStorageSubject(
     storage,
-    (x) => new Set(JSON.parse(x || fallback)) as T,
+    (x) => {
+      const value: unknown = JSON.parse(x || fallback);
+      if (!Array.isArray(value)) throw new Error('Invalid stored set');
+      return new Set(value) as T;
+    },
     (x) => JSON.stringify([...(x as Set<T>)])
   );
 }

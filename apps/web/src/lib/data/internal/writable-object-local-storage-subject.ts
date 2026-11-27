@@ -7,18 +7,24 @@
 import { localStorage } from '$lib/data/window/local-storage';
 import { writableStorageSubject } from '$lib/data/internal/writable-storage-subject';
 
-function createWritableObjectLocalStorageSubject<T>(fallback: string, storage = localStorage) {
+function createWritableObjectLocalStorageSubject<T>(isArray: boolean, storage = localStorage) {
   return writableStorageSubject(
     storage,
-    (x) => JSON.parse(x || fallback) as T,
+    (x) => {
+      const value: unknown = JSON.parse(x);
+      if (value === null || typeof value !== 'object' || Array.isArray(value) !== isArray) {
+        throw new Error('Invalid stored object');
+      }
+      return value as T;
+    },
     (x) => JSON.stringify(x)
   );
 }
 
 export function writableObjectLocalStorageSubject<T>(storage = localStorage) {
-  return createWritableObjectLocalStorageSubject<T>('{}', storage);
+  return createWritableObjectLocalStorageSubject<T>(false, storage);
 }
 
 export function writableArrayLocalStorageSubject<T>(storage = localStorage) {
-  return createWritableObjectLocalStorageSubject<T[]>('[]', storage);
+  return createWritableObjectLocalStorageSubject<T[]>(true, storage);
 }

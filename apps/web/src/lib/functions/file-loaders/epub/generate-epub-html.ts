@@ -33,6 +33,7 @@ import {
 } from '$lib/functions/reader-reference-layer/epub-reference';
 import { annotateReaderSearchBlocks } from '$lib/functions/reader-reference-layer/search';
 import path from 'path-browserify';
+import { sanitizeBookHtml } from '../../book-data-loader/sanitize-book-html';
 
 export const prependValue = 'ttu-';
 
@@ -271,7 +272,7 @@ export default async function generateEpubHtml(
     if (bodyId) {
       childBodyDiv.id = bodyId;
     }
-    childBodyDiv.innerHTML = innerHtml;
+    childBodyDiv.innerHTML = sanitizeBookHtml(innerHtml, document);
 
     const childHtmlDiv = document.createElement('div');
     childHtmlDiv.className = `ttu-book-html-wrapper ${htmlClass}`;

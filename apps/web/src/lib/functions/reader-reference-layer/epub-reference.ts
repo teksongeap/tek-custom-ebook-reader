@@ -190,7 +190,11 @@ export function readReaderLinkReference(element: Element): ReaderLinkReference |
     return undefined;
   }
 
-  const targetHref = element.getAttribute(ReaderReferenceAttribute.targetHref) || undefined;
+  const storedTargetHref = element.getAttribute(ReaderReferenceAttribute.targetHref) || undefined;
+  const targetHref =
+    kind === 'external' && storedTargetHref
+      ? getSafeExternalHref(storedTargetHref)
+      : storedTargetHref;
   const targetFragment = element.getAttribute(ReaderReferenceAttribute.targetFragment) ?? undefined;
 
   return {

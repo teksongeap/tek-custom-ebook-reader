@@ -10,7 +10,11 @@ import { localStorage } from '../window/local-storage';
 export function writableNumberLocalStorageSubject(storage = localStorage) {
   return writableStorageSubject(
     storage,
-    (x) => +x,
+    (x) => {
+      const value = Number(x);
+      if (!x.trim() || !Number.isFinite(value)) throw new Error('Invalid stored number');
+      return value;
+    },
     (x) => `${x}`
   );
 }

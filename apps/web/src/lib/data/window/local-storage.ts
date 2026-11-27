@@ -12,7 +12,7 @@ class WindowStorage {
   }
 
   getItem(key: string) {
-    return this._store.get(key);
+    return this._store.get(key) ?? null;
   }
 
   removeItem(key: string) {
@@ -24,5 +24,15 @@ class WindowStorage {
   }
 }
 
-export const localStorage =
-  typeof window === 'undefined' ? new WindowStorage() : window.localStorage;
+export type PreferenceStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'clear'>;
+
+function getLocalStorage(): PreferenceStorage {
+  try {
+    if (typeof window !== 'undefined') return window.localStorage;
+  } catch (_) {
+    // Access itself can throw when the browser blocks site storage.
+  }
+  return new WindowStorage();
+}
+
+export const localStorage = getLocalStorage();

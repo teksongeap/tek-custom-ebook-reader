@@ -10,7 +10,10 @@ import { localStorage } from '../window/local-storage';
 export function writableBooleanLocalStorageSubject(storage = localStorage) {
   return writableStorageSubject(
     storage,
-    (x) => !!+x,
+    (x) => {
+      if (x !== '0' && x !== '1') throw new Error('Invalid stored boolean');
+      return x === '1';
+    },
     (x) => (x ? '1' : '0')
   );
 }

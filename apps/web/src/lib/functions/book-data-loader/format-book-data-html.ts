@@ -12,6 +12,7 @@ import buildDummyBookImage from '$lib/functions/file-loaders/utils/build-dummy-b
 import { isElementGaiji } from '$lib/functions/is-element-gaiji';
 import { finalize, map } from 'rxjs/operators';
 import { startProfile } from '$lib/functions/performance-profiler';
+import { sanitizeBookHtml } from './sanitize-book-html';
 import {
   readerImageGalleryPictures$,
   type ReaderImageGalleryPicture
@@ -32,7 +33,7 @@ export default function formatBookDataHtml(
   return getHtmlWithImageSource(bookData, isPaginated).pipe(
     map((elementHtml) => {
       const element = document.createElement('div');
-      element.innerHTML = elementHtml;
+      element.innerHTML = sanitizeBookHtml(elementHtml, document);
 
       addImageContainerClass(element);
       // combineImagePairs(element);
