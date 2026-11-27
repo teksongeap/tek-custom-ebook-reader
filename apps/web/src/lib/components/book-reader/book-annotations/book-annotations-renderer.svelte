@@ -1575,8 +1575,7 @@
 <style lang="scss">
   :global(.book-annotation-highlight) {
     --book-annotation-base: #f5c84b;
-    // Ruby makes the wrapper taller; marker depth must follow the base font,
-    // not a percentage of that wrapper's box.
+    // Paint only a font-sized band within each selected base-text fragment.
     --book-annotation-rest-size: 100% 0.65em;
     --book-annotation-focus-size: 100% 0.74em;
     background-image: linear-gradient(
@@ -1632,6 +1631,8 @@
     --book-annotation-rest-size: 0.65em 100%;
     --book-annotation-focus-size: 0.74em 100%;
     background-position: right 0.14em center;
+    // Furigana sits to the right of vertical Japanese text. Keep the underline left.
+    text-underline-position: under left;
   }
 
   .book-annotation-card {

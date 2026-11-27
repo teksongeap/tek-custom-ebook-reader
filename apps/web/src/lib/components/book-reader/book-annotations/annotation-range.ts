@@ -5,7 +5,7 @@
  */
 
 import type { BooksDbAnnotation } from '$lib/data/database/books-db/versions/books-db';
-import { getAnnotationColorValue } from './annotation-colors';
+import { getAnnotationColorValue } from './annotation-colors.ts';
 
 const annotationHighlightClass = 'book-annotation-highlight';
 
@@ -303,10 +303,9 @@ function getTextPointAtOffset(root: HTMLElement, targetOffset: number) {
 
 function wrapRangeWithAnnotation(document: Document, range: Range, annotation: BooksDbAnnotation) {
   const textNodes = getTextNodesInRange(document, range);
-  // A live Range changes when its ruby subtree is moved into a wrapper.
+  // Splitting selected text mutates the live Range; retain its original boundaries.
   const { startContainer, endContainer, startOffset: rangeStart, endOffset: rangeEnd } = range;
   const spans: HTMLSpanElement[] = [];
-  const wrappedRubyElements = new Set<Element>();
 
   for (let index = textNodes.length - 1; index >= 0; index -= 1) {
     const textNode = textNodes[index];
@@ -320,26 +319,14 @@ function wrapRangeWithAnnotation(document: Document, range: Range, annotation: B
       continue;
     }
 
-    // Ruby layout depends on its original base/reading children. Keep the
-    // complete ruby subtree intact and put annotation UI outside that subtree.
-    let ruby = textNode.parentElement?.closest('ruby');
-    while (ruby?.parentElement?.closest('ruby')) {
-      ruby = ruby.parentElement.closest('ruby');
+    // Wrap only base text, including partial ruby bases. Wrapping the ruby element
+    // itself paints behind its readings and propagates underlines into that column.
+    let annotationNode = textNode;
+    if (safeEndOffset < annotationNode.length) {
+      annotationNode.splitText(safeEndOffset);
     }
-    if (ruby && wrappedRubyElements.has(ruby)) {
-      continue;
-    }
-
-    let annotationNode: Node = ruby || textNode;
-    if (!ruby) {
-      let annotationTextNode = textNode;
-      if (safeEndOffset < annotationTextNode.length) {
-        annotationTextNode.splitText(safeEndOffset);
-      }
-      if (safeStartOffset > 0) {
-        annotationTextNode = annotationTextNode.splitText(safeStartOffset);
-      }
-      annotationNode = annotationTextNode;
+    if (safeStartOffset > 0) {
+      annotationNode = annotationNode.splitText(safeStartOffset);
     }
 
     const span = document.createElement('span');
@@ -358,9 +345,6 @@ function wrapRangeWithAnnotation(document: Document, range: Range, annotation: B
 
     parentNode.insertBefore(span, annotationNode);
     span.appendChild(annotationNode);
-    if (ruby) {
-      wrappedRubyElements.add(ruby);
-    }
     spans.push(span);
   }
 
