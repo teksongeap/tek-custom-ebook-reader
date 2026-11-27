@@ -20,7 +20,6 @@
       >
         <Fa icon={faArrowLeft} /><span>Library</span>
       </a>
-      <h1>Settings</h1>
     </div>
     <nav class="settings-tabs" aria-label="Settings categories">
       {#each settingItems as label (label)}

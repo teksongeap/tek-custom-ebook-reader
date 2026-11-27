@@ -1320,11 +1320,6 @@
     flex-shrink: 0;
   }
 
-  .settings-page-heading h1 {
-    font-size: 1rem;
-    font-weight: 650;
-  }
-
   .settings-back-link {
     display: inline-flex;
     min-width: 2.75rem;
@@ -1395,9 +1390,6 @@
     }
     .settings-page-heading {
       gap: 0.25rem;
-    }
-    .settings-page-heading h1 {
-      display: none;
     }
     .settings-back-link span {
       display: none;
