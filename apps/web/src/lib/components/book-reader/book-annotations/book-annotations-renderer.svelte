@@ -1472,7 +1472,7 @@
     class:book-annotation-card--manual-size={isEditingPopoverManuallySized}
     style={popoverStyle}
     role="dialog"
-    tabindex={isPinned ? -1 : undefined}
+    tabindex="-1"
     aria-modal="false"
     aria-label={isEditing
       ? `Edit ${getAnnotationColorPurposeLabel(activeAnnotation.color)} note`
