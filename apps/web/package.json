@@ -41,7 +41,7 @@
     "@zip.js/zip.js": "2.4.26",
     "balanced-match": "3.0.1",
     "fake-indexeddb": "6.2.5",
-    "fast-xml-parser": "5.7.3",
+    "fast-xml-parser": "5.12.0",
     "franc": "6.2.0",
     "idb": "8.0.3",
     "marked": "18.3.0",
@@ -51,6 +51,6 @@
     "svelte-fa": "4.0.4",
     "svelte-gestures": "5.0.7",
     "svelte-meta-tags": "3.1.4",
-    "ua-parser-js": "2.0.9"
+    "ua-parser-js": "2.0.10"
   }
 }

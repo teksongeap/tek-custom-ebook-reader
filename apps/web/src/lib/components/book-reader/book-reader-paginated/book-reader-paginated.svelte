@@ -1110,7 +1110,13 @@
 
   function updateBookmarkScreen(data: BooksDbBookmarkData | undefined) {
     const bookmarkCharCount = data?.exploredCharCount;
-    if (!calculator || !bookmarkCharCount) return;
+    if (
+      !calculator ||
+      !data ||
+      bookmarkCharCount === undefined ||
+      !Number.isFinite(bookmarkCharCount)
+    )
+      return;
 
     const result = calculator.checkBookmarkOnScreen(
       bookmarkCharCount,
@@ -1140,7 +1146,7 @@
       setDefaultBookmarkPositions(0);
     }
 
-    if (result.isBookmarkScreen && data.exploredCharCount) {
+    if (result.isBookmarkScreen && data.exploredCharCount !== undefined) {
       if (result.node && !useExploredCharCount && !result.isFirstNode) {
         updateSectionData(createRange(result.node));
       } else if (result.isFirstNode) {

@@ -4,10 +4,15 @@
  * All rights reserved.
  */
 
-import { writableArrayLocalStorageSubject } from './internal/writable-object-local-storage-subject';
-import type { LibraryCollection } from '$lib/components/book-card/library-organization';
+import { writableStorageSubject } from './internal/writable-storage-subject';
+import { localStorage } from './window/local-storage';
+import {
+  parseLibraryCollections,
+  type LibraryCollection
+} from '$lib/components/book-card/library-organization';
 
-export const libraryCollections$ = writableArrayLocalStorageSubject<LibraryCollection>()(
-  'libraryCollections',
-  []
-);
+export const libraryCollections$ = writableStorageSubject<LibraryCollection[]>(
+  localStorage,
+  parseLibraryCollections,
+  JSON.stringify
+)('libraryCollections', []);

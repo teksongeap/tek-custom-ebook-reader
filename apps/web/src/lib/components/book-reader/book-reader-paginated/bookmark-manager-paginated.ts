@@ -35,7 +35,7 @@ export class BookmarkManagerPaginated implements BookmarkManager {
 
   async scrollToBookmark(bookmarkData: BooksDbBookmarkData) {
     const charCount = bookmarkData.exploredCharCount;
-    if (charCount === undefined || charCount < 0) return;
+    if (charCount === undefined || !Number.isFinite(charCount) || charCount < 0) return;
 
     const index = this.calculator.getSectionIndexByCharCount(charCount);
     const savedIndex = bookmarkData.sectionId
@@ -130,7 +130,7 @@ export class BookmarkManagerPaginated implements BookmarkManager {
       dataId: bookId,
       sectionId: this.calculator.containerEl.id || undefined,
       exploredCharCount,
-      progress: exploredCharCount / bookCharCount,
+      progress: bookCharCount > 0 ? exploredCharCount / bookCharCount : 0,
       [this.calculator.verticalMode ? 'scrollY' : 'scrollX']: bookmarkPosition,
       lastBookmarkModified: new Date().getTime()
     };
@@ -164,12 +164,7 @@ export class BookmarkManagerPaginated implements BookmarkManager {
     if (storedPositionOnly) return -1;
 
     // A reflow may invalidate the pixel position, while the section end is stable.
-    if (
-      charCount !== undefined &&
-      bookmarkData.sectionId &&
-      bookmarkData.sectionId === calc.containerEl.id &&
-      calc.isCurrentSectionEnd(charCount)
-    ) {
+    if (charCount !== undefined && calc.isCurrentSectionEnd(charCount)) {
       return this.pageManager.getLastBookmarkPosition();
     }
 

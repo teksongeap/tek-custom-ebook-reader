@@ -23,6 +23,7 @@
   let name = collection.name;
   let selectedIds = new Set(collection.bookIds);
   let query = '';
+  let searchInput: HTMLInputElement;
   let language = 'all';
   let sort: CollectionBookSort = collection.sort || 'title';
   let error = '';
@@ -165,10 +166,34 @@
     </section>
     <section class="book-browser" aria-label="Browse books">
       <div class="picker-toolbar">
-        <label class="field search-field">
-          <span class="sr-only">Search books</span>
-          <input type="search" bind:value={query} placeholder="Search your books" />
-        </label>
+        <div class="field search-field">
+          <input
+            bind:this={searchInput}
+            type="search"
+            bind:value={query}
+            aria-label="Search books"
+            placeholder="Search your books"
+            on:keydown={(event) => {
+              if (event.key === 'Escape' && query) {
+                event.preventDefault();
+                event.stopPropagation();
+                query = '';
+              }
+            }}
+          />
+          {#if query}
+            <button
+              type="button"
+              class="app-icon-button search-clear"
+              title="Clear search"
+              aria-label="Clear search"
+              on:click={() => {
+                query = '';
+                searchInput.focus();
+              }}><Fa icon={faXmark} /></button
+            >
+          {/if}
+        </div>
         <label class="field">
           <span class="sr-only">Language</span>
           <select aria-label="Language" title="Language" bind:value={language}>
@@ -321,6 +346,33 @@
   .field select {
     padding-right: 2rem;
   }
+  .search-field {
+    position: relative;
+  }
+  .search-field input {
+    padding-right: 2.75rem;
+  }
+  .search-field input::-webkit-search-cancel-button {
+    display: none;
+  }
+  .search-clear {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    right: 0.3rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    min-height: 0;
+    color: var(--app-chrome-muted);
+    font-size: 0.8rem;
+  }
+  .search-clear:hover,
+  .search-clear:focus-visible {
+    color: var(--font-color);
+  }
   .field input::placeholder {
     color: var(--app-chrome-muted);
   }
@@ -356,13 +408,46 @@
     font-size: 0.8rem;
     line-height: 1.6;
   }
-  .selected-books {
+  .selected-books,
+  .book-picker {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: 3px;
-    margin: -3px;
+    scrollbar-gutter: stable;
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+    padding: 0.375rem;
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--background-color) 75%, var(--app-surface-bg));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--font-color) 6%, transparent);
+  }
+  .selected-books::-webkit-scrollbar,
+  .book-picker::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .selected-books::-webkit-scrollbar-track,
+  .book-picker::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .selected-books::-webkit-scrollbar-thumb,
+  .book-picker::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--font-color) 38%, transparent);
+    background-clip: padding-box;
+  }
+  .selected-books::-webkit-scrollbar-thumb:hover,
+  .book-picker::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--font-color) 58%, transparent);
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    .selected-books,
+    .book-picker {
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in srgb, var(--font-color) 38%, transparent) transparent;
+    }
   }
   .selected-books li {
     display: flex;
@@ -415,7 +500,6 @@
   .picker-summary {
     padding-inline: 0.75rem;
     flex-shrink: 0;
-    border-bottom: 1px solid var(--app-surface-border);
   }
   .results-selection {
     position: relative;
@@ -431,14 +515,6 @@
   .results-selection.disabled {
     opacity: 0.5;
     cursor: default;
-  }
-  .book-picker {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 3px;
-    margin: -3px;
   }
   .book-option {
     position: relative;

@@ -3,7 +3,7 @@
   import { faBookOpen, faUpload } from '@fortawesome/free-solid-svg-icons';
   import BookCardList from '$lib/components/book-card/book-card-list.svelte';
   import LibraryHome from '$lib/components/book-card/library-home.svelte';
-  import { getUpNext } from '$lib/components/book-card/library-organization';
+  import { getBookCardProgress, getUpNext } from '$lib/components/book-card/library-organization';
   import type { BookCardProps } from '$lib/components/book-card/book-card-props';
   import BookManagerHeader from '$lib/components/book-card/book-manager-header.svelte';
   import BookExportDialog from '$lib/components/book-export/book-export-dialog.svelte';
@@ -14,7 +14,6 @@
   import MessageDialog from '$lib/components/message-dialog.svelte';
   import { preFilteredTitlesForStatistics$ } from '$lib/components/statistics/statistics-types';
   import { pxScreen } from '$lib/css-classes';
-  import type { BooksDbBookmarkData } from '$lib/data/database/books-db/versions/books-db';
   import { dialogManager } from '$lib/data/dialog-manager';
   import { pagePath } from '$lib/data/env';
   import { logger } from '$lib/data/logger';
@@ -58,6 +57,7 @@
     map,
     Observable,
     share,
+    shareReplay,
     startWith,
     Subject,
     switchMap,
@@ -86,7 +86,7 @@
             .filter((d) => $showExternalPlaceholder$ || !d.isPlaceholder)
             .map((d) => ({
               ...d,
-              ...bookmarkToProgress(bookmarkMap.get(d.id)),
+              ...getBookCardProgress(bookmarkMap.get(d.id)),
               annotationCount: annotationCounts.get(d.id) || 0
             }))
             .sort((card1: BookCardProps, card2: BookCardProps) =>
@@ -101,7 +101,7 @@
         )
       ];
     }),
-    share()
+    shareReplay({ bufferSize: 1, refCount: true })
   );
 
   const currentBookId$ = database.lastItem$.pipe(
@@ -156,15 +156,6 @@
     resetProgress();
     dialogManager.dialogs$.next([]);
   });
-
-  function bookmarkToProgress(b: BooksDbBookmarkData | undefined) {
-    return b?.progress
-      ? {
-          progress: typeof b.progress === 'string' ? +b.progress.slice(0, -1) : b.progress,
-          lastBookmarkModified: b.lastBookmarkModified || 0
-        }
-      : { progress: 0, lastBookmarkModified: 0 };
-  }
 
   function sortBookCards(
     card1: BookCardProps,
@@ -753,7 +744,7 @@
 </script>
 
 <svelte:head>
-  <title>{formatPageTitle('Book Manager')}</title>
+  <title>{formatPageTitle('Library')}</title>
 </svelte:head>
 
 {$replicator$ ?? ''}

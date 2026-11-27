@@ -6,6 +6,8 @@
     "module": "ES2022",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
+    // SvelteKit's generated declarations reference Svelte 5's Snippet on Svelte 4 too.
+    "skipLibCheck": true,
     "strict": true,
     "noImplicitReturns": true,
     "allowSyntheticDefaultImports": true

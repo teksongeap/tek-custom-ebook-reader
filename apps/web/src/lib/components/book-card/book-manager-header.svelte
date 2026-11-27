@@ -22,13 +22,12 @@
     faCircleXmark,
     faCloudArrowUp,
     faFileExport,
-    faSortDown,
-    faSortUp,
     faTimes,
     faTrash
   } from '@fortawesome/free-solid-svg-icons';
   import { createEventDispatcher } from 'svelte';
   import Fa from 'svelte-fa';
+  import SortArrow from './sort-arrow.svelte';
   import { quintOut } from 'svelte/easing';
   import { scale } from 'svelte/transition';
 
@@ -328,7 +327,7 @@
                         aria-pressed={isCurrent &&
                           $booklistSortOptions$[$storageSource$].direction === SortDirection.ASC}
                         on:click={() => changeSortOptions(item.property, SortDirection.ASC)}
-                        ><Fa icon={faSortUp} /></button
+                        ><SortArrow up /></button
                       >
                       <button
                         type="button"
@@ -338,7 +337,7 @@
                         aria-pressed={isCurrent &&
                           $booklistSortOptions$[$storageSource$].direction === SortDirection.DESC}
                         on:click={() => changeSortOptions(item.property, SortDirection.DESC)}
-                        ><Fa icon={faSortDown} /></button
+                        ><SortArrow /></button
                       >
                     </div>
                   {/each}

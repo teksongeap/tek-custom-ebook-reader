@@ -39,7 +39,7 @@ const book = {
 before(async () => {
   server = await createServer({
     root,
-    server: { middlewareMode: true, watch: null },
+    server: { middlewareMode: true, watch: null, hmr: false },
     appType: 'custom',
     logLevel: 'error'
   });

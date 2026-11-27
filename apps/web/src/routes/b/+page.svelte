@@ -1,6 +1,8 @@
 <script lang="ts">
   import {
     auditTime,
+    combineLatest,
+    startWith,
     debounceTime,
     EMPTY,
     filter,
@@ -147,6 +149,8 @@
   } from '$lib/components/book-reader/book-toc/book-toc';
   import BookToc from '$lib/components/book-reader/book-toc/book-toc.svelte';
   import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
+  import RestartBookDialog from '$lib/components/book-reader/restart-book-dialog.svelte';
+  import { createRestartBookmark } from '$lib/data/database/books-db/reading-state';
   import NumberDialog from '$lib/components/number-dialog.svelte';
   import { mergeEntries } from '$lib/components/merged-header-icon/merged-entries';
   import { preFilteredTitlesForStatistics$ } from '$lib/components/statistics/statistics-types';
@@ -273,6 +277,8 @@
   let frozenPosition = -1;
   let skipFirstFreezeChange = false;
   let bookCompleted = false;
+  let readingStateChanging = false;
+  let readerDestroyed = false;
   let confettiWidthModifier = 36;
   let confettiMaxRuns = 0;
   let showReaderImageGallery = false;
@@ -392,6 +398,17 @@
       return bookData;
     }),
     share()
+  );
+
+  const isBookFinished$ = combineLatest([
+    rawBookData$,
+    database.statisticsChanged$.pipe(startWith(undefined))
+  ]).pipe(
+    switchMap(async ([book]) =>
+      book ? !!(await database.getStatisticForCompletedBook(book.title)) : false
+    ),
+    startWith(false),
+    shareReplay({ refCount: true, bufferSize: 1 })
   );
 
   $: readerBookSections = $rawBookData$?.sections ?? emptyBookSections;
@@ -702,6 +719,7 @@
   /** Experimental Code - May be removed any time without warning */
 
   onDestroy(() => {
+    readerDestroyed = true;
     if (browser) {
       document.removeEventListener('ttu-action', handleAction, false);
       document.documentElement.lang = 'ja';
@@ -798,7 +816,7 @@
   }
 
   async function completeBook() {
-    if (!$rawBookData$) {
+    if (!$rawBookData$ || readingStateChanging || blockDataUpdates) {
       return;
     }
 
@@ -954,6 +972,79 @@
           }
         }
       ]);
+    }
+  }
+
+  async function reopenBook(restart = false) {
+    const book = $rawBookData$;
+    if (!book || readingStateChanging || blockDataUpdates || (restart && !bookmarkManager)) return;
+    readingStateChanging = true;
+    const wasAutoscrollerEnabled = autoScroller?.wasAutoScrollerEnabled$.getValue();
+    const wasPaused = $isTrackerPaused$;
+    const wasManuallyPaused = wasTrackerPaused;
+    let updatesBlocked = false;
+    let restarted = false;
+    autoScroller?.off();
+    wasTrackerPaused = true;
+    isTrackerPaused$.next(true);
+
+    try {
+      if (restart) {
+        const confirmed = await new Promise<boolean>((resolver) => {
+          dialogManager.dialogs$.next([
+            { component: RestartBookDialog, props: { resolver }, nativeModal: true }
+          ]);
+        });
+        if (!confirmed || readerDestroyed || getBookIdSync() !== book.id) return;
+      }
+
+      if (readerDestroyed || getBookIdSync() !== book.id || blockDataUpdates) return;
+      blockDataUpdates = true;
+      updatesBlocked = true;
+      skipKeyDownListener$.next(true);
+      await tick();
+      const flushed = await trackerElm?.flushUpdates(true);
+      if (flushed?.[0]) throw new Error('Unable to save pending reading statistics');
+      if (readerDestroyed || getBookIdSync() !== book.id) return;
+      const firstPage = restart ? createRestartBookmark(book.id) : undefined;
+      const changed = await database.markBookUnfinished(book.title, firstPage);
+      if (readerDestroyed || getBookIdSync() !== book.id) return;
+      trackerElm?.clearCompletedBook(changed, restart ? 0 : undefined);
+      bookCompleted = false;
+      if (firstPage && bookmarkManager) {
+        frozenPosition = -1;
+        customReadingPointRange = undefined;
+        lastSelectedRange = undefined;
+        clearRange(window);
+        await bookmarkManager.scrollToBookmark(firstPage, 0);
+        exploredCharCount = 0;
+        bookmarkData = Promise.resolve(firstPage);
+        restarted = true;
+        await tick();
+        scheduleReplication(StorageDataType.PROGRESS);
+      }
+      if (changed.length || flushed?.[1]) scheduleReplication(StorageDataType.STATISTICS);
+    } catch (error: any) {
+      if (readerDestroyed || getBookIdSync() !== book.id) return;
+      dialogManager.dialogs$.next([
+        {
+          component: MessageDialog,
+          props: { title: 'Unable to update book', message: error.message }
+        }
+      ]);
+    } finally {
+      readingStateChanging = false;
+      if (updatesBlocked) {
+        blockDataUpdates = false;
+        if (!readerDestroyed) skipKeyDownListener$.next(false);
+      }
+      // A confirmation may settle after leaving the reader; never resume another book's tracker.
+      if (!readerDestroyed && getBookIdSync() === book.id) {
+        wasTrackerPaused = wasManuallyPaused;
+        isTrackerPaused$.next(wasPaused);
+        if (!restarted && wasAutoscrollerEnabled) autoScroller?.toggle();
+        if (dataToReplicate.length) executeReplicate$.next();
+      }
     }
   }
 
@@ -1615,7 +1706,7 @@
 
   async function bookmarkPage() {
     const bookId = getBookIdSync();
-    if (!bookId || !bookmarkManager) return;
+    if (!bookId || !bookmarkManager || readingStateChanging) return;
 
     let data: BooksDbBookmarkData;
 
@@ -2123,6 +2214,7 @@
       autoScrollMultiplier={$multiplier$}
       {hasBookmarkData}
       annotationCount={annotations.length}
+      isFinished={$isBookFinished$}
       bind:isBookmarkScreen
       on:tocClick={() => {
         pauseTracker();
@@ -2131,6 +2223,8 @@
       }}
       on:jumpClick={handleJump}
       on:completeBook={completeBook}
+      on:restartBook={() => reopenBook(true)}
+      on:markUnfinished={() => reopenBook()}
       on:setCustomReadingPoint={handleSetCustomReadingPoint}
       on:showCustomReadingPoint={() => {
         showCustomReadingPoint = true;
@@ -2252,7 +2346,7 @@
     avoidPageBreak={$avoidPageBreak$}
     pageColumns={$pageColumns$}
     paginationTransitionMode={$paginationTransitionMode$}
-    autoBookmark={$autoBookmark$}
+    autoBookmark={$autoBookmark$ && !readingStateChanging}
     autoBookmarkTime={$autoBookmarkTime$}
     multiplier={$multiplier$}
     bind:exploredCharCount

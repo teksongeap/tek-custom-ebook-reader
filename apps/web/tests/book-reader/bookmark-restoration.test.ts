@@ -53,6 +53,28 @@ test('restores immediately when the saved section is already ready', async () =>
   assert.deepEqual(state.scrolls, [240]);
 });
 
+test('legacy bookmarks at the book end restore to its final column', async (t) => {
+  const state = setup(2);
+  t.mock.method(state.calculator, 'isCurrentSectionEnd', () => true);
+  await state.manager.scrollToBookmark(state.bookmark);
+  assert.deepEqual(state.scrolls, [5040]);
+});
+
+test('invalid character counts never start a section restoration', async () => {
+  for (const exploredCharCount of [NaN, Infinity, -Infinity, -1]) {
+    const state = setup();
+    await state.manager.scrollToBookmark({ ...state.bookmark, exploredCharCount });
+    assert.equal(state.index.getValue(), 0);
+    assert.deepEqual(state.scrolls, []);
+  }
+});
+
+test('empty paginated books save finite progress', () => {
+  const state = setup();
+  Object.assign(state.calculator, { charCount: 0, calcExploredCharCount: () => 0 });
+  assert.equal(state.manager.formatBookmarkData(7).progress, 0);
+});
+
 test('restoration completes only after the saved section is ready and positioned', async () => {
   const state = setup();
   let complete = false;

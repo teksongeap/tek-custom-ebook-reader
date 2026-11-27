@@ -47,6 +47,7 @@ import { iffBrowser } from '$lib/functions/rxjs/iff-browser';
 import { logger } from '$lib/data/logger';
 import pLimit from 'p-limit';
 import { resolveBookLanguage } from '$lib/functions/book-language/resolve-book-language';
+import { clearBookCompletion } from './reading-state';
 import { replicationProgress$ } from '$lib/functions/replication/replication-progress';
 import { setStorageSourceDefault } from '$lib/data/storage/storage-source-manager';
 import { storageSource$ } from '$lib/data/storage/storage-view';
@@ -631,6 +632,13 @@ export class DatabaseService {
     const db = await this.db;
 
     return db.getFromIndex('statistic', 'completedBook', [1, bookTitle]);
+  }
+
+  async markBookUnfinished(bookTitle: string, restartBookmark?: BooksDbBookmarkData) {
+    const changed = await clearBookCompletion(await this.db, bookTitle, restartBookmark);
+    this.statisticsChanged$.next();
+    if (restartBookmark) this.bookmarksChanged$.next();
+    return changed;
   }
 
   async getCompletedBookTitles() {

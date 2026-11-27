@@ -6,12 +6,31 @@
   import { createEventDispatcher } from 'svelte';
   import Fa from 'svelte-fa';
   import { getLanguageLabel } from './book-language';
+  import { database } from '$lib/data/store';
 
   export let bookCards: BookCardProps[] = [];
   export let currentBookId: number | undefined;
   export let selectedBookIds: ReadonlySet<number>;
   export let selectMode = false;
   export let visibleCount = Infinity;
+  let readingStatuses: Record<number, string> = {};
+
+  async function loadReadingStatus(book: BookCardProps) {
+    let status = 'Unknown';
+    try {
+      const completed = await database.getCompletedBookTitles();
+      status = book.isPlaceholder
+        ? 'Not stored locally'
+        : completed.has(book.title)
+          ? 'Finished'
+          : book.lastBookOpen > 0
+            ? 'In progress'
+            : 'Not opened';
+    } catch {
+      // Metadata should remain usable if the completion record cannot be read.
+    }
+    readingStatuses = { ...readingStatuses, [book.id]: status };
+  }
 
   const dispatch = createEventDispatcher<{
     bookClick: {
@@ -66,6 +85,7 @@
             fallbackPlacements={['left-start', 'bottom-start', 'top-start']}
             yOffset={5}
             portal
+            on:open={() => loadReadingStatus(bookCard)}
           >
             <button
               slot="icon"
@@ -76,7 +96,9 @@
               ><Fa icon={faInfo} /></button
             >
             <div class="book-card-detail-popover p-4" slot="content">
-              <div class="book-card-detail-label">Primary language:</div>
+              <div class="book-card-detail-label">Reading status:</div>
+              <div class="w-40">{readingStatuses[bookCard.id] || 'Checking…'}</div>
+              <div class="book-card-detail-label mt-4">Primary language:</div>
               <div class="w-40">{getLanguageLabel(bookCard.language)}</div>
               <div class="book-card-detail-label mt-4">Characters:</div>
               <div class="w-40">{bookCard.characters || 'No Data'}</div>

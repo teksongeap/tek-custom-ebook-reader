@@ -175,7 +175,19 @@
     return flushData ? flushUpdates() : Promise.resolve([false, 0]);
   }
 
+  let pendingFlush: Promise<(number | boolean)[]> | undefined;
   export async function flushUpdates(force = false) {
+    while (pendingFlush) await pendingFlush;
+    const work = flushCurrentUpdates(force);
+    pendingFlush = work;
+    try {
+      return await work;
+    } finally {
+      if (pendingFlush === work) pendingFlush = undefined;
+    }
+  }
+
+  async function flushCurrentUpdates(force = false) {
     if (!statisticsToStore.size || (blockDataUpdates && !force)) {
       return [false, 0];
     }
@@ -243,6 +255,23 @@
 
     if (oldCompletedBookStatistics) {
       statistics.set(oldCompletedBookStatistics.dateKey, oldCompletedBookStatistics);
+    }
+  }
+
+  export function clearCompletedBook(changed: BooksDbStatistic[], resetPosition?: number) {
+    bookCompletionStatistics = undefined;
+    for (const [key, entry] of statistics) {
+      const updated = { ...entry };
+      delete updated.completedBook;
+      delete updated.completedData;
+      statistics.set(key, updated);
+    }
+    for (const entry of changed) statistics.set(entry.dateKey, entry);
+    todaysStatistics = statistics.get(todayKey) || getDefaultStatistic(bookTitle, todayKey);
+    if (resetPosition !== undefined) {
+      lastExploredCharCount = resetPosition;
+      previousLastExploredCharCount = resetPosition;
+      lastExploredCharCountScroller = resetPosition;
     }
   }
 

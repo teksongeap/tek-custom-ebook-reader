@@ -92,7 +92,14 @@ export class SectionCharacterStatsCalculator {
   }
 
   getSectionIndexByCharCount(charCount: number) {
-    return binarySearchNoNegative(this.sectionAccCharCounts, charCount) + 1;
+    // At 100%, the destination is the final section, not an unrenderable index past it.
+    return Math.max(
+      0,
+      Math.min(
+        this.sectionAccCharCounts.length - 1,
+        binarySearchNoNegative(this.sectionAccCharCounts, charCount) + 1
+      )
+    );
   }
 
   isCurrentSectionEnd(charCount: number) {

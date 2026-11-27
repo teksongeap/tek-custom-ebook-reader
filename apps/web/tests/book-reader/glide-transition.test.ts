@@ -17,6 +17,7 @@ let Manager: typeof PageManagerPaginated;
 let getScrollPosition: (element: HTMLElement, vertical: boolean) => number;
 let getReadingNodes: (node: Node) => Node[];
 let toc: typeof import('../../src/lib/components/book-reader/book-toc/book-toc.ts');
+let SectionCalculator: typeof import('../../src/lib/components/book-reader/book-reader-paginated/section-character-stats-calculator.ts').SectionCharacterStatsCalculator;
 
 before(async () => {
   server = await createServer({
@@ -34,6 +35,9 @@ before(async () => {
   ({ getParagraphNodes: getReadingNodes } = await server.ssrLoadModule(
     '/src/lib/components/book-reader/get-paragraph-nodes.ts'
   ));
+  ({ SectionCharacterStatsCalculator: SectionCalculator } = await server.ssrLoadModule(
+    '/src/lib/components/book-reader/book-reader-paginated/section-character-stats-calculator.ts'
+  ));
   toc = (await server.ssrLoadModule(
     '/src/lib/components/book-reader/book-toc/book-toc.ts'
   )) as typeof import('../../src/lib/components/book-reader/book-toc/book-toc.ts');
@@ -41,6 +45,30 @@ before(async () => {
 
 after(async () => {
   await server?.close();
+});
+
+test('section lookup keeps completed and oversized bookmarks within the book', () => {
+  const calculator = new SectionCalculator(
+    {} as HTMLElement,
+    [100, 100, 100],
+    new BehaviorSubject(0),
+    () => 800,
+    () => 600,
+    () => 40,
+    false,
+    {} as HTMLElement,
+    {} as Document
+  );
+  for (const [count, expected] of [
+    [0, 0],
+    [99, 0],
+    [100, 1],
+    [200, 2],
+    [300, 2],
+    [400, 2]
+  ]) {
+    assert.equal(calculator.getSectionIndexByCharCount(count), expected);
+  }
 });
 
 function setup(

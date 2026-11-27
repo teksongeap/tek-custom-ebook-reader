@@ -1,13 +1,12 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import Fa from 'svelte-fa';
+  import SortArrow from './sort-arrow.svelte';
   import {
     faArrowDownShortWide,
     faArrowDownWideShort,
     faCheckDouble,
     faTimes,
-    faSortUp,
-    faSortDown,
     faCloudArrowUp,
     faChartLine,
     faCalendarXmark,
@@ -153,7 +152,7 @@
               aria-label={`${item.label}: ascending`}
               aria-pressed={current.property === item.property &&
                 current.direction === SortDirection.ASC}
-              on:click={() => sort(item.property, SortDirection.ASC)}><Fa icon={faSortUp} /></button
+              on:click={() => sort(item.property, SortDirection.ASC)}><SortArrow up /></button
             >
             <button
               type="button"
@@ -162,8 +161,7 @@
               aria-label={`${item.label}: descending`}
               aria-pressed={current.property === item.property &&
                 current.direction === SortDirection.DESC}
-              on:click={() => sort(item.property, SortDirection.DESC)}
-              ><Fa icon={faSortDown} /></button
+              on:click={() => sort(item.property, SortDirection.DESC)}><SortArrow /></button
             >
           </div>
         {/each}
@@ -179,6 +177,10 @@
     justify-content: flex-end;
     gap: 0.5rem;
     flex-shrink: 0;
+  }
+  .book-actions--selection {
+    flex-wrap: wrap;
+    max-width: 100%;
   }
   .action-button {
     display: inline-flex;

@@ -218,6 +218,9 @@
     gap: 0.75rem;
     margin-bottom: 1.75rem;
   }
+  .library-tools--selecting {
+    flex-wrap: wrap;
+  }
   .library-search-group {
     display: flex;
     align-items: center;
@@ -227,6 +230,7 @@
     max-width: 28rem;
   }
   .library-tools--selecting .library-search-group {
+    min-width: min(100%, 16rem);
     max-width: 34rem;
   }
   @media (max-width: 639px) {

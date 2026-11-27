@@ -7,7 +7,7 @@
 import type { BookmarkManager } from '../types';
 import type { BooksDbBookmarkData } from '$lib/data/database/books-db/versions/books-db';
 import type { CharacterStatsCalculator } from './character-stats-calculator';
-import { formatPos } from '$lib/functions/format-pos';
+import { formatPos } from '../../../functions/format-pos.ts';
 
 export class BookmarkManagerContinuous implements BookmarkManager {
   constructor(
@@ -42,7 +42,7 @@ export class BookmarkManagerContinuous implements BookmarkManager {
     return {
       dataId: bookId,
       exploredCharCount,
-      progress: exploredCharCount / bookCharCount,
+      progress: bookCharCount > 0 ? exploredCharCount / bookCharCount : 0,
       [scrollAxis]: this.window[scrollAxis],
       lastBookmarkModified: new Date().getTime()
     };
@@ -60,7 +60,12 @@ export class BookmarkManagerContinuous implements BookmarkManager {
   }
 
   private getBookmarkPosition(bookmark: BooksDbBookmarkData): TargetScroll | undefined {
-    if (!bookmark.exploredCharCount) return undefined;
+    if (
+      bookmark.exploredCharCount === undefined ||
+      !Number.isFinite(bookmark.exploredCharCount) ||
+      bookmark.exploredCharCount < 0
+    )
+      return undefined;
 
     const { verticalMode } = this.calculator;
 
@@ -83,7 +88,7 @@ export class BookmarkManagerContinuous implements BookmarkManager {
 
     const getTargetPos = (scrollAxis: 'scrollX' | 'scrollY') => {
       const scrollPos = bookmarkData[scrollAxis];
-      if (!scrollPos) return undefined;
+      if (scrollPos === undefined || !Number.isFinite(scrollPos)) return undefined;
 
       const formattedScrollPos = formatPos(scrollPos, this.calculator.direction);
       if (this.calculator.getCharCountByScrollPos(formattedScrollPos) === exploredCharCount) {

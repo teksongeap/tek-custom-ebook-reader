@@ -5,6 +5,7 @@
  */
 
 import { compareBookLanguages } from './book-language.ts';
+import type { BooksDbBookmarkData } from '../../data/database/books-db/versions/books-db';
 
 export const collectionBookSortOptions = [
   { value: 'title', label: 'Title A–Z' },
@@ -22,6 +23,61 @@ export interface LibraryCollection {
   name: string;
   bookIds: number[];
   sort?: CollectionBookSort;
+}
+
+/** Ignore malformed saved entries without preventing the library from opening. */
+export function parseLibraryCollections(value: string): LibraryCollection[] {
+  try {
+    const entries: unknown = JSON.parse(value);
+    if (!Array.isArray(entries)) return [];
+    const ids = new Set<string>();
+    return entries.flatMap((entry) => {
+      if (
+        !entry ||
+        typeof entry !== 'object' ||
+        typeof entry.id !== 'string' ||
+        !entry.id ||
+        ids.has(entry.id) ||
+        typeof entry.name !== 'string' ||
+        !Array.isArray(entry.bookIds)
+      )
+        return [];
+      ids.add(entry.id);
+      return [
+        {
+          id: entry.id,
+          name: entry.name,
+          bookIds: [
+            ...new Set<number>(
+              entry.bookIds.filter(
+                (id: unknown) => typeof id === 'number' && Number.isSafeInteger(id) && id > 0
+              )
+            )
+          ],
+          sort: collectionBookSortOptions.find((option) => option.value === entry.sort)?.value
+        }
+      ];
+    });
+  } catch {
+    return [];
+  }
+}
+
+export function getBookCardProgress(bookmark: BooksDbBookmarkData | undefined) {
+  const value = bookmark?.progress;
+  const progress =
+    typeof value === 'string'
+      ? value.trim().endsWith('%')
+        ? Number(value.trim().slice(0, -1)) / 100
+        : Number(value)
+      : value;
+  return {
+    progress:
+      typeof progress === 'number' && Number.isFinite(progress)
+        ? Math.min(1, Math.max(0, progress))
+        : 0,
+    lastBookmarkModified: bookmark?.lastBookmarkModified || 0
+  };
 }
 
 type LibraryBook = {

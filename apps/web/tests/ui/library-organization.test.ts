@@ -109,3 +109,54 @@ test('dragging can insert a collection at any position without changing its cont
     ['one', 'two', 'three', 'four']
   );
 });
+
+test('malformed saved collections cannot break the library or create duplicate shelves', async () => {
+  const { parseLibraryCollections } = await import(
+    '../../src/lib/components/book-card/library-organization.ts'
+  );
+  for (const value of ['{', 'null', '{}', 'true'])
+    assert.deepEqual(parseLibraryCollections(value), []);
+  assert.deepEqual(
+    parseLibraryCollections(
+      JSON.stringify([
+        null,
+        {},
+        { id: 'bad', name: 'Bad', bookIds: null },
+        { id: 'one', name: 'One', bookIds: [1, 1, 2, -1, 0, 1.5, '3', null], sort: 'unsupported' },
+        { id: 'one', name: 'Duplicate', bookIds: [] },
+        { id: 'two', name: 'Two', bookIds: [3], sort: 'recent' }
+      ])
+    ),
+    [
+      { id: 'one', name: 'One', bookIds: [1, 2], sort: undefined },
+      { id: 'two', name: 'Two', bookIds: [3], sort: 'recent' }
+    ]
+  );
+});
+
+test('card progress retains zero-position timestamps and normalizes legacy percentages', async () => {
+  const { getBookCardProgress } = await import(
+    '../../src/lib/components/book-card/library-organization.ts'
+  );
+  for (const [value, expected] of [
+    [0, 0],
+    [0.25, 0.25],
+    ['25%', 0.25],
+    ['0%', 0],
+    [' 50% ', 0.5],
+    [undefined, 0],
+    [NaN, 0],
+    [Infinity, 0],
+    ['bad', 0],
+    [-1, 0],
+    [2, 1]
+  ] as const) {
+    assert.deepEqual(
+      getBookCardProgress({ dataId: 7, progress: value, lastBookmarkModified: 123 }),
+      {
+        progress: expected,
+        lastBookmarkModified: 123
+      }
+    );
+  }
+});

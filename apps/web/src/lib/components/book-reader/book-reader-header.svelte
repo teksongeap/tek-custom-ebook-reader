@@ -38,6 +38,7 @@
   export let fontColor = '';
   export let backgroundColor = '';
   export let annotationCount = 0;
+  export let isFinished = false;
 
   const dispatch = createEventDispatcher<{
     tocClick: void;
@@ -45,6 +46,8 @@
     scrollToBookmarkClick: void;
     jumpClick: void;
     completeBook: void;
+    restartBook: void;
+    markUnfinished: void;
     fullscreenClick: void;
     showCustomReadingPoint: void;
     setCustomReadingPoint: void;
@@ -81,7 +84,12 @@
     ...(hasBookmarkData
       ? [{ label: 'Return to bookmark', icon: faRotateLeft, action: 'scrollToBookmarkClick' }]
       : []),
-    { label: 'Complete book', icon: faFlag, action: 'completeBook' },
+    ...(isFinished
+      ? [
+          { label: 'Restart book', icon: faRotateLeft, action: 'restartBook' },
+          { label: 'Mark as unfinished', icon: faFlag, action: 'markUnfinished' }
+        ]
+      : [{ label: 'Complete book', icon: faFlag, action: 'completeBook' }]),
     ...($customReadingPointEnabled$ || $viewMode$ === ViewMode.Paginated
       ? [
           ...(hasCustomReadingPoint

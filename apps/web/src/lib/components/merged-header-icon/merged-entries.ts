@@ -18,7 +18,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 export const mergeEntries = {
-  MANAGE: { routeId: '/manage', label: 'Manager', icon: faSignOutAlt, title: 'Go to Book Manager' },
+  MANAGE: { routeId: '/manage', label: 'Library', icon: faSignOutAlt, title: 'Go to Library' },
   SETTINGS: {
     routeId: '/settings',
     label: 'Settings',
