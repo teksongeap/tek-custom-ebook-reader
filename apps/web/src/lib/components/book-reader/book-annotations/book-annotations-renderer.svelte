@@ -15,10 +15,14 @@
   } from '@fortawesome/free-solid-svg-icons';
   import {
     clearAnnotationHighlights,
-    getAnnotationClientRect,
     renderAnnotationHighlights,
     type RenderedAnnotationSpan
   } from './annotation-range';
+  import {
+    getAnnotationAnchorIndex,
+    getAnnotationPopoverPosition,
+    type AnnotationPoint
+  } from './annotation-popover-position';
   import { getAnnotationHighlightKey } from './annotation-index';
   import { getAnnotationColorPurposeLabel, getAnnotationColorValue } from './annotation-colors';
   import { formatAnnotationTimestamp, getAnnotationEditedAt } from './annotation-time';
@@ -98,6 +102,17 @@
   let commentHasContentBelow = false;
   let popoverViewportResizeFrame: number | undefined;
   let hoveredAnnotationId = '';
+  let hoverTrigger:
+    | { annotationId: string; span: HTMLSpanElement; point: AnnotationPoint }
+    | undefined;
+  let popoverAnchor:
+    | {
+        annotationId: string;
+        span: HTMLElement;
+        fragmentIndex: number;
+        point?: AnnotationPoint;
+      }
+    | undefined;
   const cleanupBySpan = new WeakMap<HTMLSpanElement, () => void>();
   const draftTextAreaMinHeight = 38;
   const editingPopoverMinHeight = 164;
@@ -301,11 +316,17 @@
 
   function attachSpanListeners(annotation: BooksDbAnnotation, span: HTMLSpanElement) {
     const getCurrentAnnotation = () => annotationsById.get(annotation.id);
-    const pointerEnter = () => {
+    const pointerEnter = (event: PointerEvent) => {
+      if (event.pointerType === 'touch') return;
       const currentAnnotation = getCurrentAnnotation();
 
       if (currentAnnotation) {
-        queueHoverOpen(currentAnnotation);
+        queueHoverOpen(currentAnnotation, span, { x: event.clientX, y: event.clientY });
+      }
+    };
+    const pointerMove = (event: PointerEvent) => {
+      if (hoverTrigger?.span === span && activeAnnotation?.id !== annotation.id) {
+        hoverTrigger.point = { x: event.clientX, y: event.clientY };
       }
     };
     const pointerLeave = () => clearHoverOpen(annotation);
@@ -327,7 +348,7 @@
 
       event.preventDefault();
       event.stopPropagation();
-      void openAnnotation(currentAnnotation, true, span);
+      void openAnnotation(currentAnnotation, true, span, { x: event.clientX, y: event.clientY });
     };
     const doubleClick = (event: MouseEvent) => {
       const currentAnnotation = getCurrentAnnotation();
@@ -338,7 +359,10 @@
 
       event.preventDefault();
       event.stopPropagation();
-      void openAnnotationForEditing(currentAnnotation, span);
+      void openAnnotationForEditing(currentAnnotation, span, {
+        x: event.clientX,
+        y: event.clientY
+      });
     };
     const keydown = (event: KeyboardEvent) => {
       if (event.key !== 'Enter' && event.key !== ' ') {
@@ -357,6 +381,7 @@
 
     span.addEventListener('pointerenter', pointerEnter, false);
     span.addEventListener('pointerleave', pointerLeave, false);
+    span.addEventListener('pointermove', pointerMove, false);
     span.addEventListener('click', click, false);
     span.addEventListener('dblclick', doubleClick, false);
     span.addEventListener('keydown', keydown, false);
@@ -364,6 +389,7 @@
     cleanupBySpan.set(span, () => {
       span.removeEventListener('pointerenter', pointerEnter, false);
       span.removeEventListener('pointerleave', pointerLeave, false);
+      span.removeEventListener('pointermove', pointerMove, false);
       span.removeEventListener('click', click, false);
       span.removeEventListener('dblclick', doubleClick, false);
       span.removeEventListener('keydown', keydown, false);
@@ -378,7 +404,8 @@
   async function openAnnotation(
     annotation: BooksDbAnnotation,
     pinned: boolean,
-    triggerEl?: HTMLElement
+    triggerEl?: HTMLElement,
+    point?: AnnotationPoint
   ) {
     window.clearTimeout(hoverOpenTimer);
 
@@ -408,6 +435,9 @@
     const preserveCommentCanExpand = preserveExpandedState && commentCanExpand;
 
     activeAnnotation = annotation;
+    if (isDifferentAnnotation || !popoverAnchor?.span.isConnected) {
+      popoverAnchor = createPopoverAnchor(annotation.id, triggerEl, point);
+    }
     isPinned = pinned;
     focusReturnEl = pinned ? triggerEl : undefined;
     isCommentExpanded = preserveExpandedState;
@@ -427,6 +457,7 @@
     updateActiveHighlight();
 
     await tick();
+    if (activeAnnotation?.id !== annotation.id) return;
     if (isDifferentAnnotation && commentEl) {
       commentEl.scrollTop = 0;
     }
@@ -440,7 +471,11 @@
     }
   }
 
-  function queueHoverOpen(annotation: BooksDbAnnotation) {
+  function queueHoverOpen(
+    annotation: BooksDbAnnotation,
+    span: HTMLSpanElement,
+    point: AnnotationPoint
+  ) {
     if (!annotationHoverEnabled) {
       return;
     }
@@ -451,10 +486,15 @@
     window.clearTimeout(closeTimer);
     window.clearTimeout(hoverOpenTimer);
 
-    if (isPinned || editingAnnotationId) {
+    if (
+      isPinned ||
+      editingAnnotationId ||
+      (activeAnnotation?.id === annotation.id && popoverReady)
+    ) {
       return;
     }
 
+    hoverTrigger = { annotationId: annotation.id, span, point };
     hoverOpenTimer = window.setTimeout(() => {
       hoverOpenTimer = undefined;
 
@@ -467,7 +507,8 @@
         : undefined;
 
       if (currentAnnotation) {
-        void openAnnotation(currentAnnotation, false);
+        const trigger = hoverTrigger?.annotationId === annotation.id ? hoverTrigger : undefined;
+        void openAnnotation(currentAnnotation, false, trigger?.span, trigger?.point);
       }
     }, getAnnotationHoverDelay());
   }
@@ -481,14 +522,19 @@
 
     if (hoveredAnnotationId === annotation.id) {
       hoveredAnnotationId = '';
+      hoverTrigger = undefined;
       updateActiveHighlight();
     }
 
     scheduleClose();
   }
 
-  async function openAnnotationForEditing(annotation: BooksDbAnnotation, triggerEl?: HTMLElement) {
-    await openAnnotation(annotation, true, triggerEl);
+  async function openAnnotationForEditing(
+    annotation: BooksDbAnnotation,
+    triggerEl?: HTMLElement,
+    point?: AnnotationPoint
+  ) {
+    await openAnnotation(annotation, true, triggerEl, point);
     await editActiveAnnotation();
   }
 
@@ -500,7 +546,14 @@
       return;
     }
 
-    const rect = getAnnotationClientRect(activeAnnotation.id);
+    if (
+      !popoverAnchor?.span.isConnected ||
+      popoverAnchor.annotationId !== activeAnnotation.id ||
+      !popoverAnchor.span.getClientRects()[popoverAnchor.fragmentIndex]
+    ) {
+      popoverAnchor = createPopoverAnchor(activeAnnotation.id, undefined, popoverAnchor?.point);
+    }
+    const rect = popoverAnchor?.span.getClientRects()[popoverAnchor.fragmentIndex];
 
     if (!rect) {
       popoverReady = false;
@@ -512,7 +565,6 @@
     const viewportTop = viewport?.offsetTop || 0;
     const viewportWidth = viewport?.width || window.innerWidth;
     const viewportHeight = viewport?.height || window.innerHeight;
-    const gap = 14;
     const maxWidth = getPopoverMaxWidth(viewportWidth);
     const popoverRect = popoverEl.getBoundingClientRect();
     const { minHeight, maxHeight } = getEditingPopoverSizeBounds(viewportWidth, viewportHeight);
@@ -526,11 +578,19 @@
     const width = nextEditingWidth || (isCommentExpanded && !isEditing ? maxWidth : measuredWidth);
     const fallbackHeight = isEditing && isEditingPopoverManuallySized ? minHeight : 140;
     const height = nextEditingHeight || popoverRect.height || fallbackHeight;
-    const anchorCenterX = rect.left + rect.width / 2;
-    const hasRoomAbove = rect.top - viewportTop > height + gap + 12;
-    const anchoredTop = hasRoomAbove
-      ? rect.top - height - gap
-      : Math.min(viewportTop + viewportHeight - height - 12, rect.bottom + gap);
+    const automaticPosition = getAnnotationPopoverPosition({
+      anchor: rect,
+      viewport: {
+        left: viewportLeft,
+        top: viewportTop,
+        width: viewportWidth,
+        height: viewportHeight
+      },
+      width,
+      height,
+      vertical: getComputedStyle(popoverAnchor!.span).writingMode.startsWith('vertical'),
+      point: popoverAnchor?.point
+    });
     const preservedTop =
       preferredTop ?? (preserveTop && popoverReady ? popoverRect.top : undefined);
     const preservedViewportTop =
@@ -551,7 +611,7 @@
           )
         : preservedViewportTop !== undefined
           ? preservedViewportTop
-          : anchoredTop;
+          : automaticPosition.top;
     const left =
       manualPopoverLeft !== undefined
         ? limitToRange(
@@ -559,11 +619,7 @@
             viewportLeft + viewportWidth - width - 12,
             manualPopoverLeft
           )
-        : limitToRange(
-            viewportLeft + 12,
-            viewportLeft + viewportWidth - width - 12,
-            anchorCenterX - width / 2
-          );
+        : automaticPosition.left;
 
     popoverStyle = [
       getBasePopoverStyle(activeAnnotation, false),
@@ -577,6 +633,37 @@
       nextEditingHeight ? `height: ${nextEditingHeight}px` : ''
     ].join('; ');
     popoverReady = true;
+  }
+
+  function createPopoverAnchor(
+    annotationId: string,
+    trigger?: HTMLElement,
+    point?: AnnotationPoint
+  ) {
+    const spans = trigger
+      ? [trigger]
+      : renderedSpans
+          .filter(({ annotation }) => annotation.id === annotationId)
+          .map(({ span }) => span);
+    const fragments = spans.flatMap((span) =>
+      Array.from(span.getClientRects(), (rect, fragmentIndex) => ({ span, rect, fragmentIndex }))
+    );
+    const viewport = window.visualViewport;
+    const index = getAnnotationAnchorIndex(
+      fragments.map(({ rect }) => rect),
+      {
+        left: viewport?.offsetLeft || 0,
+        top: viewport?.offsetTop || 0,
+        width: viewport?.width || window.innerWidth,
+        height: viewport?.height || window.innerHeight
+      },
+      !!spans[0] && getComputedStyle(spans[0]).writingMode.startsWith('vertical'),
+      point
+    );
+    const fragment = fragments[index];
+    return fragment
+      ? { annotationId, span: fragment.span, fragmentIndex: fragment.fragmentIndex, point }
+      : undefined;
   }
 
   function getPopoverMaxWidth(viewportWidth: number) {
@@ -636,6 +723,8 @@
     window.clearTimeout(closeTimer);
     const returnFocusEl = focusReturnEl;
     focusReturnEl = undefined;
+    popoverAnchor = undefined;
+    hoverTrigger = undefined;
     if (activeAnnotation?.id === initialCommentEditAnnotationId) {
       initialCommentEditAnnotationId = '';
     }
