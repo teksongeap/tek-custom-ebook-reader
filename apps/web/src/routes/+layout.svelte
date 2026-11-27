@@ -244,7 +244,7 @@
 
 {#if showNavigationWarmup}
   <div class="app-navigation-loading writing-horizontal-tb fixed inset-0 z-50 h-full w-full">
-    <div class="tap-highlight-transparent absolute inset-0 bg-black/[.24]" />
+    <div class="tap-highlight-transparent absolute inset-0 bg-black/[.42] backdrop-blur-[3px]" />
     <div
       class="relative top-1/2 left-1/2 inline-block max-w-[80vw] -translate-x-1/2 -translate-y-1/2"
     >
@@ -253,12 +253,18 @@
   </div>
 {/if}
 
-{#if dialogs.length > 0}
+{#each dialogs.filter((dialog) => dialog.nativeModal) as dialog}
+  {#if typeof dialog.component !== 'string'}
+    <svelte:component this={dialog.component} {...dialog.props} on:close={closeAllDialogs} />
+  {/if}
+{/each}
+
+{#if dialogs.some((dialog) => !dialog.nativeModal)}
   <div class="writing-horizontal-tb fixed inset-0 z-50 h-full w-full" style:z-index={zIndex}>
     <div
       tabindex="0"
       role="button"
-      class="tap-highlight-transparent absolute inset-0 bg-black/[.32]"
+      class="tap-highlight-transparent absolute inset-0 bg-black/[.42] backdrop-blur-[3px]"
       on:click={() => {
         if (!clickOnCloseDisabled) {
           closeAllDialogs();
@@ -270,7 +276,7 @@
     <div
       class="relative top-1/2 left-1/2 inline-block max-w-[80vw] -translate-x-1/2 -translate-y-1/2"
     >
-      {#each dialogs as dialog}
+      {#each dialogs.filter((dialog) => !dialog.nativeModal) as dialog}
         {#if typeof dialog.component === 'string'}
           {@html dialog.component}
         {:else}

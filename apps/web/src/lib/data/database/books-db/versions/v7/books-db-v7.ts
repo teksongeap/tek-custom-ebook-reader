@@ -4,6 +4,7 @@
  * All rights reserved.
  */
 
+import type { BookLanguageMetadata } from '$lib/functions/book-language/language-metadata';
 import type { FsHandle, RemoteContext } from '$lib/data/storage/storage-source-manager';
 
 import type { DBSchema } from 'idb';
@@ -30,10 +31,9 @@ interface SubtitleData {
   subtitles: Subtitle[];
 }
 
-interface BooksDbV7BookData {
+interface BooksDbV7BookData extends BookLanguageMetadata {
   id: number;
   title: string;
-  language?: string;
   styleSheet: string;
   elementHtml: string;
   blobs: Record<string, Blob>;

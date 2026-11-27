@@ -12,6 +12,7 @@
   export let editable = false;
   export let collapsible = true;
   export let showCount = true;
+  export let showHeading = true;
   export let emptyMessage = 'Add a few books to make this shelf yours.';
 
   const dispatch = createEventDispatcher<{ bookClick: { id: number }; edit: void }>();
@@ -55,21 +56,25 @@
 </script>
 
 <section class="library-shelf" aria-labelledby="{id}-heading">
-  <header class:editable>
-    {#if editable}<button class="quiet-button" on:click={() => dispatch('edit')}
-        >Edit collection</button
-      >{/if}
-    <h2 id="{id}-heading" bind:this={heading}>
-      {title}{#if showCount}{' '}<span
-          class="collection-count"
-          aria-label={`${books.length} ${books.length === 1 ? 'book' : 'books'}`}
-          >{books.length}</span
+  {#if showHeading}
+    <header class:editable>
+      {#if editable}<button class="quiet-button" on:click={() => dispatch('edit')}
+          >Edit collection</button
         >{/if}
-    </h2>
-    <div class="shelf-actions">
-      <slot name="controls" />
-    </div>
-  </header>
+      <h2 id="{id}-heading" bind:this={heading}>
+        {title}{#if showCount}{' '}<span
+            class="library-book-count"
+            aria-label={`${books.length} ${books.length === 1 ? 'book' : 'books'}`}
+            >{books.length}</span
+          >{/if}
+      </h2>
+      <div class="shelf-actions">
+        <slot name="controls" />
+      </div>
+    </header>
+  {:else}
+    <h2 class="sr-only" id="{id}-heading" bind:this={heading}>{title}</h2>
+  {/if}
   {#if books.length}
     <div
       class="shelf-viewport"
@@ -107,7 +112,17 @@
 
 <style>
   .library-shelf {
+    position: relative;
     margin-bottom: 2.5rem;
+  }
+  :global(.library-shelf) + .library-shelf::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    top: -1.25rem;
+    height: 1px;
+    background: color-mix(in srgb, var(--font-color) 10%, transparent);
+    pointer-events: none;
   }
   header {
     display: grid;
@@ -161,24 +176,6 @@
     font-size: 1.15rem;
     font-weight: 550;
     letter-spacing: -0.025em;
-  }
-  .collection-count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.75rem;
-    min-height: 1.5rem;
-    margin-left: 0.5rem;
-    padding: 0.15rem 0.45rem;
-    vertical-align: middle;
-    border-radius: 0.45rem;
-    background: var(--app-chrome-hover);
-    color: var(--app-chrome-muted);
-    font-size: 0.75rem;
-    font-weight: 550;
-    line-height: 1;
-    letter-spacing: 0;
-    font-variant-numeric: tabular-nums;
   }
   .quiet-button,
   .shelf-fold {

@@ -12,6 +12,7 @@ import { database, requestPersistentStorage$ } from '$lib/data/store';
 import loadEpub from '$lib/functions/file-loaders/epub/load-epub';
 import loadHtmlz from '$lib/functions/file-loaders/htmlz/load-htmlz';
 import loadTxt from '$lib/functions/file-loaders/txt/load-txt';
+import { resolveBookLanguage } from '$lib/functions/book-language/resolve-book-language';
 import { startProfile } from '$lib/functions/performance-profiler';
 import type { LoadData } from '$lib/functions/file-loaders/types';
 import { handleErrorDuringReplication } from '$lib/functions/replication/error-handler';
@@ -108,6 +109,8 @@ export async function importData(
 
             checkCancelAndProgress(cancelSignal, true, true);
 
+            bookContent = await resolveBookLanguage(bookContent, document);
+            throwIfAborted(cancelSignal);
             currentTitle = bookContent.title;
 
             targetHandler.startContext(

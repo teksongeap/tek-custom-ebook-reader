@@ -164,7 +164,12 @@ export class FilesystemStorageHandler extends BaseStorageHandler {
 
     await this.writeFile(rootDirectory, filename, bookData, files, file);
 
-    this.addBookCard(this.currentContext.title, { characters, lastBookModified, lastBookOpen });
+    this.addBookCard(this.currentContext.title, {
+      characters,
+      lastBookModified,
+      lastBookOpen,
+      language: book.language
+    });
   }
 
   async getFilenameForRecentCheck(fileIdentifier: string) {
@@ -489,7 +494,12 @@ export class FilesystemStorageHandler extends BaseStorageHandler {
 
     await this.writeFile(rootDirectory, filename, bookData, files, file, isFile ? 0.6 : 0.4);
 
-    this.addBookCard(this.currentContext.title, { characters, lastBookModified, lastBookOpen });
+    this.addBookCard(this.currentContext.title, {
+      characters,
+      lastBookModified,
+      lastBookOpen,
+      ...(data instanceof File ? {} : { language: data.language })
+    });
 
     return 0;
   }

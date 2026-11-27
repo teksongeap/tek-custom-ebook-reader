@@ -182,7 +182,12 @@ export abstract class ApiStorageHandler extends BaseStorageHandler {
 
     await this.upload(titleId, filename, files, file, undefined);
 
-    this.addBookCard(this.currentContext.title, { characters, lastBookModified, lastBookOpen });
+    this.addBookCard(this.currentContext.title, {
+      characters,
+      lastBookModified,
+      lastBookOpen,
+      language: book.language
+    });
   }
 
   async getFilenameForRecentCheck(fileIdentifier: string) {
@@ -466,7 +471,12 @@ export abstract class ApiStorageHandler extends BaseStorageHandler {
       await this.upload(titleId, filename, files, file, await this.zipBookData(data, 0.2), '', 0.6);
     }
 
-    this.addBookCard(this.currentContext.title, { characters, lastBookModified, lastBookOpen });
+    this.addBookCard(this.currentContext.title, {
+      characters,
+      lastBookModified,
+      lastBookOpen,
+      ...(data instanceof File ? {} : { language: data.language })
+    });
 
     return 0;
   }

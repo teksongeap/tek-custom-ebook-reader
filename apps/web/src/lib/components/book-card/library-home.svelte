@@ -19,6 +19,7 @@
   import LibraryBookActions from './library-book-actions.svelte';
   import LibraryShelf from './library-shelf.svelte';
   import CollectionOrderDialog from './collection-order-dialog.svelte';
+  import CollectionEditorDialog from './collection-editor-dialog.svelte';
 
   export let books: BookCardProps[];
   export let upNext: BookCardProps[];
@@ -30,9 +31,7 @@
   let searchInput: HTMLInputElement;
   $: searchTerm = query.trim().toLocaleLowerCase();
   let editing: LibraryCollection | undefined;
-  let editorQuery = '';
   let storageError = '';
-  let editor: HTMLDivElement;
   let arranging = false;
   let arrangeButton: HTMLButtonElement;
 
@@ -47,42 +46,18 @@
     editing = undefined;
   }
   $: filteredBooks = books.filter((book) => book.title.toLocaleLowerCase().includes(searchTerm));
-  $: editorBooks = books.filter((book) =>
-    book.title.toLocaleLowerCase().includes(editorQuery.toLocaleLowerCase())
-  );
-
-  export async function editCollection(collection?: LibraryCollection) {
+  export function editCollection(collection?: LibraryCollection) {
     arranging = false;
-    editorQuery = '';
     editing = collection
       ? { ...collection, bookIds: [...collection.bookIds] }
       : { id: crypto.randomUUID(), name: '', bookIds: [] };
-    await tick();
-    editor?.querySelector<HTMLInputElement>('input')?.focus();
-    editor?.scrollIntoView({ block: 'nearest' });
   }
 
-  function toggleBook(id: number) {
-    if (!editing) return;
-    editing = {
-      ...editing,
-      bookIds: editing.bookIds.includes(id)
-        ? editing.bookIds.filter((value) => value !== id)
-        : [...editing.bookIds, id]
-    };
-  }
-
-  function updateCollectionName(name: string) {
-    if (!editing) return;
-    editing = { ...editing, name };
-  }
-
-  function persist(collections: LibraryCollection[], dismissEditor = true) {
+  function persist(collections: LibraryCollection[]) {
     try {
       // Check storage before updating the reactive preference.
       localStorage.setItem('libraryCollections', JSON.stringify(collections));
       collections$.next(collections);
-      if (dismissEditor) editing = undefined;
       storageError = '';
     } catch {
       storageError = 'Unable to save your collections. Your browser storage may be full.';
@@ -95,19 +70,7 @@
     persist(
       $collections$.map((collection) =>
         collection.id === id ? { ...collection, sort } : collection
-      ),
-      false
-    );
-  }
-
-  function saveCollection() {
-    if (!editing?.name.trim()) return;
-    const saved = { ...editing, name: editing.name.trim() };
-    const existing = $collections$.some((collection) => collection.id === saved.id);
-    persist(
-      existing
-        ? $collections$.map((collection) => (collection.id === saved.id ? saved : collection))
-        : [...$collections$, saved]
+      )
     );
   }
 </script>
@@ -127,6 +90,10 @@
             if (event.key === 'Escape') query = '';
           }}
         />
+        {#if searchTerm}<span class="search-results-count" role="status">
+            {filteredBooks.length}
+            {filteredBooks.length === 1 ? 'book' : 'books'} found
+          </span>{/if}
         {#if query}
           <button
             type="button"
@@ -182,60 +149,10 @@
     <CollectionOrderDialog on:close={closeArrangement} />
   {/if}
   {#if editing && !selectMode}
-    <div class="collection-editor" bind:this={editor}>
-      <form on:submit|preventDefault={saveCollection}>
-        <label
-          >Collection name<input
-            required
-            maxlength="80"
-            value={editing.name}
-            on:input={(event) => updateCollectionName(event.currentTarget.value)}
-            placeholder="A name that means something to you"
-          /></label
-        >
-        <label
-          >Find books<input
-            type="search"
-            bind:value={editorQuery}
-            placeholder="Search your books"
-          /></label
-        >
-        <div class="book-picker">
-          {#each editorBooks as book (book.id)}
-            <label class="book-option"
-              ><input
-                type="checkbox"
-                checked={editing.bookIds.includes(book.id)}
-                on:change={() => toggleBook(book.id)}
-              /><span>{book.title}</span></label
-            >
-          {/each}
-          {#if !editorBooks.length}<p>No matching books.</p>{/if}
-        </div>
-        <div class="editor-actions">
-          <button type="submit" class="save" disabled={!editing.name.trim()}
-            >Save collection · {editing.bookIds.length} books</button
-          >
-          <button type="button" on:click={() => (editing = undefined)}>Cancel</button>
-          {#if $collections$.some((collection) => collection.id === editing?.id)}
-            <button
-              type="button"
-              class="remove"
-              on:click={() =>
-                persist($collections$.filter((collection) => collection.id !== editing?.id))}
-              >Remove collection</button
-            >
-          {/if}
-        </div>
-      </form>
-    </div>
+    <CollectionEditorDialog {books} collection={editing} on:close={() => (editing = undefined)} />
   {/if}
 
   {#if showAll || searchTerm || selectMode}
-    {#if searchTerm}<p class="search-results-count" role="status">
-        {filteredBooks.length}
-        {filteredBooks.length === 1 ? 'book' : 'books'} found
-      </p>{/if}
     <BookCardList
       bookCards={filteredBooks}
       {currentBookId}
@@ -249,6 +166,7 @@
       id="up-next"
       title="Up next"
       showCount={false}
+      showHeading={false}
       collapsible={false}
       books={upNext}
       {currentBookId}
@@ -357,26 +275,12 @@
       padding-inline: 0.5rem;
     }
   }
-  .editor-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-  }
   .muted {
     color: var(--app-chrome-muted);
   }
-  button:focus-visible,
-  .collection-editor input:focus-visible {
+  button:focus-visible {
     outline: 2px solid var(--font-color);
     outline-offset: 4px;
-  }
-  .collection-editor {
-    scroll-margin-top: calc(var(--library-header-height, 112px) + 16px);
-    margin-bottom: 2.5rem;
-    padding: 1.25rem;
-    border: 1px solid var(--app-surface-border);
-    border-radius: 0.75rem;
   }
   .selection-summary {
     flex-shrink: 0;
@@ -394,51 +298,6 @@
     background-color: var(--background-color);
     color: var(--app-chrome-muted);
     font-size: 0.75rem;
-  }
-  label {
-    display: grid;
-    gap: 0.4rem;
-    font-size: 0.85rem;
-  }
-  .collection-editor input:not([type='checkbox']) {
-    color: var(--font-color);
-    background: var(--background-color);
-    border: 1px solid var(--app-surface-border);
-    border-radius: 0.4rem;
-    padding: 0.65rem 0.8rem;
-    width: 100%;
-    margin-bottom: 1rem;
-  }
-  .book-picker {
-    max-height: 16rem;
-    overflow-y: auto;
-    margin-bottom: 1rem;
-  }
-  .book-option {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.6rem 0;
-    cursor: pointer;
-  }
-  .book-option input {
-    accent-color: var(--font-color);
-  }
-  .editor-actions button {
-    min-height: 44px;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.8rem;
-  }
-  .save {
-    background: var(--app-accent-soft);
-    border-radius: 0.4rem;
-  }
-  .save:disabled {
-    opacity: 0.5;
-  }
-  .remove {
-    margin-left: auto;
-    color: var(--app-danger);
   }
   .library-search {
     display: flex;
@@ -510,7 +369,8 @@
     outline-offset: -2px;
   }
   .search-results-count {
-    margin: 0 0 1rem;
+    flex-shrink: 0;
+    white-space: nowrap;
     color: var(--app-chrome-muted);
     font-size: 0.8rem;
   }

@@ -8,6 +8,7 @@ export interface BookCardProps {
   id: number;
   imagePath: string | Blob;
   title: string;
+  language?: string;
   characters: number;
   lastBookModified: number;
   lastBookOpen: number;

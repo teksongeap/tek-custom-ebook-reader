@@ -363,7 +363,11 @@
               class="settings-tab-button"
               class:settings-tab-button--active={showAll}
               aria-pressed={showAll}
-              on:click={() => (showAll = true)}>All books <span>{bookCount}</span></button
+              on:click={() => (showAll = true)}
+              >All books <span
+                class="library-book-count"
+                aria-label={`${bookCount} ${bookCount === 1 ? 'book' : 'books'}`}>{bookCount}</span
+              ></button
             >
           </div>
         </nav>

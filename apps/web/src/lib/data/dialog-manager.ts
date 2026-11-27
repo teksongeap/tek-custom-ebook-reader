@@ -17,6 +17,7 @@ export interface Dialog {
   component: (new (...args: any[]) => any) | string;
   props?: Record<string, any>;
   disableCloseOnClick?: boolean;
+  nativeModal?: boolean;
   zIndex?: string;
 }
 

@@ -5,6 +5,7 @@
  */
 
 import type { LoadData } from '../types';
+import { normalizeLanguageCode } from '../../book-language/language-metadata';
 import extractEpub from './extract-epub';
 import generateEpubHtml from './generate-epub-html';
 import generateEpubStyleSheet from './generate-epub-style-sheet';
@@ -69,24 +70,11 @@ export default async function loadEpub(
       }
 
       displayData.language =
-        languageValues.reduce((languages, dcLanguage) => {
-          try {
-            if (typeof dcLanguage === 'string') {
-              languages.push(...Intl.getCanonicalLocales(dcLanguage.trim()));
-            } else if (dcLanguage && dcLanguage['#text']) {
-              languages.push(...Intl.getCanonicalLocales(dcLanguage['#text'].trim()));
-            }
-          } catch (_) {
-            //no-op
-          }
-
-          return languages;
-        }, [])?.[0] || '';
-    }
-
-    if (!displayData.language) {
-      displayData.language = 'ja';
-      console.warn(`no language data found for ${file.name} - fallback to ja`);
+        languageValues
+          .map((value) =>
+            normalizeLanguageCode(typeof value === 'string' ? value : value?.['#text'])
+          )
+          .find(Boolean) || '';
     }
 
     const blobData = reduceObjToBlobs(data);
@@ -105,6 +93,8 @@ export default async function loadEpub(
 
     return {
       ...displayData,
+      declaredLanguage: displayData.language || undefined,
+      language: '',
       elementHtml,
       blobs: blobData,
       coverImage,

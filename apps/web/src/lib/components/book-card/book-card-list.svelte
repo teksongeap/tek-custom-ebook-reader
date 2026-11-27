@@ -5,6 +5,7 @@
   import Popover from '$lib/components/popover/popover.svelte';
   import { createEventDispatcher } from 'svelte';
   import Fa from 'svelte-fa';
+  import { getLanguageLabel } from './book-language';
 
   export let bookCards: BookCardProps[] = [];
   export let currentBookId: number | undefined;
@@ -75,7 +76,9 @@
               ><Fa icon={faInfo} /></button
             >
             <div class="book-card-detail-popover p-4" slot="content">
-              <div class="book-card-detail-label">Characters:</div>
+              <div class="book-card-detail-label">Primary language:</div>
+              <div class="w-40">{getLanguageLabel(bookCard.language)}</div>
+              <div class="book-card-detail-label mt-4">Characters:</div>
               <div class="w-40">{bookCard.characters || 'No Data'}</div>
               <div class="book-card-detail-label mt-4">Last Read:</div>
               <div class="w-40">{getCardDateInfo(bookCard.lastBookOpen)}</div>

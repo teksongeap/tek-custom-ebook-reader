@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { createEventDispatcher, onMount, tick } from 'svelte';
+  import { createEventDispatcher, onDestroy, tick } from 'svelte';
   import Fa from 'svelte-fa';
-  import { faGripVertical, faXmark } from '@fortawesome/free-solid-svg-icons';
+  import Modal from '$lib/components/modal.svelte';
+  import { faGripVertical } from '@fortawesome/free-solid-svg-icons';
   import { libraryCollections$ } from '$lib/data/library-collections';
   import {
     moveCollection,
@@ -10,7 +11,7 @@
   } from './library-organization';
 
   const dispatch = createEventDispatcher<{ close: void }>();
-  let dialog: HTMLDialogElement;
+  let modal: Modal;
   let list: HTMLOListElement;
   let draft = [...$libraryCollections$];
   let grabbedId: string | undefined;
@@ -27,40 +28,11 @@
   $: draggedCollection =
     pointerId !== undefined ? draft.find((item) => item.id === grabbedId) : undefined;
 
-  onMount(() => {
-    const root = document.documentElement;
-    const previousOverflow = root.style.overflow;
-    const previousGutter = root.style.scrollbarGutter;
-    root.style.scrollbarGutter = 'stable';
-    root.style.overflow = 'hidden';
-    dialog.showModal();
-    dialog.addEventListener('keydown', trapFocus);
-    return () => {
-      cancelAnimationFrame(animationFrame);
-      dialog.removeEventListener('keydown', trapFocus);
-      dialog.close();
-      root.style.overflow = previousOverflow;
-      root.style.scrollbarGutter = previousGutter;
-    };
-  });
+  onDestroy(() => cancelAnimationFrame(animationFrame));
 
   function close() {
     stopDrag();
-    dialog.close();
-  }
-
-  function trapFocus(event: KeyboardEvent) {
-    if (event.key !== 'Tab') return;
-    const buttons = Array.from(dialog.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
-    const first = buttons[0];
-    const last = buttons[buttons.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last?.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first?.focus();
-    }
+    modal.close();
   }
 
   function save() {
@@ -171,24 +143,14 @@
   }}
 />
 
-<dialog
-  class="app-dialog collection-order-dialog"
-  aria-labelledby="collection-order-title"
-  aria-describedby="collection-order-help"
-  bind:this={dialog}
+<Modal
+  bind:this={modal}
+  id="collection-order"
+  title="Arrange collections"
+  description="Drag collections into the order you want."
+  scrollable={false}
   on:close={() => dispatch('close')}
-  on:cancel|preventDefault={close}
 >
-  <header>
-    <h2 id="collection-order-title">Arrange collections</h2>
-    <button
-      type="button"
-      class="close-button"
-      aria-label="Close collection ordering"
-      on:click={close}><Fa icon={faXmark} /></button
-    >
-  </header>
-  <p id="collection-order-help">Drag collections into the order you want.</p>
   <p class="sr-only" id="collection-drag-keys">
     Keyboard: press Space to pick up a collection, use arrow keys to move it, then Space to drop.
     Escape cancels the move.
@@ -213,10 +175,10 @@
   </ol>
   <span class="sr-only" aria-live="polite">{message}</span>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
-  <footer>
+  <svelte:fragment slot="footer">
     <button type="button" class="app-button" on:click={close}>Cancel</button>
     <button type="button" class="app-button app-button--primary" on:click={save}>Done</button>
-  </footer>
+  </svelte:fragment>
   {#if draggedCollection}
     <div
       class="drag-preview"
@@ -228,51 +190,9 @@
       <Fa icon={faGripVertical} /><span>{draggedCollection.name}</span>
     </div>
   {/if}
-</dialog>
+</Modal>
 
 <style>
-  .collection-order-dialog {
-    position: fixed;
-    inset: 0;
-    margin: auto;
-    width: min(30rem, calc(100vw - 2rem));
-    max-height: calc(100dvh - 2rem);
-    padding: 1.25rem;
-    overflow: visible;
-  }
-  .collection-order-dialog::backdrop {
-    background: rgb(0 0 0 / 42%);
-    backdrop-filter: blur(3px);
-  }
-  .collection-order-dialog[open] {
-    display: flex;
-    flex-direction: column;
-  }
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.4rem;
-  }
-  h2 {
-    font-size: 1.1rem;
-    font-weight: 600;
-  }
-  p {
-    color: var(--app-chrome-muted);
-    font-size: 0.85rem;
-  }
-  .close-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 0.4rem;
-    color: var(--app-chrome-muted);
-  }
-  .close-button:hover,
   .reorder-row:hover {
     background: var(--app-chrome-hover);
     color: var(--font-color);
@@ -289,7 +209,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    margin: 1.25rem 0;
+    margin: 0;
     padding: 3px;
   }
   .reorder-row,
@@ -353,11 +273,6 @@
   }
   .drag-preview span {
     overflow-wrap: anywhere;
-  }
-  footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
   }
   .error {
     color: var(--app-danger);

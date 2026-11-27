@@ -5,6 +5,7 @@
  */
 
 import type { LoadData } from '../types';
+import { normalizeLanguageCode } from '../../book-language/language-metadata';
 import { XMLParser } from 'fast-xml-parser';
 import extractHtmlz from './extract-htmlz';
 import { getFormattedElementHtmlz } from './generate-htmlz-html';
@@ -23,6 +24,7 @@ export default async function loadHtmlz(
 
   const displayData = {
     title: file.name,
+    language: normalizeLanguageCode(metadata?.['dc:language']),
     hasThumb: true,
     styleSheet: data['style.css']
   };
@@ -40,6 +42,8 @@ export default async function loadHtmlz(
 
   return {
     ...displayData,
+    declaredLanguage: displayData.language || undefined,
+    language: '',
     elementHtml: element.innerHTML,
     blobs: blobData,
     coverImage,

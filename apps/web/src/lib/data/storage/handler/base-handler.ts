@@ -402,8 +402,20 @@ export abstract class BaseStorageHandler {
         | 'lastBookOpen'
         | 'storageSource'
       >
-    > = ['title', 'styleSheet', 'elementHtml', 'htmlBackup', 'sections', 'toc'];
-    const staticData: Record<string, string | Section[] | BooksDbTocEntry[] | undefined> = {};
+    > = [
+      'title',
+      'language',
+      'declaredLanguage',
+      'languageSource',
+      'languageDetectionVersion',
+      'styleSheet',
+      'elementHtml',
+      'htmlBackup',
+      'sections',
+      'toc'
+    ];
+    const staticData: Record<string, string | number | Section[] | BooksDbTocEntry[] | undefined> =
+      {};
     const limiter = pLimit(1);
     const cover = bookdata.coverImage;
     const isBlobCover = cover instanceof Blob;
@@ -595,6 +607,10 @@ export abstract class BaseStorageHandler {
                   BaseStorageHandler.getBookMetadata(filename);
 
                 bookObject.title = staticData.title;
+                bookObject.language = staticData.language;
+                bookObject.declaredLanguage = staticData.declaredLanguage;
+                bookObject.languageSource = staticData.languageSource;
+                bookObject.languageDetectionVersion = staticData.languageDetectionVersion;
                 bookObject.elementHtml = staticData.elementHtml;
                 bookObject.styleSheet = staticData.styleSheet || '';
                 bookObject.sections = staticData.sections || [];

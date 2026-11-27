@@ -46,6 +46,7 @@ import { handleErrorDuringReplication } from '$lib/functions/replication/error-h
 import { iffBrowser } from '$lib/functions/rxjs/iff-browser';
 import { logger } from '$lib/data/logger';
 import pLimit from 'p-limit';
+import { resolveBookLanguage } from '$lib/functions/book-language/resolve-book-language';
 import { replicationProgress$ } from '$lib/functions/replication/replication-progress';
 import { setStorageSourceDefault } from '$lib/data/storage/storage-source-manager';
 import { storageSource$ } from '$lib/data/storage/storage-view';
@@ -240,6 +241,7 @@ export class DatabaseService {
     skipTimestampFallback = true,
     removeStorageContext = true
   ) {
+    data = await resolveBookLanguage(data, document);
     const db = await this.db;
 
     let dataId: number;

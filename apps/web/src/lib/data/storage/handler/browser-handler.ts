@@ -18,8 +18,13 @@ import { database, lastReadingGoalsModified$ } from '$lib/data/store';
 
 import type { MergeMode } from '$lib/data/merge-mode';
 import { ReplicationSaveBehavior } from '$lib/functions/replication/replication-options';
-import { StorageDataType } from '$lib/data/storage/storage-types';
+import { StorageDataType, StorageKey } from '$lib/data/storage/storage-types';
+import { storageSource$ } from '$lib/data/storage/storage-view';
 import { startProfile } from '$lib/functions/performance-profiler';
+import { resolveBookLanguage } from '$lib/functions/book-language/resolve-book-language';
+import { backfillBookLanguages } from '$lib/functions/book-language/backfill-book-languages';
+import { needsBookLanguageResolution } from '$lib/functions/book-language/language-metadata';
+import { logger } from '$lib/data/logger';
 
 export class BrowserStorageHandler extends BaseStorageHandler {
   updateSettings(
@@ -36,6 +41,8 @@ export class BrowserStorageHandler extends BaseStorageHandler {
     this.readingGoalsMergeMode = readingGoalsMergeMode;
   }
 
+  private languageBackfill: Promise<void> | undefined;
+
   async getBookList() {
     if (!this.dataListFetched) {
       const profile = startProfile('browser book list');
@@ -51,6 +58,7 @@ export class BrowserStorageHandler extends BaseStorageHandler {
 
           this.addBookCard(book.title, {
             id: book.id,
+            language: book.language,
             imagePath: book.coverImage || '',
             characters: BaseStorageHandler.getBookCharacters(
               book.characters || 0,
@@ -63,6 +71,29 @@ export class BrowserStorageHandler extends BaseStorageHandler {
         }
 
         this.dataListFetched = true;
+        if (!this.languageBackfill) {
+          let updated = 0;
+          this.languageBackfill = backfillBookLanguages(
+            db,
+            data,
+            (book) => resolveBookLanguage(book, this.window.document),
+            (book) => {
+              const card = this.titleToBookCard.get(book.title);
+              if (card?.id === book.id) {
+                this.addBookCard(book.title, { language: book.language });
+                updated += 1;
+                if (updated % 8 === 0 && storageSource$.getValue() === StorageKey.BROWSER)
+                  database.dataListChanged$.next(this);
+              }
+            }
+          )
+            .catch((error) => logger.warn(`Unable to detect book languages: ${error}`))
+            .finally(() => {
+              this.languageBackfill = undefined;
+              if (updated && storageSource$.getValue() === StorageKey.BROWSER)
+                database.dataListChanged$.next(this);
+            });
+        }
         profile.end({ cards: this.titleToBookCard.size });
       } catch (error) {
         profile.end({ error: true });
@@ -116,10 +147,30 @@ export class BrowserStorageHandler extends BaseStorageHandler {
       BaseStorageHandler.getBookMetadata(filename);
     const db = await database.db;
 
-    await db.put('data', book);
+    const tx = db.transaction('data', 'readwrite');
+    const current = await tx.store.get(book.id);
+    // A legacy book can be opened before its background detection finishes. Keep any
+    // result saved since that read instead of erasing it with the reader's older copy.
+    const saved =
+      current && current.elementHtml === book.elementHtml && !needsBookLanguageResolution(current)
+        ? {
+            ...book,
+            language: current.language,
+            declaredLanguage: current.declaredLanguage,
+            languageSource: current.languageSource,
+            languageDetectionVersion: current.languageDetectionVersion
+          }
+        : book;
+    await tx.store.put(saved);
+    await tx.done;
     profile.lap('put data');
 
-    this.addBookCard(this.currentContext.title, { characters, lastBookModified, lastBookOpen });
+    this.addBookCard(this.currentContext.title, {
+      characters,
+      lastBookModified,
+      lastBookOpen,
+      language: saved.language
+    });
     profile.end();
   }
 
@@ -432,6 +483,7 @@ export class BrowserStorageHandler extends BaseStorageHandler {
           ),
           lastBookModified: storedBookData.lastBookModified || 0,
           lastBookOpen: storedBookData.lastBookOpen || 0,
+          language: storedBookData.language,
           isPlaceholder: !storedBookData.elementHtml
         });
       }

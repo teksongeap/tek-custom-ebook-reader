@@ -4,12 +4,15 @@
  * All rights reserved.
  */
 
+import { compareBookLanguages } from './book-language.ts';
+
 export const collectionBookSortOptions = [
   { value: 'title', label: 'Title A–Z' },
   { value: 'title-desc', label: 'Title Z–A' },
   { value: 'recent', label: 'Recently opened' },
   { value: 'added', label: 'Recently added' },
-  { value: 'progress', label: 'Progress' }
+  { value: 'progress', label: 'Progress' },
+  { value: 'language', label: 'Language' }
 ] as const;
 
 export type CollectionBookSort = (typeof collectionBookSortOptions)[number]['value'];
@@ -26,6 +29,7 @@ type LibraryBook = {
   title: string;
   isPlaceholder: boolean;
   lastBookOpen: number;
+  language?: string;
 };
 
 export function getUpNext<T extends LibraryBook>(books: T[], completedTitles: Set<string>): T[] {
@@ -52,6 +56,8 @@ export function getCollectionBooks<T extends LibraryBook & { progress: number }>
     .filter((book) => ids.has(book.id))
     .sort((a, b) => {
       switch (collection.sort) {
+        case 'language':
+          return compareBookLanguages(a, b) || compareTitles(a, b) || a.id - b.id;
         case 'title-desc':
           return compareTitles(b, a) || a.id - b.id;
         case 'recent':

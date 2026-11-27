@@ -579,12 +579,12 @@
 
   function onReplicateData() {
     exportAllBooks = false;
-    dialogManager.dialogs$.next([{ component: BookExportDialog, disableCloseOnClick: true }]);
+    dialogManager.dialogs$.next([{ component: BookExportDialog, nativeModal: true }]);
   }
 
   function onReplicateAllData() {
     exportAllBooks = true;
-    dialogManager.dialogs$.next([{ component: BookExportDialog, disableCloseOnClick: true }]);
+    dialogManager.dialogs$.next([{ component: BookExportDialog, nativeModal: true }]);
   }
 
   async function onDeleteStatistics() {
