@@ -332,7 +332,7 @@ test('Fold is the default page sound', async () => {
   motion.cancel();
 });
 
-test('B1 retains its authored swell and landing as a selectable alternative', () => {
+test('Swell retains its authored swell and landing as a selectable alternative', () => {
   const f = fixture();
   f.engine.configure(true, 0.4, true, 'gather');
   f.engine.unlock();

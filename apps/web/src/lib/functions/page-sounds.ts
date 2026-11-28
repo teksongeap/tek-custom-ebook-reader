@@ -25,13 +25,13 @@ export interface PageSoundVoice {
 }
 
 export const pageSoundOptions: { id: PageSoundStyle; label: string; description: string }[] = [
+  { id: 'fold', label: 'A · Fold', description: 'A pitch dip that bends back into place' },
   {
     id: 'gather',
-    label: 'A · B1',
+    label: 'B · Swell',
     description: 'A small swell with a clean, weighted landing'
   },
-  { id: 'ribbon', label: 'B · Ribbon', description: 'A continuous sweep across the stereo field' },
-  { id: 'fold', label: 'C · Fold', description: 'A pitch dip that bends back into place' },
+  { id: 'ribbon', label: 'C · Ribbon', description: 'A continuous sweep across the stereo field' },
   { id: 'scan', label: 'D · Scan', description: 'Four quick steps passing into the next page' }
 ];
 
