@@ -1549,6 +1549,12 @@
     opacity: 0.18;
   }
 
+  .app-toolbar-divider.reader-chrome-divider {
+    display: block;
+    flex-shrink: 0;
+    color: var(--reader-page-text);
+  }
+
   .reader-toolbar-title {
     flex: 1;
     min-width: 0;

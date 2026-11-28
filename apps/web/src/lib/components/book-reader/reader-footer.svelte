@@ -101,6 +101,7 @@
       {/if}
       <div class="reader-footer-controls">
         <slot name="actions" />
+        <span class="app-toolbar-divider reader-chrome-divider" aria-hidden="true"></span>
         <button
           bind:this={collapseButton}
           type="button"

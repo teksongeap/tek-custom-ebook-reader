@@ -245,6 +245,7 @@
           {/if}
         </div>
       </Popover>
+      <span class="app-toolbar-divider reader-chrome-divider" aria-hidden="true"></span>
       <button
         id="reader-header-toggle"
         type="button"
