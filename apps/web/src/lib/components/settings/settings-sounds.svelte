@@ -17,7 +17,15 @@
   import SettingsItemGroup from './settings-item-group.svelte';
 
   const previews: { cue: SoundCue; label: string; description: string }[] = [
-    { cue: 'click', label: 'Buttons', description: 'A crisp, definite pulse' },
+    { cue: 'click', label: 'Buttons', description: 'A sharp electronic click' },
+    { cue: 'grab', label: 'Pick up', description: 'A light, precise click' },
+    { cue: 'compact', label: 'Compact note', description: 'A short, contained electronic tick' },
+    { cue: 'drop', label: 'Drop', description: 'A firm click settling into place' },
+    {
+      cue: 'collapse',
+      label: 'Collapse',
+      description: 'An electronic glide tightening into place'
+    },
     { cue: 'open', label: 'Menus', description: 'Two notes unfolding' },
     { cue: 'book', label: 'Open a book', description: 'A melodic welcome' },
     { cue: 'page', label: 'Page movement', description: 'A short electronic glide' },

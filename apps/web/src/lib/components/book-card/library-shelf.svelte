@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { createEventDispatcher, tick } from 'svelte';
+  import { createEventDispatcher, onDestroy, tick } from 'svelte';
+  import { soundDesign } from '$lib/data/sound-design';
+  import { followCollapseAnimation } from '$lib/functions/collapse-sound';
   import BookCardList from './book-card-list.svelte';
   import type { BookCardProps } from './book-card-props';
   import { faChevronDown } from '@fortawesome/free-solid-svg-icons';
@@ -19,6 +21,13 @@
   const noSelection = new Set<number>();
   let heading: HTMLHeadingElement;
   let toggle: HTMLButtonElement;
+  let viewport: HTMLDivElement;
+  let cancelCollapse: (() => void) | undefined;
+  let foldVersion = 0;
+  onDestroy(() => {
+    foldVersion += 1;
+    cancelCollapse?.();
+  });
   let expanded = false;
   let columns = 3;
   let closedHeight = 0;
@@ -43,10 +52,22 @@
   }
 
   async function toggleShelf() {
+    const version = ++foldVersion;
+    const collapsing = expanded;
+    cancelCollapse?.();
+    if (!collapsing) soundDesign.play('click');
     const headingInset = parseFloat(getComputedStyle(heading).scrollMarginTop) || 128;
     const returnToHeading = expanded && heading.getBoundingClientRect().top < headingInset;
     expanded = !expanded;
     await tick();
+    if (version !== foldVersion) return;
+    if (collapsing && viewport) {
+      cancelCollapse = followCollapseAnimation(
+        viewport,
+        () => soundDesign.beginCollapseMotion(),
+        () => soundDesign.play('collapse')
+      );
+    }
     toggle?.focus({ preventScroll: true });
     if (returnToHeading) {
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -78,6 +99,7 @@
   {#if books.length}
     <div
       class="shelf-viewport"
+      bind:this={viewport}
       style:height={fullHeight ? `${viewportHeight}px` : undefined}
       id="{id}-books"
     >
@@ -97,6 +119,7 @@
         class="shelf-fold"
         aria-expanded={expanded}
         aria-controls="{id}-books"
+        data-sound="none"
         on:click={toggleShelf}
       >
         <span>{expanded ? 'Show less' : `Show ${books.length - columns} more`}</span>

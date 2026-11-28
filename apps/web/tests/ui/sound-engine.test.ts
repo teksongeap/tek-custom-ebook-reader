@@ -193,6 +193,36 @@ test('an async save is audible even immediately after a button click', async () 
   assert.equal(f.sources[1].stops.at(-1), undefined);
 });
 
+test('button clicks stay brief and drop has more body than pickup', async () => {
+  const duration = async (cue: SoundCue) => {
+    const f = fixture();
+    f.engine.unlock();
+    f.engine.play(cue);
+    await flush();
+    return (
+      Math.max(...f.sources.map((source) => source.stops.at(-1)!)) -
+      Math.min(...f.sources.map((source) => source.starts[0]))
+    );
+  };
+  assert.ok((await duration('click')) < 0.04);
+  assert.ok((await duration('drop')) > (await duration('grab')));
+});
+
+test('quick pickup/drop pairs stay audible without accumulating overlapping voices', async () => {
+  const f = fixture();
+  f.engine.unlock();
+  for (const cue of ['grab', 'drop', 'grab', 'drop'] as const) {
+    const previousCount = f.sources.length;
+    f.engine.play(cue);
+    await flush();
+    assert.ok(f.sources.length > previousCount, `${cue} is not lost to burst limiting`);
+    assert.ok(
+      f.sources.slice(0, previousCount).every((source) => source.stops.at(-1) === undefined)
+    );
+    f.context.currentTime += 0.01;
+  }
+});
+
 test('mute cancels queued and already scheduled sounds immediately', async () => {
   const f = fixture();
   f.engine.unlock();
@@ -332,6 +362,41 @@ test('Fold is the default page sound', async () => {
   motion.cancel();
 });
 
+test('collapse follows motion and stays independent of the reading page sound preference', () => {
+  const f = fixture();
+  f.engine.beginCollapseMotion().update(0.3, 4, 1);
+  assert.equal(f.created, 0);
+  f.engine.configure(true, 0.4, false);
+  f.engine.unlock();
+  const motion = f.engine.beginCollapseMotion();
+  motion.update(0.1, 4, 1);
+  const earlyPitch = f.sources[0].frequency.value;
+  const earlyHarmonic = f.gains[2].targets.at(-1)!.value;
+  f.context.currentTime = 0.7;
+  motion.update(0.8, 4, 1);
+  assert.ok(f.sources[0].frequency.value < earlyPitch, 'pitch contracts with visual progress');
+  assert.ok(f.gains[2].targets.at(-1)!.value < earlyHarmonic, 'the upper harmonic narrows away');
+  assert.ok(f.sources.every((source) => source.stops.at(-1)! > f.context.currentTime));
+  motion.finish();
+  assert.ok(f.sources.every((source) => source.stops.at(-1) === 0.705));
+});
+
+test('reversing a collapse or muting cancels held voices without another cue', () => {
+  const f = fixture();
+  f.engine.unlock();
+  const first = f.engine.beginCollapseMotion();
+  first.update(0.5, 4, 1);
+  const second = f.engine.beginCollapseMotion();
+  assert.ok(f.sources.slice(0, 2).every((source) => source.stops.at(-1) === 0.005));
+  second.update(0.4, 4, 1);
+  f.engine.configure(false, 0.4, true);
+  second.update(0.9, 4, 1);
+  assert.equal(f.sources.length, 4);
+  assert.ok(f.sources.every((source) => source.stops.at(-1) === 0.005));
+  f.advance();
+  assert.ok(f.sources.every((source) => source.disconnected));
+});
+
 test('Swell retains its authored swell and landing as a selectable alternative', () => {
   const f = fixture();
   f.engine.configure(true, 0.4, true, 'gather');
@@ -443,6 +508,10 @@ test('every cue uses short, finite envelopes and disconnects ended sources', asy
   f.engine.unlock();
   const cues: SoundCue[] = [
     'click',
+    'grab',
+    'drop',
+    'collapse',
+    'compact',
     'toggle',
     'open',
     'close',

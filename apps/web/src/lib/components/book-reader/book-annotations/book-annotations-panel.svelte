@@ -434,7 +434,7 @@
   }
 
   function toggleCommentExpanded(annotationId: string) {
-    soundDesign.play('click');
+    soundDesign.play(expandedCommentIds.has(annotationId) ? 'compact' : 'click');
     const nextExpandedCommentIds = new Set(expandedCommentIds);
 
     if (nextExpandedCommentIds.has(annotationId)) {

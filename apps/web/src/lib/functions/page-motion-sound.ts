@@ -10,6 +10,7 @@ import {
   type PageSoundStyle,
   type SoundPoint
 } from './page-sounds.ts';
+import { getCollapseSoundVoices } from './collapse-sound.ts';
 
 export interface PageMotionSound {
   update(progress: number, speed: number, direction: 1 | -1, remainingSeconds?: number): void;
@@ -42,11 +43,11 @@ function sample(points: SoundPoint[], time: number) {
 export function createPageMotionSound(
   context: AudioContext,
   destination: AudioNode,
-  style: PageSoundStyle,
+  style: PageSoundStyle | 'collapse',
   isAudible: () => boolean,
   onClose: () => void
 ): PageMotionSound {
-  const score = getPageSoundVoices(style);
+  const score = style === 'collapse' ? getCollapseSoundVoices() : getPageSoundVoices(style);
   const duration = Math.max(...score.map((voice) => voice.offset + voice.duration));
   const voices: { source: OscillatorNode; gain: GainNode; pan?: StereoPannerNode }[] = [];
   let closed = false;
@@ -129,8 +130,10 @@ export function createPageMotionSound(
           const time = scoreTime - voice.offset;
           const active = time >= 0 && time < voice.duration && phase < 1;
           const peak = Math.max(...voice.gain.map((point) => point.value));
-          const body = style === 'scan' || gather ? 0 : peak * 0.1;
-          const level = active ? (sample(voice.gain, time) + body) * (gather ? 1 : energy) : 0;
+          const body = style === 'scan' || style === 'collapse' || gather ? 0 : peak * 0.1;
+          const level = active
+            ? (sample(voice.gain, time) + body) * (gather || style === 'collapse' ? 1 : energy)
+            : 0;
           source.frequency.setTargetAtTime(sample(voice.frequency, Math.max(0, time)), now, 0.003);
           if (pan && voice.pan)
             pan.pan.setTargetAtTime(sample(voice.pan, Math.max(0, time)) * direction, now, 0.003);

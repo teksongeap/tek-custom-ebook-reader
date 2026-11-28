@@ -3,6 +3,7 @@
   import { BookReaderAvailableKeybind } from '$lib/data/book-reader-keybind';
   import type { BooksDbAnnotation } from '$lib/data/database/books-db/versions/books-db';
   import { bookReaderKeybindMap$ } from '$lib/data/store';
+  import { soundDesign } from '$lib/data/sound-design';
   import { getReaderChromeStyle } from '$lib/functions/reader-typography';
   import { createEventDispatcher, onDestroy, onMount, tick } from 'svelte';
   import Fa from 'svelte-fa';
@@ -870,6 +871,7 @@
     }
 
     const isExpanding = !isCommentExpanded;
+    soundDesign.play(isExpanding ? 'click' : 'compact');
     const expansionTop = isExpanding ? popoverEl?.getBoundingClientRect().top : undefined;
     const shouldFocusExpandedControl =
       isExpanding &&
@@ -1630,6 +1632,7 @@
             type="button"
             class="book-annotation-card-expand"
             aria-expanded={isCommentExpanded}
+            data-sound="none"
             aria-controls={`annotation-comment-${activeAnnotation.id}`}
             aria-keyshortcuts="S"
             title={`${isCommentExpanded ? 'Show less' : 'Show more'} (S)`}

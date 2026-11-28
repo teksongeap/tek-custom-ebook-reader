@@ -9,6 +9,7 @@ import {
   defaultPageSoundStyle,
   normalizePageSoundStyle,
   type PageSoundStyle,
+  type PageSoundVoice,
   type SoundPoint
 } from './page-sounds.ts';
 import {
@@ -16,9 +17,14 @@ import {
   silentPageMotion,
   type PageMotionSound
 } from './page-motion-sound.ts';
+import { getCollapseSoundVoices } from './collapse-sound.ts';
 
 export type SoundCue =
   | 'click'
+  | 'grab'
+  | 'drop'
+  | 'collapse'
+  | 'compact'
   | 'toggle'
   | 'open'
   | 'close'
@@ -33,6 +39,10 @@ export type SoundCue =
 
 const priority: Record<SoundCue, number> = {
   click: 0,
+  grab: 1,
+  drop: 2,
+  collapse: 2,
+  compact: 2,
   toggle: 1,
   navigate: 2,
   open: 3,
@@ -70,10 +80,12 @@ export class SoundEngine {
   private pending: { cue: SoundCue; pageStyle: PageSoundStyle } | undefined;
   private lastPlayed = -Infinity;
   private lastPriority = -1;
+  private lastCue: SoundCue | undefined;
   private resuming: Promise<void> | undefined;
   private generation = 0;
   private disposed = false;
   private pageMotions = new Set<PageMotionSound>();
+  private collapseMotion: PageMotionSound | undefined;
 
   constructor(
     private createContext: () => AudioContext | undefined,
@@ -164,12 +176,14 @@ export class SoundEngine {
         return;
       const now = this.context.currentTime;
       if (now - this.lastPlayed < 0.07) {
-        if (priority[next.cue] <= this.lastPriority) return;
+        const nextDragGesture = this.lastCue === 'drop' && next.cue === 'grab';
+        if (!nextDragGesture && priority[next.cue] <= this.lastPriority) return;
         this.stop();
       }
       if (this.voices.size >= 12) return;
       this.lastPlayed = now;
       this.lastPriority = priority[next.cue];
+      this.lastCue = next.cue;
       try {
         this.render(next.cue, now + 0.005, next.pageStyle);
       } catch (_) {
@@ -209,6 +223,32 @@ export class SoundEngine {
     return motion;
   }
 
+  beginCollapseMotion(): PageMotionSound {
+    this.collapseMotion?.cancel();
+    if (
+      this.disposed ||
+      !this.enabled ||
+      !this.volume ||
+      !this.isVisible() ||
+      !this.context ||
+      !this.master ||
+      this.context.state !== 'running'
+    )
+      return silentPageMotion;
+    let motion: PageMotionSound = silentPageMotion;
+    motion = createPageMotionSound(
+      this.context,
+      this.master,
+      'collapse',
+      () => this.enabled && !!this.volume && this.isVisible(),
+      () => {
+        if (this.collapseMotion === motion) this.collapseMotion = undefined;
+      }
+    );
+    if (motion !== silentPageMotion) this.collapseMotion = motion;
+    return motion;
+  }
+
   dispose() {
     this.disposed = true;
     this.stop();
@@ -219,6 +259,7 @@ export class SoundEngine {
   }
 
   private stop() {
+    this.collapseMotion?.cancel();
     for (const motion of this.pageMotions) motion.cancel();
     this.generation += 1;
     this.pending = undefined;
@@ -235,8 +276,24 @@ export class SoundEngine {
   private render(cue: SoundCue, at: number, pageStyle: PageSoundStyle) {
     switch (cue) {
       case 'click':
-        this.tone(pitch.root, at, 0.065, 0.24);
-        this.tone(pitch.octave, at + 0.008, 0.055, 0.035);
+        this.impact(pitch.root, at, 0.024, 0.23, pitch.octave, 'triangle');
+        this.impact(pitch.octave * 2, at, 0.009, 0.035, pitch.octave * 3);
+        break;
+      case 'grab':
+        this.impact(pitch.fifth, at, 0.022, 0.18, pitch.fifth * 1.5, 'triangle');
+        this.impact(pitch.octave * 2, at, 0.009, 0.025);
+        break;
+      case 'drop':
+        this.impact(pitch.octave, at, 0.01, 0.11, pitch.octave * 1.5, 'triangle');
+        this.impact(pitch.lowRoot, at + 0.004, 0.065, 0.24, pitch.root);
+        this.impact(pitch.root, at + 0.011, 0.038, 0.085, pitch.root * 1.06, 'triangle');
+        break;
+      case 'collapse':
+        this.renderVoices(getCollapseSoundVoices(), at);
+        break;
+      case 'compact':
+        this.impact(pitch.root, at, 0.06, 0.14, pitch.root * 1.12);
+        this.impact(pitch.octave, at, 0.018, 0.014);
         break;
       case 'toggle':
         this.tone(pitch.third, at, 0.085, 0.19);
@@ -264,7 +321,7 @@ export class SoundEngine {
         });
         break;
       case 'page':
-        this.pageSound(pageStyle, at);
+        this.renderVoices(getPageSoundVoices(pageStyle), at);
         break;
       case 'save':
         this.tone(pitch.fifth, at, 0.15, 0.18);
@@ -289,9 +346,9 @@ export class SoundEngine {
     }
   }
 
-  private pageSound(style: PageSoundStyle, at: number) {
+  private renderVoices(voices: PageSoundVoice[], at: number) {
     const context = this.context!;
-    for (const voice of getPageSoundVoices(style)) {
+    for (const voice of voices) {
       const start = at + voice.offset;
       const source = context.createOscillator();
       source.type = 'sine';
@@ -324,6 +381,27 @@ export class SoundEngine {
     oscillator.frequency.setValueAtTime(from, at);
     oscillator.frequency.exponentialRampToValueAtTime(frequency, at + duration * 0.45);
     this.envelope(oscillator, at, duration, level);
+  }
+
+  private impact(
+    frequency: number,
+    at: number,
+    duration: number,
+    level: number,
+    from = frequency,
+    waveform: OscillatorType = 'sine'
+  ) {
+    const context = this.context!;
+    const oscillator = context.createOscillator();
+    oscillator.type = waveform;
+    oscillator.frequency.setValueAtTime(from, at);
+    oscillator.frequency.exponentialRampToValueAtTime(frequency, at + duration * 0.35);
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0, at);
+    gain.gain.linearRampToValueAtTime(level, at + 0.0007);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + duration - 0.001);
+    gain.gain.linearRampToValueAtTime(0, at + duration);
+    this.connectVoice(oscillator, gain, at, duration);
   }
 
   private envelope(source: AudioScheduledSourceNode, at: number, duration: number, level: number) {

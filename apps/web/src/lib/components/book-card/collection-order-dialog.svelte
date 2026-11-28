@@ -4,6 +4,7 @@
   import Modal from '$lib/components/modal.svelte';
   import { faGripVertical } from '@fortawesome/free-solid-svg-icons';
   import { libraryCollections$ } from '$lib/data/library-collections';
+  import { soundDesign } from '$lib/data/sound-design';
   import {
     moveCollection,
     moveCollectionToIndex,
@@ -31,12 +32,13 @@
   onDestroy(() => cancelAnimationFrame(animationFrame));
 
   function close() {
-    stopDrag();
+    stopDrag(true);
     modal.close();
   }
 
   function save() {
     try {
+      stopDrag();
       // Apply only the order; retain any membership or sort changes made elsewhere.
       const current = $libraryCollections$;
       const byId = new Map(current.map((collection) => [collection.id, collection]));
@@ -63,6 +65,7 @@
     const rect = row.getBoundingClientRect();
     originalOrder = draft;
     grabbedId = id;
+    soundDesign.play('grab');
     pointerId = event.pointerId;
     x = event.clientX;
     y = event.clientY;
@@ -98,11 +101,13 @@
   }
 
   function stopDrag(cancel = false) {
+    if (!grabbedId) return;
     if (cancel) draft = originalOrder;
-    if (grabbedId) {
-      const index = draft.findIndex((collection) => collection.id === grabbedId);
-      message = `${draft[index]?.name || 'Collection'} placed at position ${index + 1} of ${draft.length}.`;
+    const index = draft.findIndex((collection) => collection.id === grabbedId);
+    if (!cancel && index >= 0) {
+      soundDesign.play('drop');
     }
+    message = `${draft[index]?.name || 'Collection'} placed at position ${index + 1} of ${draft.length}.`;
     cancelAnimationFrame(animationFrame);
     pointerId = undefined;
     grabbedId = undefined;
@@ -115,6 +120,7 @@
       else {
         originalOrder = draft;
         grabbedId = id;
+        soundDesign.play('grab');
         message = 'Picked up. Use arrow keys to move, then Space to drop.';
       }
     } else if (grabbedId === id && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
@@ -164,6 +170,7 @@
           aria-label={`Reorder ${collection.name}`}
           aria-describedby="collection-drag-keys"
           aria-pressed={grabbedId === collection.id}
+          data-sound="none"
           on:pointerdown={(event) => startDrag(event, collection.id)}
           on:keydown={(event) => keyboardReorder(event, collection.id)}
           ><span class="drag-grip" aria-hidden="true"><Fa icon={faGripVertical} /></span>
