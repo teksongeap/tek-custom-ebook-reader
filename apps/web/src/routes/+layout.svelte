@@ -2,6 +2,7 @@
   import { browser } from '$app/environment';
   import { navigating, page } from '$app/stores';
   import DomainHint from '$lib/components/domain-hint.svelte';
+  import AppSounds from '$lib/components/app-sounds.svelte';
   import LoadingDialog from '$lib/components/loading-dialog.svelte';
   import { basePath, clearConsoleOnReload } from '$lib/data/env';
   import { dialogManager, type Dialog } from '$lib/data/dialog-manager';
@@ -223,6 +224,8 @@
 </script>
 
 <svelte:window bind:online={$isOnline$} />
+
+<AppSounds />
 
 <MetaTags
   title="とく Ebook Reader"

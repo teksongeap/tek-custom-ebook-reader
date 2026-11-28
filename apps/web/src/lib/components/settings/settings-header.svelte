@@ -6,7 +6,7 @@
   export let bookPageLink: string | undefined;
   export let activeSettings: string;
 
-  const settingItems = ['Reader', 'Data', 'Statistics'];
+  const settingItems = ['Reader', 'Sound', 'Data', 'Statistics'];
 </script>
 
 <header class="app-header settings-page-header">

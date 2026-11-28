@@ -14,6 +14,7 @@
   import SettingsFontSelector from '$lib/components/settings/settings-font-selector.svelte';
   import SettingsReadingGoals from '$lib/components/settings/settings-reading-goals.svelte';
   import SettingsItemGroup from '$lib/components/settings/settings-item-group.svelte';
+  import SettingsSounds from '$lib/components/settings/settings-sounds.svelte';
   import {
     optionsForAutoReplicationType,
     optionsForBlurMode,
@@ -858,6 +859,8 @@
         </SettingsItemGroup>
       {/if}
     {/if}
+  {:else if activeSettings === 'Sound'}
+    <SettingsSounds />
   {:else if activeSettings === 'Data'}
     <SettingsItemGroup title="Persistent storage" tooltip={persistentStorageTooltip}>
       <div class="flex items-center">

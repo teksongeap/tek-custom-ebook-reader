@@ -25,6 +25,7 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { faXmark } from '@fortawesome/free-solid-svg-icons';
   import Fa from 'svelte-fa';
+  import { soundDesign } from '$lib/data/sound-design';
 
   export let id: string;
   export let title: string;
@@ -38,6 +39,7 @@
   let dialog: HTMLDialogElement;
 
   export function close() {
+    soundDesign.play('close');
     dialog.close();
   }
 
@@ -49,6 +51,7 @@
     const previousFocus = document.activeElement as HTMLElement | null;
     const unlockScrolling = lockScrolling(document.documentElement);
     dialog.showModal();
+    soundDesign.play('open');
     dialog.addEventListener('keydown', trapFocus);
     dialog.querySelector<HTMLElement>('[data-modal-autofocus]')?.focus();
     return () => {

@@ -17,6 +17,7 @@
   import { dialogManager } from '$lib/data/dialog-manager';
   import { pagePath } from '$lib/data/env';
   import { logger } from '$lib/data/logger';
+  import { soundDesign } from '$lib/data/sound-design';
   import { SortDirection, type SortOption } from '$lib/data/sort-types';
   import { getStorageHandler } from '$lib/data/storage/storage-handler-factory';
   import { StorageKey } from '$lib/data/storage/storage-types';
@@ -343,6 +344,8 @@
 
     if (error) {
       showError(errorTitle, error, 'Error(s) occurred during bookimport');
+    } else if (!cancelSignal.aborted) {
+      soundDesign.play('success');
     }
   }
 
@@ -459,6 +462,8 @@
 
     if (error) {
       showError('Deletion failed', error, 'Error(s) occurred during deletion');
+    } else if (deleted.length) {
+      soundDesign.play('remove');
     }
   }
 

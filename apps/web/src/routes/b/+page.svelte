@@ -164,6 +164,7 @@
   import { dialogManager } from '$lib/data/dialog-manager';
   import { pagePath } from '$lib/data/env';
   import { DB_VERSION, PAGE_CHANGE, SKIPKEYLISTENER, SYNCED } from '$lib/data/events';
+  import { soundDesign } from '$lib/data/sound-design';
   import { fullscreenManager } from '$lib/data/fullscreen-manager';
   import { logger } from '$lib/data/logger';
   import { MergeMode } from '$lib/data/merge-mode';
@@ -962,6 +963,7 @@
             bookCompleted = false;
           });
       }
+      soundDesign.play('complete');
     } catch ({ message }: any) {
       dialogManager.dialogs$.next([
         {
@@ -1448,6 +1450,7 @@
     };
 
     await database.putAnnotation(annotation);
+    soundDesign.play('save');
 
     annotations = [...annotations, annotation];
     activeAnnotationId = annotation.id;
@@ -1466,6 +1469,7 @@
 
   async function deleteAnnotation(annotation: BooksDbAnnotation) {
     await database.deleteAnnotation(annotation.id);
+    soundDesign.play('remove');
 
     annotations = annotations.filter((item) => item.id !== annotation.id);
 
@@ -1501,6 +1505,7 @@
     };
 
     await database.putAnnotation(updatedAnnotation);
+    soundDesign.play('save');
 
     annotations = annotations.map((annotation) =>
       annotation.id === updatedAnnotation.id ? updatedAnnotation : annotation
@@ -1704,7 +1709,7 @@
     readerTargetNavigation$.next(navigation);
   }
 
-  async function bookmarkPage() {
+  async function bookmarkPage(audible = true) {
     const bookId = getBookIdSync();
     if (!bookId || !bookmarkManager || readingStateChanging) return;
 
@@ -1728,6 +1733,8 @@
     }
 
     await database.putBookmark(data);
+
+    if (audible) soundDesign.play('save');
 
     bookmarkData = Promise.resolve(data);
 
@@ -1970,7 +1977,7 @@
       }
 
       if (!$manualBookmark$) {
-        await bookmarkPage();
+        await bookmarkPage(false);
       }
 
       if ($statisticsEnabled$ && trackerElm) {
@@ -2377,7 +2384,7 @@
     }}
     on:annotationUpdate={updateAnnotationComment}
     on:annotationDelete={({ detail }) => deleteAnnotation(detail)}
-    on:bookmark={() => bookmarkPage()}
+    on:bookmark={() => bookmarkPage(false)}
     on:trackerPause={() => pauseTracker(true)}
   />
   <AnnotationSelectionToolbar
