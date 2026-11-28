@@ -19,6 +19,7 @@
   import { readerImageGalleryPictures$ } from './book-reader-image-gallery/book-reader-image-gallery';
   import { mergeEntries } from '$lib/components/merged-header-icon/merged-entries';
   import Popover from '$lib/components/popover/popover.svelte';
+  import SoundToggle from '$lib/components/sound-toggle.svelte';
   import { customReadingPointEnabled$, viewMode$ } from '$lib/data/store';
   import { ViewMode } from '$lib/data/view-mode';
   import { getReaderChromeStyle } from '$lib/functions/reader-typography';
@@ -186,6 +187,7 @@
     </div>
     <span class="reader-header-title reader-toolbar-title" title={bookTitle}>{bookTitle}</span>
     <div class="reader-toolbar-actions" role="group" aria-label="Reader settings and display">
+      <SoundToggle />
       <button
         type="button"
         class="app-toolbar-button"

@@ -14,7 +14,10 @@ import { PaginationTransitionMode } from '$lib/data/pagination-transition-mode';
 import { setReaderAnimatedScrollPosition } from '$lib/functions/reader-viewport';
 import { transitionReaderNavigation } from '$lib/functions/reader-navigation-transition';
 import { logger } from '$lib/data/logger';
+import { soundDesign } from '$lib/data/sound-design';
 import type { PageManager } from '../types';
+import { silentPageMotion, type PageMotionSound } from '$lib/functions/page-motion-sound';
+import { getGlideRemainingSeconds } from '$lib/functions/reader-glide-timing';
 
 export class PageManagerPaginated implements PageManager {
   private destroyed = false;
@@ -28,6 +31,10 @@ export class PageManagerPaginated implements PageManager {
   private animationScrollSize: number | undefined;
 
   private animationIsUser = false;
+  private animationSound: PageMotionSound | undefined;
+  private animationSoundSpan = 1;
+  private animationSoundProgress = 0;
+  private sectionSound: PageMotionSound | undefined;
 
   private sectionTransitionIndex: number | undefined;
 
@@ -161,8 +168,8 @@ export class PageManagerPaginated implements PageManager {
     return this.getLastScrollPos(this.getMeasuredScrollSize(scrollSizeProp), this.getColumnPitch());
   }
 
-  beginSectionTransition(index: number) {
-    this.cancelAnimation();
+  beginSectionTransition(index: number, releaseSound = false) {
+    this.cancelAnimation(releaseSound);
     this.clearSectionTransitionSubscription();
     this.clearTrailingBlankSpace();
     this.clearContentTransform();
@@ -181,6 +188,8 @@ export class PageManagerPaginated implements PageManager {
 
   destroy() {
     this.destroyed = true;
+    this.sectionSound?.cancel();
+    this.sectionSound = undefined;
     this.cancelAnimation();
     this.clearSectionTransitionSubscription();
     this.clearTrailingBlankSpace();
@@ -245,10 +254,14 @@ export class PageManagerPaginated implements PageManager {
     const nextPage = this.sectionIndex$.getValue() - 1;
     if (nextPage < 0) return false;
 
-    this.changeSection(nextPage, () => {
-      const scrollSize = this.getMeasuredScrollSize(scrollSizeProp);
-      this.jumpToPos(this.getLastScrollPos(scrollSize, offset), scrollSize, viewportSize, isUser);
-    });
+    this.changeSection(
+      nextPage,
+      () => {
+        const scrollSize = this.getMeasuredScrollSize(scrollSizeProp);
+        this.jumpToPos(this.getLastScrollPos(scrollSize, offset), scrollSize, viewportSize, isUser);
+      },
+      isUser
+    );
     return true;
   }
 
@@ -257,17 +270,21 @@ export class PageManagerPaginated implements PageManager {
     const nextPage = this.sectionIndex$.getValue() + 1;
     if (nextPage >= this.sectionIds.length) return false;
 
-    this.changeSection(nextPage, () => {
-      const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
-      const viewportSize = this.verticalMode ? this.height : this.width;
-      this.jumpToPos(0, this.getMeasuredScrollSize(scrollSizeProp), viewportSize, isUser);
-      this.updateSectionData(this.sectionIds[nextPage - 1], 100, false);
-      this.updateSectionData(this.sectionIds[nextPage], 0);
-    });
+    this.changeSection(
+      nextPage,
+      () => {
+        const scrollSizeProp = this.verticalMode ? 'scrollHeight' : 'scrollWidth';
+        const viewportSize = this.verticalMode ? this.height : this.width;
+        this.jumpToPos(0, this.getMeasuredScrollSize(scrollSizeProp), viewportSize, isUser);
+        this.updateSectionData(this.sectionIds[nextPage - 1], 100, false);
+        this.updateSectionData(this.sectionIds[nextPage], 0);
+      },
+      isUser
+    );
     return true;
   }
 
-  private changeSection(index: number, positionDestination: () => void) {
+  private changeSection(index: number, positionDestination: () => void, isUser: boolean) {
     const direction = index < this.sectionIndex$.getValue() ? -1 : 1;
     this.sectionTransitionIndex = index;
     const update = () =>
@@ -276,7 +293,7 @@ export class PageManagerPaginated implements PageManager {
           resolve();
           return;
         }
-        this.beginSectionTransition(index);
+        this.beginSectionTransition(index, isUser);
         this.sectionTransitionResolve = resolve;
         this.sectionTransitionSubscription = this.updateSectionIndex(index).subscribe({
           next: () => {
@@ -298,9 +315,21 @@ export class PageManagerPaginated implements PageManager {
         ? transitionReaderNavigation(update, {
             kind: 'section',
             direction,
-            vertical: this.verticalMode
+            vertical: this.verticalMode,
+            onMotion: isUser
+              ? () => {
+                  if (this.destroyed) return silentPageMotion;
+                  this.sectionSound = soundDesign.beginPageMotion();
+                  return this.sectionSound;
+                }
+              : undefined,
+            onInstant: () => {
+              if (isUser && !this.destroyed) soundDesign.play('page');
+            }
           })
-        : update();
+        : update().then(() => {
+            if (isUser && !this.destroyed) soundDesign.play('page');
+          });
     void navigation.catch((error) => {
       this.completeSectionTransition(index);
       this.clearSectionTransitionSubscription();
@@ -310,12 +339,12 @@ export class PageManagerPaginated implements PageManager {
 
   private moveToPos(pos: number, scrollSize: number, viewportSize: number, isUser: boolean) {
     const targetPos = Math.max(0, pos);
-
     if (this.transitionMode === PaginationTransitionMode.Glide) {
       this.animateToPos(targetPos, scrollSize, viewportSize, isUser);
       return;
     }
 
+    if (isUser && targetPos !== this.virtualScrollPos$.getValue()) soundDesign.play('page');
     this.jumpToPos(targetPos, scrollSize, viewportSize, isUser);
   }
 
@@ -339,12 +368,19 @@ export class PageManagerPaginated implements PageManager {
         window.matchMedia('(prefers-reduced-motion: reduce)').matches)
     ) {
       this.jumpToPos(pos, scrollSize, viewportSize, isUser);
+      if (isUser && distance >= 1) soundDesign.play('page');
       return;
     }
 
     this.animationTargetPos = pos;
     this.animationIsUser = isUser;
+    if (!isUser) {
+      this.animationSound?.cancel();
+      this.animationSound = undefined;
+    }
     this.animationScrollSize = scrollSize;
+    // Keep the audio phase continuous when a running spring gets a new target.
+    this.animationSoundSpan = distance / Math.max(0.001, 1 - this.animationSoundProgress);
     // Reserve the final extent once, before any animation frames run.
     this.setTrailingBlankSpace(
       Math.max(0, Math.ceil(Math.max(start, pos) + viewportSize - scrollSize)),
@@ -377,6 +413,19 @@ export class PageManagerPaginated implements PageManager {
           : `translate3d(${offset}px, 0, 0)`;
         this.virtualScrollPos$.next(nextPos);
         setReaderAnimatedScrollPosition(this.scrollEl, nextPos);
+        this.animationSoundProgress = Math.min(
+          1,
+          Math.max(0, 1 - Math.abs(target - nextPos) / this.animationSoundSpan)
+        );
+        if (this.animationIsUser) {
+          this.animationSound ??= soundDesign.beginPageMotion();
+          this.animationSound.update(
+            this.animationSoundProgress,
+            this.animationVelocity / viewportSize,
+            this.animationVelocity < 0 ? -1 : 1,
+            getGlideRemainingSeconds(nextPos - target, this.animationVelocity, stiffness)
+          );
+        }
         this.animationFrame = requestAnimationFrame(animate);
         return;
       }
@@ -387,6 +436,9 @@ export class PageManagerPaginated implements PageManager {
       this.animationScrollSize = undefined;
       // Commit native scrolling once, removing the temporary layer in the same frame.
       this.setVisualPos(target, scrollSize, viewportSize);
+      this.animationSound?.finish();
+      this.animationSound = undefined;
+      this.animationSoundProgress = 0;
       this.updateSectionData(
         this.sectionIds[this.sectionIndex$.getValue()],
         this.getProgressPercentage(target, scrollSize)
@@ -477,7 +529,11 @@ export class PageManagerPaginated implements PageManager {
     return Math.max(0, scrollValue);
   }
 
-  private cancelAnimation() {
+  private cancelAnimation(releaseSound = false) {
+    if (releaseSound) this.animationSound?.finish();
+    else this.animationSound?.cancel();
+    this.animationSound = undefined;
+    this.animationSoundProgress = 0;
     if (this.animationFrame !== undefined) {
       cancelAnimationFrame(this.animationFrame);
     }

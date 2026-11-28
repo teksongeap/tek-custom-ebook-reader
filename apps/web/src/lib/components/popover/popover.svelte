@@ -2,6 +2,7 @@
   import { browser } from '$app/environment';
   import { popovers } from '$lib/components/popover/popover';
   import { CLOSE_POPOVER } from '$lib/data/events';
+  import { soundDesign } from '$lib/data/sound-design';
   import { clickOutside } from '$lib/functions/use-click-outside';
   import type { Instance, Placement } from '@popperjs/core';
   import flip from '@popperjs/core/lib/modifiers/flip';
@@ -51,6 +52,7 @@
     }
 
     isOpen = !isOpen;
+    if (eventType === 'click') soundDesign.play(isOpen ? 'open' : 'close');
     await tick();
 
     if (isOpen && instance) {

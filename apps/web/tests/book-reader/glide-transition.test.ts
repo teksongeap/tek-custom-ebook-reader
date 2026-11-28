@@ -14,6 +14,7 @@ import { PaginationTransitionMode } from '../../src/lib/data/pagination-transiti
 
 let server: ViteDevServer;
 let Manager: typeof PageManagerPaginated;
+let sounds: typeof import('../../src/lib/data/sound-design.ts').soundDesign;
 let getScrollPosition: (element: HTMLElement, vertical: boolean) => number;
 let getReadingNodes: (node: Node) => Node[];
 let toc: typeof import('../../src/lib/components/book-reader/book-toc/book-toc.ts');
@@ -29,6 +30,7 @@ before(async () => {
   ({ PageManagerPaginated: Manager } = await server.ssrLoadModule(
     '/src/lib/components/book-reader/book-reader-paginated/page-manager-paginated.ts'
   ));
+  ({ soundDesign: sounds } = await server.ssrLoadModule('/src/lib/data/sound-design.ts'));
   ({ getReaderScrollPosition: getScrollPosition } = await server.ssrLoadModule(
     '/src/lib/functions/reader-viewport.ts'
   ));
@@ -264,6 +266,101 @@ test('jumping during a glide cancels pending frames and restores native text nav
   assert.equal(state.contentStyle.willChange, '');
   assert.equal(getScrollPosition(state.scrollEl, false), 2520);
   assert.deepEqual(state.changes, [false]);
+});
+
+function observeSound(t: TestContext) {
+  const updates: { progress: number; speed: number; direction: number }[] = [];
+  let starts = 0;
+  let finishes = 0;
+  let cancels = 0;
+  const clips: string[] = [];
+  t.mock.method(sounds, 'beginPageMotion', () => {
+    starts += 1;
+    return {
+      update: (progress: number, speed: number, direction: number) =>
+        updates.push({ progress, speed, direction }),
+      finish: () => {
+        finishes += 1;
+      },
+      cancel: () => {
+        cancels += 1;
+      }
+    };
+  });
+  t.mock.method(sounds, 'play', (cue: string) => {
+    clips.push(cue);
+  });
+  return {
+    updates,
+    clips,
+    get starts() {
+      return starts;
+    },
+    get finishes() {
+      return finishes;
+    },
+    get cancels() {
+      return cancels;
+    }
+  };
+}
+
+for (const vertical of [false, true]) {
+  test(`${vertical ? 'vertical' : 'horizontal'} page audio advances with visual frames and finishes at the visual commit`, (t) => {
+    const sound = observeSound(t);
+    const state = setup(t, vertical);
+    const target = vertical ? 640 : 840;
+    state.manager.nextPage();
+    assert.equal(sound.starts, 0, 'input alone does not play a clip');
+    assert.deepEqual(sound.clips, []);
+    state.step(16);
+    assert.equal(sound.starts, 1);
+    assert.ok(Math.abs(sound.updates[0].progress - state.position.getValue() / target) < 0.00001);
+    state.step(160);
+    assert.equal(sound.finishes, 0);
+    state.step(1000);
+    assert.equal(state.position.getValue(), target);
+    assert.equal(sound.finishes, 1);
+    assert.equal(sound.cancels, 0);
+  });
+}
+
+test('retargeting a glide preserves the audio gesture and cancellation cannot sound like a completed turn', (t) => {
+  const sound = observeSound(t);
+  const state = setup(t);
+  state.manager.nextPage();
+  state.step(100);
+  const phase = sound.updates.at(-1)!.progress;
+  state.manager.nextPage();
+  state.step(116);
+  assert.equal(sound.starts, 1);
+  assert.ok(sound.updates.at(-1)!.progress > phase);
+  state.manager.jumpTo(2520, false);
+  assert.equal(sound.cancels, 1);
+  assert.equal(sound.finishes, 0);
+  assert.equal(state.frames.size, 0);
+});
+
+test('a normal chapter handoff releases the running sound so the next transition can continue it', (t) => {
+  const sound = observeSound(t);
+  const state = setup(t, false, false, 0, false, ['section', 'next-section']);
+  state.manager.nextPage();
+  state.step(100);
+  state.manager.nextSection();
+  assert.equal(sound.finishes, 1);
+  assert.equal(sound.cancels, 0, 'a chapter handoff must not hard-cut the running oscillators');
+  state.renderComplete.next(1);
+});
+
+test('restoration stays silent and reduced motion uses one immediate confirmation', (t) => {
+  const sound = observeSound(t);
+  const state = setup(t, false, true);
+  state.manager.scrollTo(840, false);
+  assert.equal(sound.starts, 0);
+  assert.deepEqual(sound.clips, []);
+  state.manager.nextPage();
+  assert.equal(sound.starts, 0);
+  assert.deepEqual(sound.clips, ['page']);
 });
 
 test('spring travel stays consistent across frame rates and missed frames', (t) => {

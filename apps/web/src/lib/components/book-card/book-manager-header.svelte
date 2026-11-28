@@ -3,6 +3,7 @@
   import type { BookCardProps } from '$lib/components/book-card/book-card-props';
   import { mergeEntries } from '$lib/components/merged-header-icon/merged-entries';
   import Popover from '$lib/components/popover/popover.svelte';
+  import SoundToggle from '$lib/components/sound-toggle.svelte';
   import { pagePath } from '$lib/data/env';
   import { SortDirection } from '$lib/data/sort-types';
   import { FilesystemStorageHandler } from '$lib/data/storage/handler/filesystem-handler';
@@ -373,6 +374,7 @@
       {/if}
       {#if !selectMode || $storageSource$ === StorageKey.BROWSER}
         <nav class="library-toolbar-secondary" aria-label="More library controls">
+          <SoundToggle />
           {#if hasBookOpened}
             <button
               type="button"

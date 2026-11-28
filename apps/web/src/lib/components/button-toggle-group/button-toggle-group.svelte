@@ -28,7 +28,9 @@
   {#each options as option}
     <div class="flex">
       <button
+        type="button"
         title={option.id}
+        aria-pressed={option.id === selectedOptionId}
         class="setting-toggle-button m-1 p-2 text-lg"
         class:setting-toggle-button--selected={option.id === selectedOptionId}
         class:setting-toggle-button--selected-inverted={option.id === selectedOptionId &&

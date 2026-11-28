@@ -163,3 +163,98 @@ test('a superseded transition cannot clear the newer active transition', async (
   releaseSecond();
   await Promise.all([second, third]);
 });
+
+test('section audio waits for visual readiness, follows eased animation progress, and ends with the transition', async (t) => {
+  let reveal!: () => void;
+  let finish!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    reveal = resolve;
+  });
+  const finished = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  browser(t, (update) => ({
+    types: new Set<string>(),
+    skipTransition() {},
+    ready,
+    finished,
+    updateCallbackDone: Promise.resolve().then(update)
+  }));
+  const frames = new Map<number, FrameRequestCallback>();
+  let id = 0;
+  for (const [key, value] of Object.entries({
+    requestAnimationFrame: (callback: FrameRequestCallback) => {
+      frames.set(++id, callback);
+      return id;
+    },
+    cancelAnimationFrame: (frame: number) => {
+      frames.delete(frame);
+    }
+  })) {
+    const original = Object.getOwnPropertyDescriptor(globalThis, key);
+    Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
+    t.after(() => {
+      if (original) Object.defineProperty(globalThis, key, original);
+      else Reflect.deleteProperty(globalThis, key);
+    });
+  }
+  t.mock.method(performance, 'now', () => 0);
+  const progress = [0, 0];
+  Object.assign(document, {
+    getAnimations: () =>
+      ['old', 'new'].map((kind, index) => ({
+        effect: {
+          pseudoElement: `::view-transition-${kind}(ttu-reader-page)`,
+          getComputedTiming: () => ({ progress: progress[index] })
+        }
+      }))
+  });
+  let starts = 0;
+  let finishes = 0;
+  const updates: number[] = [];
+  await transitionReaderNavigation(async () => {}, {
+    kind: 'section',
+    onMotion: () => {
+      starts += 1;
+      return {
+        update: (value) => updates.push(value),
+        finish: () => {
+          finishes += 1;
+        },
+        cancel() {}
+      };
+    }
+  });
+  assert.equal(starts, 0, 'content preparation cannot start the sound');
+  reveal();
+  await Promise.resolve();
+  assert.equal(starts, 1);
+  progress[0] = 1;
+  progress[1] = 0.6;
+  const callbacks = [...frames.values()];
+  frames.clear();
+  callbacks.forEach((callback) => callback(200));
+  assert.equal(updates[0], 0.8, 'the sound follows the actual old/new page effects');
+  assert.equal(finishes, 0);
+  finish();
+  await Promise.resolve();
+  assert.equal(finishes, 1);
+  assert.equal(frames.size, 0);
+});
+
+test('reduced-motion section navigation gives confirmation only after the destination is ready', async (t) => {
+  browser(t, undefined, true);
+  const events: string[] = [];
+  await transitionReaderNavigation(
+    async () => {
+      events.push('position');
+    },
+    {
+      onInstant: () => events.push('confirm'),
+      onMotion: () => {
+        throw new Error('Reduced motion cannot create a moving sound');
+      }
+    }
+  );
+  assert.deepEqual(events, ['position', 'confirm']);
+});
