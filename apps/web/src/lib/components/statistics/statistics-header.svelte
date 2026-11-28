@@ -130,6 +130,7 @@
           class="app-toolbar-button"
           title="Resume reading"
           aria-label="Resume reading"
+          data-sound="none"
           on:click={() => goto(`${pagePath}/b?id=${currentBookId}`)}
         >
           <Fa icon={faBookOpen} /><span class="hidden lg:inline">Resume reading</span>

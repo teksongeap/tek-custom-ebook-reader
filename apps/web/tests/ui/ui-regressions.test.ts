@@ -106,6 +106,7 @@ test('book cards offer separate reading and metadata buttons without a delete ac
   assert.match(buttons[0], /type="button"/);
   assert.match(buttons[0], /aria-label="A book to read"/);
   assert.doesNotMatch(buttons[0], /aria-pressed/);
+  assert.match(buttons[0], /data-sound="none"/, 'opening waits for the book navigation cue');
   assert.match(buttons[1], /type="button"/);
   assert.match(buttons[1], /aria-label="Details for A book to read"/);
   assert.doesNotMatch(html, /Delete book|Delete A book to read/);
@@ -120,6 +121,7 @@ test('selection mode exposes both selected and unselected toggle states', () => 
       selectMode: true
     });
     assert.match(html, new RegExp(`aria-pressed="${selected}"`));
+    assert.doesNotMatch(html, /data-sound="none"/, 'selecting still gets its toggle cue');
     // The visual selection overlay must not add a second keyboard stop.
     assert.doesNotMatch(html, /role="button"|tabindex="0"/);
     assert.equal(html.includes('book-card-shell--selected'), selected);

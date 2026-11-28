@@ -37,6 +37,7 @@
         class="settings-back-link settings-resume-link"
         href={bookPageLink}
         aria-label="Back to book"
+        data-sound="none"
         title="Back to book"
       >
         <Fa icon={faBookOpen} /><span>Back to book</span>

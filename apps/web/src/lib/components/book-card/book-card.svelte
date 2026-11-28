@@ -73,6 +73,7 @@
   type="button"
   aria-label={title}
   aria-pressed={selected}
+  data-sound={selected === undefined ? 'none' : undefined}
   class="book-card-button relative w-full outline-none"
   on:click
 >

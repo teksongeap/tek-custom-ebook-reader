@@ -381,6 +381,7 @@
               class="app-toolbar-button library-resume-control"
               title="Resume reading"
               aria-label="Resume reading"
+              data-sound="none"
               on:click={() => dispatch('backToBookClick')}
             >
               <Fa icon={faBookOpen} /><span class="app-toolbar-label">Resume reading</span>
@@ -424,10 +425,9 @@
                 <button
                   type="button"
                   class="app-menu-item library-compact-resume"
-                  on:click={() => {
-                    moreMenuElm.toggleOpen();
-                    dispatch('backToBookClick');
-                  }}><Fa icon={faBookOpen} /><span>Resume reading</span></button
+                  data-sound="none"
+                  on:click={() => dispatch('backToBookClick')}
+                  ><Fa icon={faBookOpen} /><span>Resume reading</span></button
                 >
               {/if}
 
