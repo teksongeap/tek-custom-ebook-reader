@@ -25,7 +25,8 @@
   import { getReaderChromeStyle } from '$lib/functions/reader-typography';
   import { getWeightedAverage } from '$lib/functions/utils';
   import { debounceTime, fromEvent, Subject, take, takeUntil } from 'rxjs';
-  import { onMount } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
+  import { soundDesign } from '$lib/data/sound-design';
   import Fa from 'svelte-fa';
 
   type TocItem = {
@@ -70,6 +71,7 @@
   export let fontSize = 20;
   export let fontColor = '';
   export let backgroundColor = '';
+  const dispatch = createEventDispatcher<{ navigate: { closePanel: boolean } }>();
 
   let chapters: SectionWithProgress[] = [];
   let tocTree: TocItem[] = [];
@@ -382,6 +384,7 @@
     if (!chapter) {
       return;
     }
+    dispatch('navigate', { closePanel: closeToc });
 
     const hasCharacterChange =
       typeof chapter.startCharacter === 'number' && exploredCharCount !== chapter.startCharacter;
@@ -404,6 +407,7 @@
   }
 
   function toggleExpanded(reference: string) {
+    soundDesign.play('click');
     const nextExpandedReferences = new Set(expandedReferences);
     const nextCollapsedReferences = new Set(collapsedReferences);
 
@@ -487,6 +491,7 @@
       class="book-toc-panel-close"
       title="Close contents"
       aria-label="Close contents"
+      data-sound="none"
       on:click={closeTocMenu}
     >
       <Fa icon={faXmark} />
@@ -516,6 +521,7 @@
               class="book-toc-item-disclosure"
               aria-expanded={isExpanded(item)}
               aria-label={isExpanded(item) ? 'Collapse section' : 'Expand section'}
+              data-sound="none"
               on:click|stopPropagation={() => toggleExpanded(item.id)}
             >
               <Fa icon={isExpanded(item) ? faChevronDown : faChevronRight} />
@@ -523,7 +529,12 @@
           {:else}
             <span class="book-toc-item-disclosure book-toc-item-disclosure--placeholder"></span>
           {/if}
-          <button type="button" class="book-toc-item" on:click={() => goToChapter(item, true)}>
+          <button
+            type="button"
+            class="book-toc-item"
+            data-sound="none"
+            on:click={() => goToChapter(item, true)}
+          >
             <span class="book-toc-item-label">{item.label}</span>
             {#if formatTocMeta(item)}
               <span class="book-toc-item-meta">{formatTocMeta(item)}</span>
@@ -545,6 +556,7 @@
       class="book-toc-panel-nav"
       title={prevChapterAvailable ? `${verticalMode ? 'Next' : 'Previous'} chapter` : ''}
       aria-label={verticalMode ? 'Next chapter' : 'Previous chapter'}
+      data-sound="none"
       disabled={!prevChapterAvailable}
       on:click={() => changeChapter(prevChapterAvailable, verticalMode ? 1 : -1)}
     >
@@ -555,6 +567,7 @@
       class="book-toc-panel-nav"
       title={nextChapterAvailable ? `${verticalMode ? 'Previous' : 'Next'} chapter` : ''}
       aria-label={verticalMode ? 'Previous chapter' : 'Next chapter'}
+      data-sound="none"
       disabled={!nextChapterAvailable}
       on:click={() => changeChapter(nextChapterAvailable, verticalMode ? -1 : 1)}
     >

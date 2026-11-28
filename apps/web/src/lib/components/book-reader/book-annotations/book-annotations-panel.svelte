@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, tick } from 'svelte';
+  import { soundDesign } from '$lib/data/sound-design';
   import Fa from 'svelte-fa';
   import {
     faArrowDownWideShort,
@@ -353,6 +354,7 @@
   }
 
   function toggleAnnotationSortDirection() {
+    soundDesign.play('toggle');
     $lastAnnotationSortDirection$ =
       activeSortDirection === SortDirection.ASC ? SortDirection.DESC : SortDirection.ASC;
     resetAnnotationPage();
@@ -387,11 +389,13 @@
   }
 
   function editAnnotation(annotation: BooksDbAnnotation) {
+    if (editingAnnotationId !== annotation.id) soundDesign.play('open');
     editingAnnotationId = annotation.id;
     draftComment = annotation.comment;
   }
 
-  function cancelEditing() {
+  function cancelEditing(audible = false) {
+    if (audible && editingAnnotationId) soundDesign.play('close');
     editingAnnotationId = '';
     draftComment = '';
   }
@@ -400,6 +404,7 @@
     const comment = draftComment.trim();
 
     if (comment === annotation.comment) {
+      soundDesign.play('click');
       cancelEditing();
       return;
     }
@@ -414,6 +419,12 @@
   function handleDraftCommentKeydown(event: KeyboardEvent, annotation: BooksDbAnnotation) {
     event.stopPropagation();
 
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelEditing(true);
+      return;
+    }
+
     if (event.key !== 'Enter' || event.shiftKey || event.isComposing) {
       return;
     }
@@ -423,6 +434,7 @@
   }
 
   function toggleCommentExpanded(annotationId: string) {
+    soundDesign.play('click');
     const nextExpandedCommentIds = new Set(expandedCommentIds);
 
     if (nextExpandedCommentIds.has(annotationId)) {
@@ -584,6 +596,7 @@
       class="annotations-panel-close"
       title="Close annotations"
       aria-label="Close annotations"
+      data-sound="none"
       on:click={() => dispatch('close')}
     >
       <Fa icon={faXmark} />
@@ -658,6 +671,7 @@
         title={`${activeSortDirectionLabel}. Click to switch ${nextSortDirectionLabel}.`}
         aria-label={`Sort direction: ${activeSortDirectionLabel}. Click to switch ${nextSortDirectionLabel}.`}
         aria-pressed={activeSortDirection === SortDirection.DESC}
+        data-sound="none"
         on:click|stopPropagation={toggleAnnotationSortDirection}
         on:keydown|stopPropagation={() => {}}
       >
@@ -730,6 +744,7 @@
                     type="button"
                     class="annotation-item-comment-expand"
                     aria-expanded={isCommentExpanded}
+                    data-sound="none"
                     on:pointerdown|stopPropagation={() => {}}
                     on:click|stopPropagation={() => toggleCommentExpanded(annotation.id)}
                     on:keydown|stopPropagation={(event) => {
@@ -763,7 +778,8 @@
                   <button
                     type="button"
                     class="annotation-item-editor-secondary"
-                    on:click|stopPropagation={cancelEditing}
+                    data-sound="none"
+                    on:click|stopPropagation={() => cancelEditing(true)}
                   >
                     Cancel
                   </button>
@@ -786,6 +802,7 @@
               class="annotation-item-jump"
               title="Go to annotation"
               aria-label="Go to annotation"
+              data-sound="none"
               on:click|stopPropagation={() => dispatch('jump', annotation)}
               on:keydown|stopPropagation={() => {}}
             >
@@ -798,6 +815,7 @@
               class="annotation-item-edit"
               title="Edit annotation"
               aria-label="Edit annotation"
+              data-sound="none"
               on:click|stopPropagation={() => editAnnotation(annotation)}
               on:keydown|stopPropagation={() => {}}
             >

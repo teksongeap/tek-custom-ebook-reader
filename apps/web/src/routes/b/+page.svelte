@@ -165,6 +165,7 @@
   import { pagePath } from '$lib/data/env';
   import { DB_VERSION, PAGE_CHANGE, SKIPKEYLISTENER, SYNCED } from '$lib/data/events';
   import { soundDesign } from '$lib/data/sound-design';
+  import { createReaderPanelSound } from '$lib/functions/reader-panel-sound';
   import { fullscreenManager } from '$lib/data/fullscreen-manager';
   import { logger } from '$lib/data/logger';
   import { MergeMode } from '$lib/data/merge-mode';
@@ -247,6 +248,16 @@
   let annotationsBookId: number | undefined;
   let showAnnotationsPanel = false;
   let showSearchPanel = false;
+  const panelSound = createReaderPanelSound((cue) => soundDesign.play(cue));
+  $: panelSound.update(
+    showAnnotationsPanel
+      ? 'annotations'
+      : showSearchPanel && $bookData$ && $rawBookData$
+        ? 'search'
+        : $tocIsOpen$ && $sectionData$
+          ? 'contents'
+          : undefined
+  );
   let bookSearchQuery = '';
   let bookSearchQueryBookId = '';
   let activeAnnotationId = '';
@@ -1450,7 +1461,7 @@
     };
 
     await database.putAnnotation(annotation);
-    soundDesign.play('save');
+    soundDesign.play(annotation.comment.trim() ? 'save' : 'toggle');
 
     annotations = [...annotations, annotation];
     activeAnnotationId = annotation.id;
@@ -1518,6 +1529,7 @@
   let annotationNavigationToken = 0;
 
   async function jumpToAnnotation(annotation: BooksDbAnnotation) {
+    panelSound.navigate('annotations');
     const navigationToken = ++annotationNavigationToken;
     closeAnnotationsPanel();
     activeAnnotationId = '';
@@ -1704,6 +1716,7 @@
   }
 
   function jumpToSearchTarget(navigation: ReaderTargetNavigation) {
+    panelSound.navigate('search');
     closeSearchPanel();
     pauseTracker(true);
     readerTargetNavigation$.next(navigation);
@@ -2421,6 +2434,7 @@
     }}
   >
     <BookToc
+      on:navigate={({ detail }) => panelSound.navigate('contents', detail.closePanel)}
       sectionData={$sectionData$}
       tocEntries={$rawBookData$?.toc ?? []}
       verticalMode={$verticalMode$}

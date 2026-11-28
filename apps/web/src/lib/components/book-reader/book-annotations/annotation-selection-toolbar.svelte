@@ -207,6 +207,7 @@
             class="annotation-toolbar-swatch"
             title={`${colorOption.label} (${index + 1})`}
             aria-label={`${colorOption.label} highlight, shortcut ${index + 1}`}
+            data-sound="none"
             style:--book-annotation-base={colorOption.value}
             on:click={() => saveAnnotation(colorOption.id)}
             on:keydown|stopPropagation={() => {}}

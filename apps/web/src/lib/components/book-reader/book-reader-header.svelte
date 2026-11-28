@@ -161,6 +161,7 @@
           class="app-toolbar-button"
           title="Open table of contents"
           aria-label="Open table of contents"
+          data-sound="none"
           on:click={() => dispatch('tocClick')}
         >
           <Fa icon={faList} /><span class="app-toolbar-label">Contents</span>
@@ -172,6 +173,7 @@
           class="app-toolbar-button"
           title="Search book"
           aria-label="Search book"
+          data-sound="none"
           on:click={() => dispatch('searchClick')}
         >
           <Fa icon={faMagnifyingGlass} /><span class="app-toolbar-label">Search</span>
@@ -181,6 +183,7 @@
           class="app-toolbar-button"
           title={annotationCount ? `Annotations (${annotationCount})` : 'Annotations'}
           aria-label={annotationCount ? `Annotations (${annotationCount})` : 'Annotations'}
+          data-sound="none"
           on:click={() => dispatch('annotationsClick')}
         >
           <Fa icon={faHighlighter} /><span class="app-toolbar-label">Annotations</span>

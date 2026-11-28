@@ -23,6 +23,7 @@ let renderLoading: typeof render;
 let renderReaderLoading: typeof render;
 let renderFooter: typeof render;
 let renderReaderHeader: typeof render;
+const readerPanelRenderers: { label: string; render: typeof render }[] = [];
 let getChapterMarkers: typeof import('../../src/lib/components/book-reader/reader-footer.ts').getReaderChapterMarkers;
 
 const book = {
@@ -59,6 +60,14 @@ before(async () => {
     '/src/lib/components/book-reader/book-reader-header.svelte'
   );
   renderReaderHeader = (props) => readerHeader.default.render(props);
+  for (const [label, path] of [
+    ['Close contents', 'book-toc/book-toc.svelte'],
+    ['Close search', 'book-search/book-search-panel.svelte'],
+    ['Close annotations', 'book-annotations/book-annotations-panel.svelte']
+  ]) {
+    const panel = await server.ssrLoadModule(`/src/lib/components/book-reader/${path}`);
+    readerPanelRenderers.push({ label, render: (props) => panel.default.render(props) });
+  }
   ({ getReaderChapterMarkers: getChapterMarkers } = await server.ssrLoadModule(
     '/src/lib/components/book-reader/reader-footer.ts'
   ));
@@ -203,7 +212,13 @@ test('the header uses an icon-only collapse control with the same caret styling 
   assert.doesNotMatch(html, />Hide<\/span>/);
   const dom = new JSDOM(html);
   try {
-    for (const label of ['Back to library', 'Reader settings']) {
+    for (const label of [
+      'Back to library',
+      'Reader settings',
+      'Open table of contents',
+      'Search book',
+      'Annotations'
+    ]) {
       const control = dom.window.document.querySelector(`[aria-label="${label}"]`)!;
       assert.equal(getControlSound(control.querySelector('svg')!), undefined);
     }
@@ -213,6 +228,20 @@ test('the header uses an icon-only collapse control with the same caret styling 
     }
   } finally {
     dom.window.close();
+  }
+});
+
+test('all reader panel close buttons leave sound to the shared panel state', () => {
+  for (const { label, render: renderPanel } of readerPanelRenderers) {
+    const { html } = renderPanel({ verticalMode: false, wasTrackerPaused: true });
+    const dom = new JSDOM(html);
+    try {
+      const control = dom.window.document.querySelector(`[aria-label="${label}"]`)!;
+      assert.ok(control, label);
+      assert.equal(getControlSound(control.querySelector('svg')!), undefined, label);
+    } finally {
+      dom.window.close();
+    }
   }
 });
 

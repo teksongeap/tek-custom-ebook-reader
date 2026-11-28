@@ -228,6 +228,7 @@
       class="book-search-panel-close"
       title="Close search"
       aria-label="Close search"
+      data-sound="none"
       on:click={() => dispatch('close')}
     >
       <Fa icon={faXmark} />
@@ -281,7 +282,12 @@
       {#each visibleSearchResults as result (result.id)}
         {@const excerpt = getReaderSearchExcerpt(result)}
         {@const locationLabel = getSearchResultLocationLabel(result)}
-        <button type="button" class="book-search-result" on:click={() => jumpToResult(result)}>
+        <button
+          type="button"
+          class="book-search-result"
+          data-sound="none"
+          on:click={() => jumpToResult(result)}
+        >
           <span class="book-search-result-copy">
             <span>{excerpt.before}</span><mark>{excerpt.match}</mark><span>{excerpt.after}</span>
           </span>
