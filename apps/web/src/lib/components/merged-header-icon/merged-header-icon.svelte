@@ -36,7 +36,8 @@
     dispatch('action', target);
 
     if (
-      !(target === mergeEntries.FILE_IMPORT.label || target === mergeEntries.FOLDER_IMPORT.label)
+      !(target === mergeEntries.FILE_IMPORT.label || target === mergeEntries.FOLDER_IMPORT.label) &&
+      !actionItems.find((item) => item.label === target)?.routeId
     ) {
       menuElm.toggleOpen();
     }
@@ -64,6 +65,7 @@
         tabindex="0"
         role="button"
         title={actionItem.title}
+        data-sound={actionItem.routeId ? 'none' : undefined}
         class={baseIconClasses}
         on:click={() => handleActionMenuItem(actionItem.label)}
         on:keyup={dummyFn}
@@ -89,6 +91,7 @@
             role="button"
             class="app-menu-item"
             title={actionItem.title}
+            data-sound={actionItem.routeId ? 'none' : undefined}
             on:click={() => handleActionMenuItem(actionItem.label)}
             on:keyup={dummyFn}
           >

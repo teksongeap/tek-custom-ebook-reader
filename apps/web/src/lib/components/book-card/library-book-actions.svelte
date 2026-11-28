@@ -103,6 +103,7 @@
       class="action-button"
       title="Statistics for selected books"
       aria-label="Statistics for selected books"
+      data-sound="none"
       disabled={!selectedCount}
       on:click={() => dispatch('selectionToStatistics')}
       ><Fa icon={faChartLine} /><span class="action-label secondary-label">Statistics</span></button

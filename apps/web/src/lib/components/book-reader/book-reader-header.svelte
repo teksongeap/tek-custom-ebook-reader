@@ -135,7 +135,8 @@
   ] as MenuItem[];
 
   function runAction(action: Action) {
-    menu.toggleOpen();
+    // Navigation unmounts the menu and supplies its own sound.
+    if (action !== 'statisticsClick') menu.toggleOpen();
     dispatch(action);
   }
 </script>
@@ -148,6 +149,7 @@
         class="app-toolbar-button"
         title="Back to library"
         aria-label="Back to library"
+        data-sound="none"
         on:click={() => dispatch('bookManagerClick')}
       >
         <Fa icon={faArrowLeft} /><span class="app-toolbar-label">Library</span>
@@ -193,6 +195,7 @@
         class="app-toolbar-button"
         title="Reader settings"
         aria-label="Reader settings"
+        data-sound="none"
         on:click={() => dispatch('settingsClick')}
       >
         <Fa icon={faGear} /><span class="app-toolbar-label">Settings</span>
@@ -225,7 +228,12 @@
         </button>
         <div class="app-menu reader-toolbar-menu" slot="content">
           {#each menuItems as item (item.action)}
-            <button type="button" class="app-menu-item" on:click={() => runAction(item.action)}>
+            <button
+              type="button"
+              class="app-menu-item"
+              data-sound={item.action === 'statisticsClick' ? 'none' : undefined}
+              on:click={() => runAction(item.action)}
+            >
               <Fa icon={item.icon} /><span>{item.label}</span>
             </button>
           {/each}

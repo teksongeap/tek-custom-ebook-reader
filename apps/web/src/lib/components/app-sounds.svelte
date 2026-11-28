@@ -2,6 +2,7 @@
   import { afterNavigate } from '$app/navigation';
   import { dialogManager } from '$lib/data/dialog-manager';
   import { soundDesign } from '$lib/data/sound-design';
+  import { getControlSound } from '$lib/functions/control-sound';
   import { onMount } from 'svelte';
 
   afterNavigate(({ from, to }) => {
@@ -16,14 +17,8 @@
     const click = (event: MouseEvent) => {
       if (!event.isTrusted || event.defaultPrevented || event.button !== 0) return;
       const target = event.target instanceof Element ? event.target : undefined;
-      const control = target?.closest('button, a[href], [role="button"], summary');
-      if (
-        !control ||
-        control.closest('[data-sound="none"], [inert]') ||
-        control.matches(':disabled, [aria-disabled="true"]')
-      )
-        return;
-      soundDesign.play(control.hasAttribute('aria-pressed') ? 'toggle' : 'click');
+      const cue = target && getControlSound(target);
+      if (cue) soundDesign.play(cue);
     };
     const change = (event: Event) => {
       if (!event.isTrusted || !(event.target instanceof Element)) return;

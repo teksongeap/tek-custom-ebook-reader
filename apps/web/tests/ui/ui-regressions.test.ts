@@ -8,6 +8,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { JSDOM } from 'jsdom';
+import { getControlSound } from '../../src/lib/functions/control-sound.ts';
 import postcss from 'postcss';
 import * as sass from 'sass';
 import tailwind from 'tailwindcss';
@@ -199,6 +201,19 @@ test('the header uses an icon-only collapse control with the same caret styling 
     /aria-label="Hide reader controls" aria-expanded="true" aria-controls="reader-controls"/
   );
   assert.doesNotMatch(html, />Hide<\/span>/);
+  const dom = new JSDOM(html);
+  try {
+    for (const label of ['Back to library', 'Reader settings']) {
+      const control = dom.window.document.querySelector(`[aria-label="${label}"]`)!;
+      assert.equal(getControlSound(control.querySelector('svg')!), undefined);
+    }
+    for (const label of ['Toggle fullscreen', 'Hide reader controls']) {
+      const control = dom.window.document.querySelector(`[aria-label="${label}"]`)!;
+      assert.equal(getControlSound(control.querySelector('svg')!), 'click');
+    }
+  } finally {
+    dom.window.close();
+  }
 });
 
 test('chapter landmarks retain real positions and thin out as the track narrows', () => {
